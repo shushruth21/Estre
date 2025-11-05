@@ -8,12 +8,36 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Link } from "react-router-dom";
 import { Loader2, ArrowLeft } from "lucide-react";
 
+// Column mapping for different category tables
+const CATEGORY_COLUMNS = {
+  bed: {
+    netPrice: 'net_price_single_no_storage_rs',
+    strikePrice: 'strike_price_rs'
+  },
+  kids_bed: {
+    netPrice: 'net_price_single_no_storage_rs',
+    strikePrice: 'strike_price_rs'
+  },
+  database_pouffes: {
+    netPrice: 'net_price',
+    strikePrice: 'strike_price_rs'
+  },
+  default: {
+    netPrice: 'net_price_rs',
+    strikePrice: 'strike_price_1seater_rs'
+  }
+};
+
+const getCategoryColumns = (category: string) => {
+  return CATEGORY_COLUMNS[category as keyof typeof CATEGORY_COLUMNS] || CATEGORY_COLUMNS.default;
+};
+
 type Product = {
   id: string;
   title: string;
   images?: string | null;
-  net_price_rs?: number | null;
-  strike_price_1seater_rs?: number | null;
+  netPrice?: number | null;
+  strikePrice?: number | null;
   discount_percent?: number | null;
   discount_rs?: number | null;
 };
@@ -37,15 +61,29 @@ const Products = () => {
   const { data: products, isLoading, error } = useQuery({
     queryKey: ["products", category],
     queryFn: async () => {
+      const columns = getCategoryColumns(category);
+      
       // Using dynamic table names with Supabase requires runtime querying
       const { data, error } = await supabase
         .from(`${category}_database` as any)
-        .select("id, title, images, net_price_rs, strike_price_1seater_rs, discount_percent, discount_rs")
+        .select(`id, title, images, ${columns.netPrice}, ${columns.strikePrice}, discount_percent, discount_rs`)
         .eq("is_active", true)
         .order("created_at", { ascending: false }) as any;
 
       if (error) throw error;
-      return (data || []) as Product[];
+      
+      // Normalize the data to use consistent property names
+      const normalizedData = (data || []).map((item: any) => ({
+        id: item.id,
+        title: item.title,
+        images: item.images,
+        netPrice: item[columns.netPrice],
+        strikePrice: item[columns.strikePrice],
+        discount_percent: item.discount_percent,
+        discount_rs: item.discount_rs
+      }));
+      
+      return normalizedData as Product[];
     },
     retry: 1,
   });
@@ -110,15 +148,15 @@ const Products = () => {
                 )}
                 <CardContent className="p-6">
                   <h3 className="text-xl font-bold mb-2">{product.title}</h3>
-                  {product.net_price_rs && (
+                  {product.netPrice && (
                     <p className="text-2xl font-bold text-primary mb-2">
-                      ₹{product.net_price_rs.toLocaleString()}
+                      ₹{product.netPrice.toLocaleString()}
                     </p>
                   )}
-                  {product.strike_price_1seater_rs && product.discount_percent && (
+                  {product.strikePrice && product.discount_percent && (
                     <div className="flex items-center gap-2 text-sm">
                       <span className="line-through text-muted-foreground">
-                        ₹{product.strike_price_1seater_rs.toLocaleString()}
+                        ₹{product.strikePrice.toLocaleString()}
                       </span>
                       <span className="text-success font-semibold">
                         {product.discount_percent}% OFF
