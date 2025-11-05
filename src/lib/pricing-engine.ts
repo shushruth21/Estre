@@ -267,14 +267,14 @@ async function calculateFabricCharges(
   if (fabricCodes.length === 0) return 0;
 
   const { data: fabrics } = await supabase
-    .from("fabrics")
-    .select("code, price_per_mtr_rs")
-    .in("code", fabricCodes);
+    .from("fabric_coding")
+    .select("estre_code, price")
+    .in("estre_code", fabricCodes);
 
   if (!fabrics) return 0;
 
   const fabricPriceMap = fabrics.reduce((acc, f) => {
-    acc[f.code] = f.price_per_mtr_rs;
+    acc[f.estre_code] = f.price || 0;
     return acc;
   }, {} as Record<string, number>);
 

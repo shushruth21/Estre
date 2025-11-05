@@ -35,17 +35,17 @@ const FabricSelector = ({
   const [selectedPart, setSelectedPart] = useState<string>("structure");
 
   const { data: fabrics, isLoading } = useQuery({
-    queryKey: ["fabrics", searchTerm],
+    queryKey: ["fabric_coding", searchTerm],
     queryFn: async () => {
       let query = supabase
-        .from("fabrics")
+        .from("fabric_coding")
         .select("*")
         .eq("is_active", true)
-        .order("code");
+        .order("estre_code");
 
       if (searchTerm) {
         query = query.or(
-          `code.ilike.%${searchTerm}%,title.ilike.%${searchTerm}%`
+          `estre_code.ilike.%${searchTerm}%,title.ilike.%${searchTerm}%`
         );
       }
 
@@ -208,14 +208,14 @@ const FabricPartSelector = ({
                   <Card
                     key={fabric.id}
                     className="cursor-pointer hover:border-primary transition-colors"
-                    onClick={() => onSelect(fabric.code)}
+                    onClick={() => onSelect(fabric.estre_code)}
                   >
                     <CardContent className="p-4">
                       <div className="flex items-start gap-3">
-                        {fabric.images && fabric.images.length > 0 && (
+                        {fabric.colour_link && (
                           <img
-                            src={fabric.images[0]}
-                            alt={fabric.title}
+                            src={fabric.colour_link}
+                            alt={fabric.title || ''}
                             className="w-16 h-16 object-cover rounded"
                           />
                         )}
@@ -223,22 +223,22 @@ const FabricPartSelector = ({
                           <div className="flex items-start justify-between mb-1">
                             <div>
                               <Badge variant="outline" className="mb-1">
-                                {fabric.code}
+                                {fabric.estre_code}
                               </Badge>
-                              <h4 className="font-semibold">{fabric.title}</h4>
+                              <h4 className="font-semibold">{fabric.title || fabric.description}</h4>
                             </div>
                             <p className="text-sm font-bold text-primary">
-                              ₹{fabric.price_per_mtr_rs}/mtr
+                              ₹{fabric.price || 0}/mtr
                             </p>
                           </div>
-                          {fabric.material && (
+                          {fabric.brand && (
                             <p className="text-xs text-muted-foreground">
-                              {fabric.material}
+                              {fabric.brand}
                             </p>
                           )}
-                          {fabric.color_family && (
+                          {fabric.colour && (
                             <Badge variant="secondary" className="mt-1 text-xs">
-                              {fabric.color_family}
+                              {fabric.colour}
                             </Badge>
                           )}
                         </div>
