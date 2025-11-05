@@ -1,0 +1,258 @@
+import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Search } from "lucide-react";
+
+interface FabricSelectorProps {
+  configuration: any;
+  onConfigurationChange: (updates: any) => void;
+}
+
+const FabricSelector = ({
+  configuration,
+  onConfigurationChange,
+}: FabricSelectorProps) => {
+  const [searchTerm, setSearchTerm] = useState("");
+  const [selectedPart, setSelectedPart] = useState<string>("structure");
+
+  const { data: fabrics, isLoading } = useQuery({
+    queryKey: ["fabrics", searchTerm],
+    queryFn: async () => {
+      let query = supabase
+        .from("fabrics")
+        .select("*")
+        .eq("is_active", true)
+        .order("code");
+
+      if (searchTerm) {
+        query = query.or(
+          `code.ilike.%${searchTerm}%,title.ilike.%${searchTerm}%`
+        );
+      }
+
+      const { data, error } = await query.limit(50);
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const selectFabric = (fabricCode: string) => {
+    const fabricUpdates: any = { ...configuration.fabric };
+
+    if (selectedPart === "structure") {
+      fabricUpdates.structureCode = fabricCode;
+    } else if (selectedPart === "backrest") {
+      fabricUpdates.backrestCode = fabricCode;
+    } else if (selectedPart === "seat") {
+      fabricUpdates.seatCode = fabricCode;
+    } else if (selectedPart === "headrest") {
+      fabricUpdates.headrestCode = fabricCode;
+    }
+
+    onConfigurationChange({ fabric: fabricUpdates });
+  };
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <Label>Cladding Plan</Label>
+        <Select
+          value={configuration.fabric?.claddingPlan || "Single Colour"}
+          onValueChange={(value) =>
+            onConfigurationChange({
+              fabric: { ...configuration.fabric, claddingPlan: value },
+            })
+          }
+        >
+          <SelectTrigger>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="Single Colour">Single Colour</SelectItem>
+            <SelectItem value="Multi Colour">Multi Colour</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      {/* Fabric Selection */}
+      <div className="space-y-4">
+        <FabricPartSelector
+          label="Structure Fabric"
+          selectedCode={configuration.fabric?.structureCode}
+          fabrics={fabrics}
+          isLoading={isLoading}
+          searchTerm={searchTerm}
+          onSearchChange={setSearchTerm}
+          onSelect={(code) => {
+            setSelectedPart("structure");
+            selectFabric(code);
+          }}
+        />
+
+        {configuration.fabric?.claddingPlan === "Multi Colour" && (
+          <>
+            <FabricPartSelector
+              label="Backrest Fabric"
+              selectedCode={configuration.fabric?.backrestCode}
+              fabrics={fabrics}
+              isLoading={isLoading}
+              searchTerm={searchTerm}
+              onSearchChange={setSearchTerm}
+              onSelect={(code) => {
+                setSelectedPart("backrest");
+                selectFabric(code);
+              }}
+            />
+
+            <FabricPartSelector
+              label="Seat Fabric"
+              selectedCode={configuration.fabric?.seatCode}
+              fabrics={fabrics}
+              isLoading={isLoading}
+              searchTerm={searchTerm}
+              onSearchChange={setSearchTerm}
+              onSelect={(code) => {
+                setSelectedPart("seat");
+                selectFabric(code);
+              }}
+            />
+          </>
+        )}
+      </div>
+    </div>
+  );
+};
+
+interface FabricPartSelectorProps {
+  label: string;
+  selectedCode?: string;
+  fabrics?: any[];
+  isLoading: boolean;
+  searchTerm: string;
+  onSearchChange: (term: string) => void;
+  onSelect: (code: string) => void;
+}
+
+const FabricPartSelector = ({
+  label,
+  selectedCode,
+  fabrics,
+  isLoading,
+  searchTerm,
+  onSearchChange,
+  onSelect,
+}: FabricPartSelectorProps) => {
+  const selectedFabric = fabrics?.find((f) => f.code === selectedCode);
+
+  return (
+    <div>
+      <Label className="mb-2">{label}</Label>
+      <Dialog>
+        <DialogTrigger asChild>
+          <Button variant="outline" className="w-full justify-start">
+            {selectedFabric ? (
+              <div className="flex items-center gap-2">
+                <Badge>{selectedFabric.code}</Badge>
+                <span>{selectedFabric.title}</span>
+                <span className="ml-auto text-primary">
+                  ₹{selectedFabric.price_per_mtr_rs}/mtr
+                </span>
+              </div>
+            ) : (
+              "Select fabric..."
+            )}
+          </Button>
+        </DialogTrigger>
+        <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{label}</DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="relative">
+              <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search by code or title..."
+                value={searchTerm}
+                onChange={(e) => onSearchChange(e.target.value)}
+                className="pl-9"
+              />
+            </div>
+
+            {isLoading ? (
+              <div className="text-center py-8 text-muted-foreground">
+                Loading fabrics...
+              </div>
+            ) : (
+              <div className="grid md:grid-cols-2 gap-4">
+                {fabrics?.map((fabric) => (
+                  <Card
+                    key={fabric.id}
+                    className="cursor-pointer hover:border-primary transition-colors"
+                    onClick={() => onSelect(fabric.code)}
+                  >
+                    <CardContent className="p-4">
+                      <div className="flex items-start gap-3">
+                        {fabric.images && fabric.images.length > 0 && (
+                          <img
+                            src={fabric.images[0]}
+                            alt={fabric.title}
+                            className="w-16 h-16 object-cover rounded"
+                          />
+                        )}
+                        <div className="flex-1">
+                          <div className="flex items-start justify-between mb-1">
+                            <div>
+                              <Badge variant="outline" className="mb-1">
+                                {fabric.code}
+                              </Badge>
+                              <h4 className="font-semibold">{fabric.title}</h4>
+                            </div>
+                            <p className="text-sm font-bold text-primary">
+                              ₹{fabric.price_per_mtr_rs}/mtr
+                            </p>
+                          </div>
+                          {fabric.material && (
+                            <p className="text-xs text-muted-foreground">
+                              {fabric.material}
+                            </p>
+                          )}
+                          {fabric.color_family && (
+                            <Badge variant="secondary" className="mt-1 text-xs">
+                              {fabric.color_family}
+                            </Badge>
+                          )}
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+};
+
+export default FabricSelector;
