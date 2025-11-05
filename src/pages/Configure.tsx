@@ -8,6 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ArrowLeft, ArrowRight, ShoppingCart, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { calculateDynamicPrice } from "@/lib/dynamic-pricing";
+import ProductImageGallery from "@/components/ui/ProductImageGallery";
 import SofaConfigurator from "@/components/configurators/SofaConfigurator";
 import BedConfigurator from "@/components/configurators/BedConfigurator";
 import ReclinerConfigurator from "@/components/configurators/ReclinerConfigurator";
@@ -167,12 +168,33 @@ const Configure = () => {
       </header>
 
       <div className="container mx-auto px-4 py-8">
-        <div className="grid lg:grid-cols-3 gap-8">
+        <div className="grid lg:grid-cols-5 gap-8">
+          {/* Product Gallery */}
+          <div className="lg:col-span-2">
+            <div className="sticky top-24">
+              <ProductImageGallery 
+                images={product.images}
+                productTitle={product.title}
+              />
+              
+              <Card className="mt-4 luxury-card border-muted/50">
+                <CardContent className="p-6">
+                  <h2 className="font-serif text-3xl font-bold mb-2">
+                    {product.title}
+                  </h2>
+                  <p className="text-muted-foreground">
+                    Customize every detail to match your vision
+                  </p>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+
           {/* Configuration Panel */}
           <div className="lg:col-span-2">
-            <Card>
+            <Card className="luxury-card border-muted/50">
               <CardHeader>
-                <CardTitle>Product Configuration</CardTitle>
+                <CardTitle className="font-serif text-2xl">Product Configuration</CardTitle>
               </CardHeader>
               <CardContent>
                 {category === "sofa" && (
@@ -239,12 +261,14 @@ const Configure = () => {
           {/* Pricing Summary Sidebar */}
           <div className="lg:col-span-1">
             <div className="sticky top-24">
-              <PricingSummary
-                pricing={pricing}
-                isCalculating={isCalculating}
-                onAddToCart={handleAddToCart}
-                configuration={configuration}
-              />
+              <div className="luxury-card border-muted/50">
+                <PricingSummary
+                  pricing={pricing}
+                  isCalculating={isCalculating}
+                  onAddToCart={handleAddToCart}
+                  configuration={configuration}
+                />
+              </div>
             </div>
           </div>
         </div>

@@ -153,39 +153,48 @@ const Products = () => {
             <Loader2 className="h-8 w-8 animate-spin text-primary" />
           </div>
         ) : !error && (
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
             {products?.map((product) => (
-              <Card key={product.id} className="overflow-hidden hover:shadow-lg transition-smooth">
+              <Card key={product.id} className="group overflow-hidden luxury-card border-muted/50">
                 {product.images && (
-                  <div className="aspect-video bg-muted flex items-center justify-center">
+                  <div className="aspect-[4/3] bg-gradient-to-br from-muted to-muted/50 overflow-hidden">
                     <img
                       src={product.images}
                       alt={product.title}
-                      className="w-full h-full object-cover"
+                      className="w-full h-full object-cover image-zoom"
+                      loading="lazy"
                     />
                   </div>
                 )}
-                <CardContent className="p-6">
-                  <h3 className="text-xl font-bold mb-2">{product.title}</h3>
-                  {product.netPrice && (
-                    <p className="text-2xl font-bold text-primary mb-2">
-                      ₹{product.netPrice.toLocaleString()}
-                    </p>
-                  )}
-                  {product.strikePrice && product.discount_percent && (
-                    <div className="flex items-center gap-2 text-sm">
-                      <span className="line-through text-muted-foreground">
+                <CardContent className="p-6 space-y-3">
+                  <h3 className="text-2xl font-serif font-semibold tracking-tight group-hover:text-primary transition-colors">
+                    {product.title}
+                  </h3>
+                  
+                  <div className="flex items-baseline gap-3">
+                    {product.netPrice && (
+                      <p className="text-3xl font-bold text-foreground">
+                        ₹{product.netPrice.toLocaleString()}
+                      </p>
+                    )}
+                    {product.strikePrice && (
+                      <span className="text-lg line-through text-muted-foreground">
                         ₹{product.strikePrice.toLocaleString()}
                       </span>
-                      <span className="text-success font-semibold">
-                        {product.discount_percent}% OFF
-                      </span>
+                    )}
+                  </div>
+
+                  {product.discount_percent && (
+                    <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-primary/10 text-primary rounded-full text-sm font-semibold">
+                      Save {product.discount_percent}%
                     </div>
                   )}
                 </CardContent>
                 <CardFooter className="p-6 pt-0">
                   <Link to={`/configure/${category}/${product.id}`} className="w-full">
-                    <Button className="w-full">Configure</Button>
+                    <Button className="w-full luxury-button font-semibold">
+                      Configure Now
+                    </Button>
                   </Link>
                 </CardFooter>
               </Card>
