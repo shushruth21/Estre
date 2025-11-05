@@ -1,26 +1,14 @@
-import { useEffect, useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { useToast } from "@/hooks/use-toast";
-import { Loader2, Trash2, ShoppingBag, ArrowLeft } from "lucide-react";
+import { Card, CardContent } from "@/components/ui/card";
+import { Loader2, ShoppingBag, ArrowLeft } from "lucide-react";
+import { CartItem } from "@/components/cart/CartItem";
+import { CartSummary } from "@/components/cart/CartSummary";
 
 const Cart = () => {
   const navigate = useNavigate();
-  const { toast } = useToast();
-  const queryClient = useQueryClient();
-  const [deliveryAddress, setDeliveryAddress] = useState({
-    street: "",
-    city: "",
-    state: "",
-    pincode: "",
-    landmark: "",
-  });
 
   const { data: user } = useQuery({
     queryKey: ["user"],
@@ -47,99 +35,7 @@ const Cart = () => {
     enabled: !!user,
   });
 
-  const deleteItem = useMutation({
-    mutationFn: async (id: string) => {
-      const { error } = await supabase
-        .from("customer_orders")
-        .delete()
-        .eq("id", id);
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["cart"] });
-      toast({ title: "Item removed from cart" });
-    },
-  });
-
-  const placeOrder = useMutation({
-    mutationFn: async () => {
-      if (!user || !cartItems || cartItems.length === 0) {
-        throw new Error("Cart is empty");
-      }
-
-      const orderNumber = `ORD-${Date.now()}`;
-      const subtotal = cartItems.reduce((sum, item) => sum + (item.calculated_price || 0), 0);
-
-      // Create main order
-      const { data: order, error: orderError } = await supabase
-        .from("orders")
-        .insert({
-          order_number: orderNumber,
-          customer_id: user.id,
-          customer_name: user.user_metadata?.full_name || user.email,
-          customer_email: user.email || "",
-          customer_phone: user.user_metadata?.phone || "",
-          delivery_address: deliveryAddress,
-          subtotal_rs: subtotal,
-          net_total_rs: subtotal,
-          status: "pending",
-          payment_status: "pending",
-          advance_percent: 50,
-          advance_amount_rs: subtotal * 0.5,
-        })
-        .select()
-        .single();
-
-      if (orderError) throw orderError;
-
-      // Create order items
-      const orderItems = cartItems.map((item) => ({
-        order_id: order.id,
-        product_id: item.product_id,
-        product_category: item.product_type,
-        product_title: (item.configuration as any)?.productTitle || "Custom Product",
-        configuration: item.configuration,
-        unit_price_rs: item.calculated_price,
-        total_price_rs: item.calculated_price,
-        quantity: 1,
-      }));
-
-      const { error: itemsError } = await supabase
-        .from("order_items")
-        .insert(orderItems);
-
-      if (itemsError) throw itemsError;
-
-      // Delete draft cart items
-      const { error: deleteError } = await supabase
-        .from("customer_orders")
-        .delete()
-        .eq("status", "draft")
-        .eq("customer_email", user.email);
-
-      if (deleteError) throw deleteError;
-
-      return order;
-    },
-    onSuccess: (order) => {
-      toast({
-        title: "Order Placed!",
-        description: `Order ${order.order_number} has been created successfully`,
-      });
-      queryClient.invalidateQueries({ queryKey: ["cart"] });
-      navigate(`/orders`);
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Order Failed",
-        description: error.message,
-        variant: "destructive",
-      });
-    },
-  });
-
   const totalAmount = cartItems?.reduce((sum, item) => sum + (item.calculated_price || 0), 0) || 0;
-  const advanceAmount = totalAmount * 0.5;
 
   if (!user) {
     return (
@@ -193,137 +89,17 @@ const Cart = () => {
           </Card>
         ) : (
           <div className="grid lg:grid-cols-3 gap-8">
-            {/* Cart Items */}
             <div className="lg:col-span-2 space-y-4">
               {cartItems.map((item) => (
-                <Card key={item.id}>
-                  <CardContent className="p-6">
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <h3 className="font-bold mb-1">
-                          {item.product_type?.toUpperCase()} Configuration
-                        </h3>
-                        <p className="text-sm text-muted-foreground mb-2">
-                          Product ID: {item.product_id}
-                        </p>
-                        <p className="text-2xl font-bold text-primary">
-                          ₹{Math.round(item.calculated_price || 0).toLocaleString()}
-                        </p>
-                      </div>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => deleteItem.mutate(item.id)}
-                        disabled={deleteItem.isPending}
-                      >
-                        {deleteItem.isPending ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                          <Trash2 className="h-4 w-4" />
-                        )}
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
+                <CartItem key={item.id} item={item} />
               ))}
             </div>
 
-            {/* Order Summary & Delivery Address */}
-            <div className="space-y-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Order Summary</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  <div className="flex justify-between">
-                    <span>Subtotal</span>
-                    <span>₹{Math.round(totalAmount).toLocaleString()}</span>
-                  </div>
-                  <div className="flex justify-between font-semibold text-lg">
-                    <span>Total</span>
-                    <span className="text-primary">
-                      ₹{Math.round(totalAmount).toLocaleString()}
-                    </span>
-                  </div>
-                  <div className="flex justify-between text-sm text-muted-foreground">
-                    <span>Advance (50%)</span>
-                    <span>₹{Math.round(advanceAmount).toLocaleString()}</span>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle>Delivery Address</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div>
-                    <Label>Street Address</Label>
-                    <Input
-                      value={deliveryAddress.street}
-                      onChange={(e) =>
-                        setDeliveryAddress({ ...deliveryAddress, street: e.target.value })
-                      }
-                      placeholder="House no., Street"
-                      required
-                    />
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <Label>City</Label>
-                      <Input
-                        value={deliveryAddress.city}
-                        onChange={(e) =>
-                          setDeliveryAddress({ ...deliveryAddress, city: e.target.value })
-                        }
-                        required
-                      />
-                    </div>
-                    <div>
-                      <Label>State</Label>
-                      <Input
-                        value={deliveryAddress.state}
-                        onChange={(e) =>
-                          setDeliveryAddress({ ...deliveryAddress, state: e.target.value })
-                        }
-                        required
-                      />
-                    </div>
-                  </div>
-                  <div>
-                    <Label>Pincode</Label>
-                    <Input
-                      value={deliveryAddress.pincode}
-                      onChange={(e) =>
-                        setDeliveryAddress({ ...deliveryAddress, pincode: e.target.value })
-                      }
-                      required
-                    />
-                  </div>
-                  <div>
-                    <Label>Landmark (Optional)</Label>
-                    <Input
-                      value={deliveryAddress.landmark}
-                      onChange={(e) =>
-                        setDeliveryAddress({ ...deliveryAddress, landmark: e.target.value })
-                      }
-                    />
-                  </div>
-
-                  <Button
-                    onClick={() => placeOrder.mutate()}
-                    disabled={placeOrder.isPending || !deliveryAddress.street || !deliveryAddress.city}
-                    className="w-full"
-                    size="lg"
-                  >
-                    {placeOrder.isPending && (
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    )}
-                    Place Order
-                  </Button>
-                </CardContent>
-              </Card>
-            </div>
+            <CartSummary
+              subtotal={totalAmount}
+              onCheckout={() => navigate("/checkout")}
+              checkoutDisabled={false}
+            />
           </div>
         )}
       </div>
