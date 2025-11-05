@@ -533,6 +533,69 @@ export type Database = {
         }
         Relationships: []
       }
+      database_pouffes: {
+        Row: {
+          adjusted_bom_rs: number | null
+          bom_rs: number | null
+          created_at: string | null
+          discount_percent: number | null
+          discount_rs: number | null
+          fabric_required_mtr: number | null
+          id: string
+          image: string | null
+          lwh_dia_h_inch: string | null
+          lwh_inch: string | null
+          markup_percent: number | null
+          net_markup: number | null
+          net_price: number | null
+          strike_price_rs: number | null
+          title: string | null
+          updated_at: string | null
+          wastage_delivery_gst_percent: number | null
+          wastage_delivery_gst_rs: number | null
+        }
+        Insert: {
+          adjusted_bom_rs?: number | null
+          bom_rs?: number | null
+          created_at?: string | null
+          discount_percent?: number | null
+          discount_rs?: number | null
+          fabric_required_mtr?: number | null
+          id?: string
+          image?: string | null
+          lwh_dia_h_inch?: string | null
+          lwh_inch?: string | null
+          markup_percent?: number | null
+          net_markup?: number | null
+          net_price?: number | null
+          strike_price_rs?: number | null
+          title?: string | null
+          updated_at?: string | null
+          wastage_delivery_gst_percent?: number | null
+          wastage_delivery_gst_rs?: number | null
+        }
+        Update: {
+          adjusted_bom_rs?: number | null
+          bom_rs?: number | null
+          created_at?: string | null
+          discount_percent?: number | null
+          discount_rs?: number | null
+          fabric_required_mtr?: number | null
+          id?: string
+          image?: string | null
+          lwh_dia_h_inch?: string | null
+          lwh_inch?: string | null
+          markup_percent?: number | null
+          net_markup?: number | null
+          net_price?: number | null
+          strike_price_rs?: number | null
+          title?: string | null
+          updated_at?: string | null
+          wastage_delivery_gst_percent?: number | null
+          wastage_delivery_gst_rs?: number | null
+        }
+        Relationships: []
+      }
       dining_chairs_admin_settings: {
         Row: {
           category: string | null
@@ -716,51 +779,6 @@ export type Database = {
           upgrade?: number | null
           vendor?: string | null
           vendor_code?: string | null
-        }
-        Relationships: []
-      }
-      fabrics: {
-        Row: {
-          category: string | null
-          code: string
-          color_family: string | null
-          created_at: string | null
-          id: string
-          images: string[] | null
-          is_active: boolean | null
-          material: string | null
-          metadata: Json | null
-          price_per_mtr_rs: number
-          title: string
-          updated_at: string | null
-        }
-        Insert: {
-          category?: string | null
-          code: string
-          color_family?: string | null
-          created_at?: string | null
-          id?: string
-          images?: string[] | null
-          is_active?: boolean | null
-          material?: string | null
-          metadata?: Json | null
-          price_per_mtr_rs: number
-          title: string
-          updated_at?: string | null
-        }
-        Update: {
-          category?: string | null
-          code?: string
-          color_family?: string | null
-          created_at?: string | null
-          id?: string
-          images?: string[] | null
-          is_active?: boolean | null
-          material?: string | null
-          metadata?: Json | null
-          price_per_mtr_rs?: number
-          title?: string
-          updated_at?: string | null
         }
         Relationships: []
       }
@@ -1302,6 +1320,39 @@ export type Database = {
         }
         Relationships: []
       }
+      profiles: {
+        Row: {
+          avatar_url: string | null
+          created_at: string | null
+          department: string | null
+          full_name: string | null
+          id: string
+          phone: string | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          avatar_url?: string | null
+          created_at?: string | null
+          department?: string | null
+          full_name?: string | null
+          id?: string
+          phone?: string | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          avatar_url?: string | null
+          created_at?: string | null
+          department?: string | null
+          full_name?: string | null
+          id?: string
+          phone?: string | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       recliner_admin_settings: {
         Row: {
           category: string | null
@@ -1706,15 +1757,53 @@ export type Database = {
           },
         ]
       }
+      user_roles: {
+        Row: {
+          created_at: string | null
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
+      is_admin_or_manager: { Args: { _user_id: string }; Returns: boolean }
     }
     Enums: {
       accessory_type: "leg" | "armrest" | "console" | "pillow" | "other"
+      app_role:
+        | "admin"
+        | "store_manager"
+        | "production_manager"
+        | "sales_executive"
+        | "factory_staff"
+        | "customer"
       calculation_type: "percentage" | "flat_rate" | "multiplier"
       formula_unit: "percent" | "rupees" | "multiplier"
       job_card_priority: "low" | "normal" | "high" | "urgent"
@@ -1887,6 +1976,14 @@ export const Constants = {
   public: {
     Enums: {
       accessory_type: ["leg", "armrest", "console", "pillow", "other"],
+      app_role: [
+        "admin",
+        "store_manager",
+        "production_manager",
+        "sales_executive",
+        "factory_staff",
+        "customer",
+      ],
       calculation_type: ["percentage", "flat_rate", "multiplier"],
       formula_unit: ["percent", "rupees", "multiplier"],
       job_card_priority: ["low", "normal", "high", "urgent"],
