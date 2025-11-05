@@ -764,6 +764,176 @@ export type Database = {
         }
         Relationships: []
       }
+      job_card_tasks: {
+        Row: {
+          assigned_to: string | null
+          completed_at: string | null
+          completed_by: string | null
+          created_at: string | null
+          id: string
+          job_card_id: string | null
+          notes: string | null
+          sort_order: number | null
+          started_at: string | null
+          status: Database["public"]["Enums"]["task_status"] | null
+          task_name: string
+          task_type: Database["public"]["Enums"]["task_type"] | null
+        }
+        Insert: {
+          assigned_to?: string | null
+          completed_at?: string | null
+          completed_by?: string | null
+          created_at?: string | null
+          id?: string
+          job_card_id?: string | null
+          notes?: string | null
+          sort_order?: number | null
+          started_at?: string | null
+          status?: Database["public"]["Enums"]["task_status"] | null
+          task_name: string
+          task_type?: Database["public"]["Enums"]["task_type"] | null
+        }
+        Update: {
+          assigned_to?: string | null
+          completed_at?: string | null
+          completed_by?: string | null
+          created_at?: string | null
+          id?: string
+          job_card_id?: string | null
+          notes?: string | null
+          sort_order?: number | null
+          started_at?: string | null
+          status?: Database["public"]["Enums"]["task_status"] | null
+          task_name?: string
+          task_type?: Database["public"]["Enums"]["task_type"] | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "job_card_tasks_job_card_id_fkey"
+            columns: ["job_card_id"]
+            isOneToOne: false
+            referencedRelation: "job_cards"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      job_cards: {
+        Row: {
+          accessories: Json | null
+          actual_completion_date: string | null
+          actual_start_date: string | null
+          admin_notes: string | null
+          assigned_at: string | null
+          assigned_by: string | null
+          assigned_to: string | null
+          configuration: Json
+          created_at: string | null
+          customer_name: string
+          customer_phone: string
+          delivery_address: Json
+          dimensions: Json
+          expected_completion_date: string | null
+          fabric_codes: Json
+          fabric_meters: Json
+          id: string
+          job_card_number: string
+          order_id: string | null
+          order_item_id: string | null
+          order_number: string
+          priority: Database["public"]["Enums"]["job_card_priority"] | null
+          product_category: string
+          product_title: string
+          quality_approved: boolean | null
+          quality_approved_at: string | null
+          quality_approved_by: string | null
+          quality_issues: string | null
+          staff_notes: string | null
+          status: Database["public"]["Enums"]["job_card_status"] | null
+          updated_at: string | null
+        }
+        Insert: {
+          accessories?: Json | null
+          actual_completion_date?: string | null
+          actual_start_date?: string | null
+          admin_notes?: string | null
+          assigned_at?: string | null
+          assigned_by?: string | null
+          assigned_to?: string | null
+          configuration: Json
+          created_at?: string | null
+          customer_name: string
+          customer_phone: string
+          delivery_address: Json
+          dimensions: Json
+          expected_completion_date?: string | null
+          fabric_codes: Json
+          fabric_meters: Json
+          id?: string
+          job_card_number: string
+          order_id?: string | null
+          order_item_id?: string | null
+          order_number: string
+          priority?: Database["public"]["Enums"]["job_card_priority"] | null
+          product_category: string
+          product_title: string
+          quality_approved?: boolean | null
+          quality_approved_at?: string | null
+          quality_approved_by?: string | null
+          quality_issues?: string | null
+          staff_notes?: string | null
+          status?: Database["public"]["Enums"]["job_card_status"] | null
+          updated_at?: string | null
+        }
+        Update: {
+          accessories?: Json | null
+          actual_completion_date?: string | null
+          actual_start_date?: string | null
+          admin_notes?: string | null
+          assigned_at?: string | null
+          assigned_by?: string | null
+          assigned_to?: string | null
+          configuration?: Json
+          created_at?: string | null
+          customer_name?: string
+          customer_phone?: string
+          delivery_address?: Json
+          dimensions?: Json
+          expected_completion_date?: string | null
+          fabric_codes?: Json
+          fabric_meters?: Json
+          id?: string
+          job_card_number?: string
+          order_id?: string | null
+          order_item_id?: string | null
+          order_number?: string
+          priority?: Database["public"]["Enums"]["job_card_priority"] | null
+          product_category?: string
+          product_title?: string
+          quality_approved?: boolean | null
+          quality_approved_at?: string | null
+          quality_approved_by?: string | null
+          quality_issues?: string | null
+          staff_notes?: string | null
+          status?: Database["public"]["Enums"]["job_card_status"] | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "job_cards_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "job_cards_order_item_id_fkey"
+            columns: ["order_item_id"]
+            isOneToOne: false
+            referencedRelation: "order_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       kids_bed_admin_settings: {
         Row: {
           category: string | null
@@ -898,6 +1068,128 @@ export type Database = {
           markup_percentage?: number | null
           price_per_unit?: number | null
           size?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      order_items: {
+        Row: {
+          configuration: Json
+          created_at: string | null
+          id: string
+          order_id: string | null
+          product_category: string
+          product_id: string | null
+          product_title: string
+          quantity: number | null
+          total_price_rs: number
+          unit_price_rs: number
+        }
+        Insert: {
+          configuration: Json
+          created_at?: string | null
+          id?: string
+          order_id?: string | null
+          product_category: string
+          product_id?: string | null
+          product_title: string
+          quantity?: number | null
+          total_price_rs: number
+          unit_price_rs: number
+        }
+        Update: {
+          configuration?: Json
+          created_at?: string | null
+          id?: string
+          order_id?: string | null
+          product_category?: string
+          product_id?: string | null
+          product_title?: string
+          quantity?: number | null
+          total_price_rs?: number
+          unit_price_rs?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "order_items_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      orders: {
+        Row: {
+          admin_notes: string | null
+          advance_amount_rs: number | null
+          advance_percent: number | null
+          approved_at: string | null
+          approved_by: string | null
+          balance_amount_rs: number | null
+          created_at: string | null
+          customer_email: string
+          customer_id: string | null
+          customer_name: string
+          customer_phone: string
+          delivery_address: Json
+          discount_amount_rs: number | null
+          discount_code: string | null
+          id: string
+          metadata: Json | null
+          net_total_rs: number
+          order_number: string
+          payment_status: Database["public"]["Enums"]["payment_status"] | null
+          status: Database["public"]["Enums"]["order_status"] | null
+          subtotal_rs: number
+          updated_at: string | null
+        }
+        Insert: {
+          admin_notes?: string | null
+          advance_amount_rs?: number | null
+          advance_percent?: number | null
+          approved_at?: string | null
+          approved_by?: string | null
+          balance_amount_rs?: number | null
+          created_at?: string | null
+          customer_email: string
+          customer_id?: string | null
+          customer_name: string
+          customer_phone: string
+          delivery_address: Json
+          discount_amount_rs?: number | null
+          discount_code?: string | null
+          id?: string
+          metadata?: Json | null
+          net_total_rs: number
+          order_number: string
+          payment_status?: Database["public"]["Enums"]["payment_status"] | null
+          status?: Database["public"]["Enums"]["order_status"] | null
+          subtotal_rs: number
+          updated_at?: string | null
+        }
+        Update: {
+          admin_notes?: string | null
+          advance_amount_rs?: number | null
+          advance_percent?: number | null
+          approved_at?: string | null
+          approved_by?: string | null
+          balance_amount_rs?: number | null
+          created_at?: string | null
+          customer_email?: string
+          customer_id?: string | null
+          customer_name?: string
+          customer_phone?: string
+          delivery_address?: Json
+          discount_amount_rs?: number | null
+          discount_code?: string | null
+          id?: string
+          metadata?: Json | null
+          net_total_rs?: number
+          order_number?: string
+          payment_status?: Database["public"]["Enums"]["payment_status"] | null
+          status?: Database["public"]["Enums"]["order_status"] | null
+          subtotal_rs?: number
           updated_at?: string | null
         }
         Relationships: []
@@ -1373,6 +1665,47 @@ export type Database = {
         }
         Relationships: []
       }
+      staff_activity_log: {
+        Row: {
+          action: string
+          created_at: string | null
+          details: Json | null
+          id: string
+          job_card_id: string | null
+          job_card_number: string | null
+          staff_id: string | null
+          staff_name: string
+        }
+        Insert: {
+          action: string
+          created_at?: string | null
+          details?: Json | null
+          id?: string
+          job_card_id?: string | null
+          job_card_number?: string | null
+          staff_id?: string | null
+          staff_name: string
+        }
+        Update: {
+          action?: string
+          created_at?: string | null
+          details?: Json | null
+          id?: string
+          job_card_id?: string | null
+          job_card_number?: string | null
+          staff_id?: string | null
+          staff_name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "staff_activity_log_job_card_id_fkey"
+            columns: ["job_card_id"]
+            isOneToOne: false
+            referencedRelation: "job_cards"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
@@ -1384,6 +1717,28 @@ export type Database = {
       accessory_type: "leg" | "armrest" | "console" | "pillow" | "other"
       calculation_type: "percentage" | "flat_rate" | "multiplier"
       formula_unit: "percent" | "rupees" | "multiplier"
+      job_card_priority: "low" | "normal" | "high" | "urgent"
+      job_card_status:
+        | "pending"
+        | "fabric_cutting"
+        | "frame_assembly"
+        | "upholstery"
+        | "finishing"
+        | "quality_check"
+        | "completed"
+        | "on_hold"
+        | "cancelled"
+      order_status:
+        | "draft"
+        | "pending"
+        | "confirmed"
+        | "production"
+        | "quality_check"
+        | "ready_for_delivery"
+        | "shipped"
+        | "delivered"
+        | "cancelled"
+      payment_status: "pending" | "advance_paid" | "fully_paid" | "refunded"
       product_category:
         | "sofa"
         | "sofa_bed"
@@ -1395,6 +1750,15 @@ export type Database = {
         | "arm_chair"
         | "pouffe"
         | "bench"
+      task_status: "pending" | "in_progress" | "completed" | "skipped"
+      task_type:
+        | "fabric_cutting"
+        | "frame_work"
+        | "upholstery"
+        | "assembly"
+        | "finishing"
+        | "quality_check"
+        | "packaging"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1525,6 +1889,30 @@ export const Constants = {
       accessory_type: ["leg", "armrest", "console", "pillow", "other"],
       calculation_type: ["percentage", "flat_rate", "multiplier"],
       formula_unit: ["percent", "rupees", "multiplier"],
+      job_card_priority: ["low", "normal", "high", "urgent"],
+      job_card_status: [
+        "pending",
+        "fabric_cutting",
+        "frame_assembly",
+        "upholstery",
+        "finishing",
+        "quality_check",
+        "completed",
+        "on_hold",
+        "cancelled",
+      ],
+      order_status: [
+        "draft",
+        "pending",
+        "confirmed",
+        "production",
+        "quality_check",
+        "ready_for_delivery",
+        "shipped",
+        "delivered",
+        "cancelled",
+      ],
+      payment_status: ["pending", "advance_paid", "fully_paid", "refunded"],
       product_category: [
         "sofa",
         "sofa_bed",
@@ -1536,6 +1924,16 @@ export const Constants = {
         "arm_chair",
         "pouffe",
         "bench",
+      ],
+      task_status: ["pending", "in_progress", "completed", "skipped"],
+      task_type: [
+        "fabric_cutting",
+        "frame_work",
+        "upholstery",
+        "assembly",
+        "finishing",
+        "quality_check",
+        "packaging",
       ],
     },
   },
