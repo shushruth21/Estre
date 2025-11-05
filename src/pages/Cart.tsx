@@ -4,8 +4,10 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Loader2, ShoppingBag, ArrowLeft } from "lucide-react";
+import { Separator } from "@/components/ui/separator";
 import { CartItem } from "@/components/cart/CartItem";
 import { CartSummary } from "@/components/cart/CartSummary";
+import { SavedForLater } from "@/components/cart/SavedForLater";
 
 const Cart = () => {
   const navigate = useNavigate();
@@ -18,7 +20,7 @@ const Cart = () => {
     },
   });
 
-  const { data: cartItems, isLoading } = useQuery({
+  const { data: allItems, isLoading } = useQuery({
     queryKey: ["cart", user?.id],
     queryFn: async () => {
       if (!user) return [];
@@ -34,6 +36,9 @@ const Cart = () => {
     },
     enabled: !!user,
   });
+
+  const cartItems = allItems?.filter(item => !item.saved_for_later) || [];
+  const savedItems = allItems?.filter(item => item.saved_for_later) || [];
 
   const totalAmount = cartItems?.reduce((sum, item) => sum + (item.calculated_price || 0), 0) || 0;
 
@@ -74,7 +79,7 @@ const Cart = () => {
       <div className="container mx-auto px-4 py-12">
         <h1 className="text-3xl font-bold mb-8">Shopping Cart</h1>
 
-        {!cartItems || cartItems.length === 0 ? (
+        {cartItems.length === 0 && savedItems.length === 0 ? (
           <Card>
             <CardContent className="py-12 text-center">
               <ShoppingBag className="h-16 w-16 mx-auto mb-4 text-muted-foreground" />
@@ -89,17 +94,39 @@ const Cart = () => {
           </Card>
         ) : (
           <div className="grid lg:grid-cols-3 gap-8">
-            <div className="lg:col-span-2 space-y-4">
-              {cartItems.map((item) => (
-                <CartItem key={item.id} item={item} />
-              ))}
+            <div className="lg:col-span-2 space-y-8">
+              {cartItems.length > 0 ? (
+                <div className="space-y-4">
+                  {cartItems.map((item) => (
+                    <CartItem key={item.id} item={item} />
+                  ))}
+                </div>
+              ) : (
+                <Card>
+                  <CardContent className="py-8 text-center">
+                    <ShoppingBag className="h-12 w-12 mx-auto mb-3 text-muted-foreground" />
+                    <p className="text-muted-foreground">
+                      Your cart is empty. Check your saved items below or continue shopping.
+                    </p>
+                  </CardContent>
+                </Card>
+              )}
+
+              {savedItems.length > 0 && (
+                <>
+                  <Separator className="my-8" />
+                  <SavedForLater items={savedItems} />
+                </>
+              )}
             </div>
 
-            <CartSummary
-              subtotal={totalAmount}
-              onCheckout={() => navigate("/checkout")}
-              checkoutDisabled={false}
-            />
+            {cartItems.length > 0 && (
+              <CartSummary
+                subtotal={totalAmount}
+                onCheckout={() => navigate("/checkout")}
+                checkoutDisabled={false}
+              />
+            )}
           </div>
         )}
       </div>

@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { Trash2, Loader2, Minus, Plus, Package } from "lucide-react";
+import { Trash2, Loader2, Minus, Plus, Package, Bookmark } from "lucide-react";
 
 interface CartItemProps {
   item: any;
@@ -28,6 +28,20 @@ export const CartItem = ({ item }: CartItemProps) => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["cart"] });
+    },
+  });
+
+  const saveForLater = useMutation({
+    mutationFn: async () => {
+      const { error } = await supabase
+        .from("customer_orders")
+        .update({ saved_for_later: true })
+        .eq("id", item.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["cart"] });
+      toast({ title: "Item saved for later" });
     },
   });
 
@@ -67,7 +81,7 @@ export const CartItem = ({ item }: CartItemProps) => {
               Product ID: {item.product_id}
             </p>
             
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-4 flex-wrap">
               <div className="flex items-center gap-2 border rounded-md">
                 <Button
                   variant="ghost"
@@ -93,6 +107,22 @@ export const CartItem = ({ item }: CartItemProps) => {
               <div className="text-2xl font-bold text-primary">
                 ₹{Math.round(item.calculated_price || 0).toLocaleString()}
               </div>
+            </div>
+            
+            <div className="flex items-center gap-2 mt-3">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => saveForLater.mutate()}
+                disabled={saveForLater.isPending}
+              >
+                {saveForLater.isPending ? (
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                ) : (
+                  <Bookmark className="h-4 w-4 mr-2" />
+                )}
+                Save for Later
+              </Button>
             </div>
           </div>
 
