@@ -15,6 +15,9 @@ import { Plus, Trash2 } from "lucide-react";
 import FabricSelector from "./FabricSelector";
 import { useDropdownOptions } from "@/hooks/useDropdownOptions";
 import { useAdminSettings } from "@/hooks/useAdminSettings";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { Checkbox } from "@/components/ui/checkbox";
 
 interface SofaConfiguratorProps {
   product: any;
@@ -44,6 +47,21 @@ const SofaConfigurator = ({
 
   // Load admin settings for defaults
   const { data: adminSettings } = useAdminSettings("sofa");
+
+  // Fetch accessories from accessories_prices table
+  const { data: accessories, isLoading: accessoriesLoading } = useQuery({
+    queryKey: ["accessories-prices"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("accessories_prices")
+        .select("*")
+        .eq("is_active", true)
+        .order("description", { ascending: true });
+
+      if (error) throw error;
+      return data;
+    },
+  });
 
   useEffect(() => {
     updateConfiguration({
@@ -90,6 +108,15 @@ const SofaConfigurator = ({
     newSeats[index] = { ...newSeats[index], [field]: value };
     setSeats(newSeats);
     updateConfiguration({ seats: newSeats });
+  };
+
+  const toggleAccessory = (accessoryId: string, checked: boolean) => {
+    const currentAccessories = configuration.accessories || [];
+    const newAccessories = checked
+      ? [...currentAccessories, accessoryId]
+      : currentAccessories.filter((id: string) => id !== accessoryId);
+    
+    updateConfiguration({ accessories: newAccessories });
   };
 
   return (
@@ -536,9 +563,54 @@ const SofaConfigurator = ({
 
       {/* Accessories */}
       <TabsContent value="accessories" className="space-y-6">
-        <div className="text-center py-12 text-muted-foreground">
-          Accessories selection coming soon
-        </div>
+        {accessoriesLoading ? (
+          <div className="text-center py-12 text-muted-foreground">
+            Loading accessories...
+          </div>
+        ) : accessories && accessories.length > 0 ? (
+          <div className="space-y-4">
+            <Label>Select Accessories</Label>
+            {accessories.map((accessory) => (
+              <Card key={accessory.id}>
+                <CardContent className="pt-6">
+                  <div className="flex items-start gap-4">
+                    <Checkbox
+                      id={accessory.id}
+                      checked={(configuration.accessories || []).includes(accessory.id)}
+                      onCheckedChange={(checked) => 
+                        toggleAccessory(accessory.id, checked as boolean)
+                      }
+                    />
+                    <div className="flex-1">
+                      <label
+                        htmlFor={accessory.id}
+                        className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                      >
+                        {accessory.description}
+                      </label>
+                      {accessory.sale_price && (
+                        <p className="text-sm text-muted-foreground mt-1">
+                          ₹{Number(accessory.sale_price).toLocaleString()}
+                        </p>
+                      )}
+                      {accessory.images && (
+                        <img
+                          src={accessory.images}
+                          alt={accessory.description}
+                          className="mt-2 w-32 h-32 object-cover rounded"
+                        />
+                      )}
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        ) : (
+          <div className="text-center py-12 text-muted-foreground">
+            No accessories available
+          </div>
+        )}
       </TabsContent>
     </Tabs>
   );
