@@ -496,6 +496,9 @@ export type Database = {
           order_number: string
           product_id: string | null
           product_type: string
+          quantity: number | null
+          saved_for_later: boolean | null
+          share_token: string | null
           status: string | null
           updated_at: string | null
         }
@@ -512,6 +515,9 @@ export type Database = {
           order_number: string
           product_id?: string | null
           product_type: string
+          quantity?: number | null
+          saved_for_later?: boolean | null
+          share_token?: string | null
           status?: string | null
           updated_at?: string | null
         }
@@ -528,6 +534,9 @@ export type Database = {
           order_number?: string
           product_id?: string | null
           product_type?: string
+          quantity?: number | null
+          saved_for_later?: boolean | null
+          share_token?: string | null
           status?: string | null
           updated_at?: string | null
         }
@@ -1137,6 +1146,47 @@ export type Database = {
           },
         ]
       }
+      order_timeline: {
+        Row: {
+          created_at: string | null
+          created_by: string | null
+          description: string | null
+          id: string
+          metadata: Json | null
+          order_id: string | null
+          status: string
+          title: string
+        }
+        Insert: {
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          metadata?: Json | null
+          order_id?: string | null
+          status: string
+          title: string
+        }
+        Update: {
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          metadata?: Json | null
+          order_id?: string | null
+          status?: string
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "order_timeline_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       orders: {
         Row: {
           admin_notes: string | null
@@ -1153,13 +1203,25 @@ export type Database = {
           delivery_address: Json
           discount_amount_rs: number | null
           discount_code: string | null
+          expected_delivery_date: string | null
+          fabric_availability_checked: boolean | null
           id: string
+          invoice_number: string | null
+          invoice_url: string | null
           metadata: Json | null
           net_total_rs: number
           order_number: string
+          payment_gateway: string | null
+          payment_method: string | null
           payment_status: Database["public"]["Enums"]["payment_status"] | null
+          payment_transaction_id: string | null
+          production_capacity_checked: boolean | null
+          rejection_reason: string | null
+          special_instructions: string | null
           status: Database["public"]["Enums"]["order_status"] | null
           subtotal_rs: number
+          terms_accepted: boolean | null
+          terms_accepted_at: string | null
           updated_at: string | null
         }
         Insert: {
@@ -1177,13 +1239,25 @@ export type Database = {
           delivery_address: Json
           discount_amount_rs?: number | null
           discount_code?: string | null
+          expected_delivery_date?: string | null
+          fabric_availability_checked?: boolean | null
           id?: string
+          invoice_number?: string | null
+          invoice_url?: string | null
           metadata?: Json | null
           net_total_rs: number
           order_number: string
+          payment_gateway?: string | null
+          payment_method?: string | null
           payment_status?: Database["public"]["Enums"]["payment_status"] | null
+          payment_transaction_id?: string | null
+          production_capacity_checked?: boolean | null
+          rejection_reason?: string | null
+          special_instructions?: string | null
           status?: Database["public"]["Enums"]["order_status"] | null
           subtotal_rs: number
+          terms_accepted?: boolean | null
+          terms_accepted_at?: string | null
           updated_at?: string | null
         }
         Update: {
@@ -1201,16 +1275,87 @@ export type Database = {
           delivery_address?: Json
           discount_amount_rs?: number | null
           discount_code?: string | null
+          expected_delivery_date?: string | null
+          fabric_availability_checked?: boolean | null
           id?: string
+          invoice_number?: string | null
+          invoice_url?: string | null
           metadata?: Json | null
           net_total_rs?: number
           order_number?: string
+          payment_gateway?: string | null
+          payment_method?: string | null
           payment_status?: Database["public"]["Enums"]["payment_status"] | null
+          payment_transaction_id?: string | null
+          production_capacity_checked?: boolean | null
+          rejection_reason?: string | null
+          special_instructions?: string | null
           status?: Database["public"]["Enums"]["order_status"] | null
           subtotal_rs?: number
+          terms_accepted?: boolean | null
+          terms_accepted_at?: string | null
           updated_at?: string | null
         }
         Relationships: []
+      }
+      payment_transactions: {
+        Row: {
+          amount_rs: number
+          created_at: string | null
+          currency: string | null
+          gateway_response: Json | null
+          id: string
+          order_id: string | null
+          payment_gateway: string
+          payment_method: string | null
+          payment_type: string
+          refund_amount_rs: number | null
+          refund_reason: string | null
+          status: string
+          transaction_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          amount_rs: number
+          created_at?: string | null
+          currency?: string | null
+          gateway_response?: Json | null
+          id?: string
+          order_id?: string | null
+          payment_gateway: string
+          payment_method?: string | null
+          payment_type: string
+          refund_amount_rs?: number | null
+          refund_reason?: string | null
+          status: string
+          transaction_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          amount_rs?: number
+          created_at?: string | null
+          currency?: string | null
+          gateway_response?: Json | null
+          id?: string
+          order_id?: string | null
+          payment_gateway?: string
+          payment_method?: string | null
+          payment_type?: string
+          refund_amount_rs?: number | null
+          refund_reason?: string | null
+          status?: string
+          transaction_id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payment_transactions_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       pricing_formulas: {
         Row: {
