@@ -1,6 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Sofa, Bed, Armchair, ChevronRight } from "lucide-react";
+import { Sofa, Bed, Armchair, ChevronRight, MonitorPlay, UtensilsCrossed, Baby, SofaIcon, Box } from "lucide-react";
 import { Link } from "react-router-dom";
 
 const Index = () => {
@@ -9,22 +9,71 @@ const Index = () => {
       icon: Sofa,
       title: "Sofas",
       description: "Customize your perfect sofa with premium fabrics",
-      href: "/products/sofa",
+      href: "/products?category=sofa",
       gradient: "from-primary to-primary/80"
     },
     {
       icon: Bed,
       title: "Beds",
       description: "Design your dream bed with luxury finishes",
-      href: "/products/bed",
+      href: "/products?category=bed",
       gradient: "from-secondary to-secondary/80"
     },
     {
       icon: Armchair,
       title: "Recliners",
       description: "Create your comfort zone with custom recliners",
-      href: "/products/recliner",
+      href: "/products?category=recliner",
       gradient: "from-accent to-accent/80"
+    },
+    {
+      icon: MonitorPlay,
+      title: "Cinema Chairs",
+      description: "Premium theater seating for home entertainment",
+      href: "/products?category=cinema_chairs",
+      gradient: "from-purple-600 to-purple-700"
+    },
+    {
+      icon: UtensilsCrossed,
+      title: "Dining Chairs",
+      description: "Elegant seating for memorable meals",
+      href: "/products?category=dining_chairs",
+      gradient: "from-green-600 to-green-700"
+    },
+    {
+      icon: Armchair,
+      title: "Arm Chairs",
+      description: "Comfortable accent seating pieces",
+      href: "/products?category=arm_chairs",
+      gradient: "from-blue-600 to-blue-700"
+    },
+    {
+      icon: Box,
+      title: "Benches",
+      description: "Versatile seating with storage options",
+      href: "/products?category=benches",
+      gradient: "from-teal-600 to-teal-700"
+    },
+    {
+      icon: Baby,
+      title: "Kids Beds",
+      description: "Safe and fun beds for children",
+      href: "/products?category=kids_bed",
+      gradient: "from-pink-600 to-pink-700"
+    },
+    {
+      icon: SofaIcon,
+      title: "Sofa Beds",
+      description: "Dual-purpose comfort and convenience",
+      href: "/products?category=sofabed",
+      gradient: "from-indigo-600 to-indigo-700"
+    },
+    {
+      icon: Box,
+      title: "Pouffes",
+      description: "Stylish footrests and accent pieces",
+      href: "/products?category=database_pouffes",
+      gradient: "from-orange-600 to-orange-700"
     }
   ];
 
@@ -71,7 +120,7 @@ const Index = () => {
           <h3 className="text-3xl font-bold text-center mb-12">
             Explore Our Categories
           </h3>
-          <div className="grid md:grid-cols-3 gap-8">
+          <div className="grid sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
             {categories.map((category) => {
               const Icon = category.icon;
               return (

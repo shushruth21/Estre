@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -18,7 +19,20 @@ type Product = {
 };
 
 const Products = () => {
-  const [category, setCategory] = useState<string>("sofa");
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [category, setCategory] = useState<string>(searchParams.get("category") || "sofa");
+
+  useEffect(() => {
+    const categoryParam = searchParams.get("category");
+    if (categoryParam) {
+      setCategory(categoryParam);
+    }
+  }, [searchParams]);
+
+  const handleCategoryChange = (newCategory: string) => {
+    setCategory(newCategory);
+    setSearchParams({ category: newCategory });
+  };
 
   const { data: products, isLoading } = useQuery({
     queryKey: ["products", category],
@@ -53,7 +67,7 @@ const Products = () => {
         <h1 className="text-4xl font-bold mb-8">Product Catalog</h1>
 
         {/* Category Tabs */}
-        <Tabs value={category} onValueChange={setCategory} className="mb-8">
+        <Tabs value={category} onValueChange={handleCategoryChange} className="mb-8">
           <TabsList className="flex-wrap h-auto">
             <TabsTrigger value="sofa">Sofas</TabsTrigger>
             <TabsTrigger value="bed">Beds</TabsTrigger>
