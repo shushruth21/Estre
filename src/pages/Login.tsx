@@ -20,22 +20,42 @@ const Login = () => {
     setIsLoading(true);
 
     try {
-      const { error } = await supabase.auth.signInWithPassword({
+      const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
 
       if (error) throw error;
 
+      // Fetch user roles to determine redirect
+      const { data: roles } = await supabase
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", data.user.id);
+
       toast({
-        title: "Success",
+        title: "Welcome back!",
         description: "Logged in successfully",
       });
-      navigate("/dashboard");
+
+      // Role-based redirect
+      if (roles && roles.length > 0) {
+        const userRole = roles[0].role;
+        if (userRole === 'admin' || userRole === 'store_manager' || userRole === 'production_manager') {
+          navigate("/admin/dashboard");
+        } else if (userRole === 'factory_staff') {
+          navigate("/staff/job-cards");
+        } else {
+          navigate("/");
+        }
+      } else {
+        // Default redirect for users without roles
+        navigate("/");
+      }
     } catch (error: any) {
       toast({
-        title: "Error",
-        description: error.message,
+        title: "Login Failed",
+        description: error.message || "Invalid email or password",
         variant: "destructive",
       });
     } finally {
