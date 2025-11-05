@@ -1,5 +1,4 @@
 import { useState, useEffect } from "react";
-import { useQuery } from "@tanstack/react-query";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -12,9 +11,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { loadDropdownOptions } from "@/lib/pricing-engine";
 import { Plus, Trash2 } from "lucide-react";
 import FabricSelector from "./FabricSelector";
+import { useDropdownOptions } from "@/hooks/useDropdownOptions";
+import { useAdminSettings } from "@/hooks/useAdminSettings";
 
 interface SofaConfiguratorProps {
   product: any;
@@ -32,30 +32,18 @@ const SofaConfigurator = ({
   ]);
 
   // Load dropdown options from database
-  const { data: loungerSizes } = useQuery({
-    queryKey: ["dropdown", "sofa", "lounger_size"],
-    queryFn: () => loadDropdownOptions("sofa", "lounger_size"),
-  });
+  const { data: sofaTypes } = useDropdownOptions("sofa", "sofa_type");
+  const { data: seatTypes } = useDropdownOptions("sofa", "seat_type");
+  const { data: loungerSizes } = useDropdownOptions("sofa", "lounger_size");
+  const { data: consoleSizes } = useDropdownOptions("sofa", "console_size");
+  const { data: foamTypes } = useDropdownOptions("sofa", "foam_type");
+  const { data: seatDepths } = useDropdownOptions("sofa", "seat_depth");
+  const { data: seatWidths } = useDropdownOptions("sofa", "seat_width");
+  const { data: seatHeights } = useDropdownOptions("sofa", "seat_height");
+  const { data: backrestDepths } = useDropdownOptions("sofa", "backrest_depth");
 
-  const { data: consoleSizes } = useQuery({
-    queryKey: ["dropdown", "sofa", "console_size"],
-    queryFn: () => loadDropdownOptions("sofa", "console_size"),
-  });
-
-  const { data: foamTypes } = useQuery({
-    queryKey: ["dropdown", "sofa", "foam_type"],
-    queryFn: () => loadDropdownOptions("sofa", "foam_type"),
-  });
-
-  const { data: seatDepths } = useQuery({
-    queryKey: ["dropdown", "sofa", "seat_depth"],
-    queryFn: () => loadDropdownOptions("sofa", "seat_depth"),
-  });
-
-  const { data: seatWidths } = useQuery({
-    queryKey: ["dropdown", "sofa", "seat_width"],
-    queryFn: () => loadDropdownOptions("sofa", "seat_width"),
-  });
+  // Load admin settings for defaults
+  const { data: adminSettings } = useAdminSettings("sofa");
 
   useEffect(() => {
     updateConfiguration({
@@ -127,10 +115,18 @@ const SofaConfigurator = ({
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="Standard">Standard</SelectItem>
-                <SelectItem value="L Shape">L Shape</SelectItem>
-                <SelectItem value="U Shape">U Shape</SelectItem>
-                <SelectItem value="Combo">Combo</SelectItem>
+                {sofaTypes?.map((type) => (
+                  <SelectItem key={type.id} value={type.option_value}>
+                    {type.display_label || type.option_value}
+                  </SelectItem>
+                )) || (
+                  <>
+                    <SelectItem value="Standard">Standard</SelectItem>
+                    <SelectItem value="L Shape">L Shape</SelectItem>
+                    <SelectItem value="U Shape">U Shape</SelectItem>
+                    <SelectItem value="Combo">Combo</SelectItem>
+                  </>
+                )}
               </SelectContent>
             </Select>
           </div>
@@ -170,12 +166,20 @@ const SofaConfigurator = ({
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="1-Seater">1-Seater</SelectItem>
-                            <SelectItem value="2-Seater">2-Seater</SelectItem>
-                            <SelectItem value="3-Seater">3-Seater</SelectItem>
-                            <SelectItem value="4-Seater">4-Seater</SelectItem>
-                            <SelectItem value="Corner">Corner</SelectItem>
-                            <SelectItem value="Backrest">Backrest</SelectItem>
+                            {seatTypes?.map((type) => (
+                              <SelectItem key={type.id} value={type.option_value}>
+                                {type.display_label || type.option_value}
+                              </SelectItem>
+                            )) || (
+                              <>
+                                <SelectItem value="1-Seater">1-Seater</SelectItem>
+                                <SelectItem value="2-Seater">2-Seater</SelectItem>
+                                <SelectItem value="3-Seater">3-Seater</SelectItem>
+                                <SelectItem value="4-Seater">4-Seater</SelectItem>
+                                <SelectItem value="Corner">Corner</SelectItem>
+                                <SelectItem value="Backrest">Backrest</SelectItem>
+                              </>
+                            )}
                           </SelectContent>
                         </Select>
                       </div>
@@ -485,12 +489,48 @@ const SofaConfigurator = ({
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="16">16"</SelectItem>
-                <SelectItem value="18">18"</SelectItem>
-                <SelectItem value="20">20"</SelectItem>
+                {seatHeights?.map((option) => (
+                  <SelectItem key={option.id} value={option.option_value}>
+                    {option.option_value}"
+                  </SelectItem>
+                )) || (
+                  <>
+                    <SelectItem value="16">16"</SelectItem>
+                    <SelectItem value="18">18"</SelectItem>
+                    <SelectItem value="20">20"</SelectItem>
+                  </>
+                )}
               </SelectContent>
             </Select>
           </div>
+
+          {backrestDepths && backrestDepths.length > 0 && (
+            <div>
+              <Label>Backrest Depth (inches)</Label>
+              <Select
+                value={configuration.dimensions?.backrestDepth?.toString() || ""}
+                onValueChange={(value) =>
+                  updateConfiguration({
+                    dimensions: {
+                      ...configuration.dimensions,
+                      backrestDepth: parseInt(value),
+                    },
+                  })
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select depth" />
+                </SelectTrigger>
+                <SelectContent>
+                  {backrestDepths?.map((option) => (
+                    <SelectItem key={option.id} value={option.option_value}>
+                      {option.option_value}"
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
         </div>
       </TabsContent>
 

@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ArrowLeft, ArrowRight, ShoppingCart, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { calculateSofaPrice, SofaConfiguration } from "@/lib/pricing-engine";
+import { calculateDynamicPrice } from "@/lib/dynamic-pricing";
 import SofaConfigurator from "@/components/configurators/SofaConfigurator";
 import BedConfigurator from "@/components/configurators/BedConfigurator";
 import ReclinerConfigurator from "@/components/configurators/ReclinerConfigurator";
@@ -45,18 +45,25 @@ const Configure = () => {
 
   // Recalculate price when configuration changes
   useEffect(() => {
-    if (configuration.productId && category === "sofa") {
+    if (configuration.productId && category && productId) {
       calculatePrice();
     }
-  }, [configuration, category]);
+  }, [configuration, category, productId]);
 
   const calculatePrice = async () => {
-    if (category !== "sofa") return;
+    if (!category || !productId || !configuration.productId) return;
 
     setIsCalculating(true);
     try {
-      const result = await calculateSofaPrice(configuration as SofaConfiguration);
-      setPricing(result);
+      const totalPrice = await calculateDynamicPrice(category, productId, configuration);
+      setPricing({ 
+        total: totalPrice,
+        breakdown: {
+          basePrice: totalPrice,
+          fabricCost: 0, // Can be extracted from calculation if needed
+          adjustments: 0,
+        }
+      });
     } catch (error: any) {
       console.error("Price calculation error:", error);
       toast({
