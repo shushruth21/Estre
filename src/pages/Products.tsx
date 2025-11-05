@@ -8,6 +8,25 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Link } from "react-router-dom";
 import { Loader2, ArrowLeft } from "lucide-react";
 
+// Table name mapping for categories
+const CATEGORY_TABLE_NAMES = {
+  sofa: 'sofa_database',
+  bed: 'bed_database',
+  recliner: 'recliner_database',
+  cinema_chairs: 'cinema_chairs_database',
+  dining_chairs: 'dining_chairs_database',
+  arm_chairs: 'arm_chairs_database',
+  benches: 'benches_database',
+  kids_bed: 'kids_bed_database',
+  sofabed: 'sofabed_database',
+  database_pouffes: 'database_pouffes', // Special case - no _database suffix
+};
+
+const getCategoryTableName = (category: string): string => {
+  return CATEGORY_TABLE_NAMES[category as keyof typeof CATEGORY_TABLE_NAMES] 
+    || `${category}_database`;
+};
+
 // Column mapping for different category tables
 const CATEGORY_COLUMNS = {
   bed: {
@@ -65,7 +84,7 @@ const Products = () => {
       
       // Using dynamic table names with Supabase requires runtime querying
       const { data, error } = await supabase
-        .from(`${category}_database` as any)
+        .from(getCategoryTableName(category) as any)
         .select(`id, title, images, ${columns.netPrice}, ${columns.strikePrice}, discount_percent, discount_rs`)
         .eq("is_active", true)
         .order("created_at", { ascending: false }) as any;
