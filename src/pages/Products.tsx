@@ -14,8 +14,8 @@ type Product = {
   images?: string | null;
   net_price_rs?: number | null;
   strike_price_1seater_rs?: number | null;
-  strike_price_rs?: number | null;
   discount_percent?: number | null;
+  discount_rs?: number | null;
 };
 
 const Products = () => {
@@ -34,19 +34,20 @@ const Products = () => {
     setSearchParams({ category: newCategory });
   };
 
-  const { data: products, isLoading } = useQuery({
+  const { data: products, isLoading, error } = useQuery({
     queryKey: ["products", category],
     queryFn: async () => {
       // Using dynamic table names with Supabase requires runtime querying
       const { data, error } = await supabase
         .from(`${category}_database` as any)
-        .select("id, title, images, net_price_rs, strike_price_1seater_rs, strike_price_rs, discount_percent")
+        .select("id, title, images, net_price_rs, strike_price_1seater_rs, discount_percent, discount_rs")
         .eq("is_active", true)
         .order("created_at", { ascending: false }) as any;
 
       if (error) throw error;
       return (data || []) as Product[];
     },
+    retry: 1,
   });
 
   return (
@@ -83,11 +84,18 @@ const Products = () => {
         </Tabs>
 
         {/* Products Grid */}
+        {error && (
+          <div className="text-center py-20">
+            <p className="text-destructive text-lg mb-2">Error loading products</p>
+            <p className="text-muted-foreground">{error.message}</p>
+          </div>
+        )}
+        
         {isLoading ? (
           <div className="flex items-center justify-center py-20">
             <Loader2 className="h-8 w-8 animate-spin text-primary" />
           </div>
-        ) : (
+        ) : !error && (
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
             {products?.map((product) => (
               <Card key={product.id} className="overflow-hidden hover:shadow-lg transition-smooth">
@@ -107,10 +115,10 @@ const Products = () => {
                       ₹{product.net_price_rs.toLocaleString()}
                     </p>
                   )}
-                  {(product.strike_price_1seater_rs || product.strike_price_rs) && product.discount_percent && (
+                  {product.strike_price_1seater_rs && product.discount_percent && (
                     <div className="flex items-center gap-2 text-sm">
                       <span className="line-through text-muted-foreground">
-                        ₹{(product.strike_price_1seater_rs || product.strike_price_rs || 0).toLocaleString()}
+                        ₹{product.strike_price_1seater_rs.toLocaleString()}
                       </span>
                       <span className="text-success font-semibold">
                         {product.discount_percent}% OFF

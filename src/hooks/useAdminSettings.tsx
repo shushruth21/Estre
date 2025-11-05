@@ -46,6 +46,9 @@ export const useAdminSettings = (category: string, settingKey?: string) => {
     },
     staleTime: 5 * 60 * 1000, // Cache for 5 minutes
     enabled: !!tableName,
+    retry: 1,
+    // Don't block page if settings are missing
+    placeholderData: [] as AdminSetting[],
   });
 };
 

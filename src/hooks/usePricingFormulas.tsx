@@ -28,6 +28,9 @@ export const usePricingFormulas = (category: string) => {
       return data as PricingFormula[];
     },
     staleTime: 5 * 60 * 1000, // Cache for 5 minutes
+    retry: 1,
+    // Don't block page if formulas are missing
+    placeholderData: [],
   });
 };
 

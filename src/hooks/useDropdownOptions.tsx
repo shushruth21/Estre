@@ -32,6 +32,9 @@ export const useDropdownOptions = (category: string, fieldName?: string) => {
       return data as DropdownOption[];
     },
     staleTime: 5 * 60 * 1000, // Cache for 5 minutes
+    retry: 1,
+    // Return empty array if query fails, don't block the page
+    placeholderData: [],
   });
 };
 
