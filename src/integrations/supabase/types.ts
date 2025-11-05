@@ -14,6 +14,48 @@ export type Database = {
   }
   public: {
     Tables: {
+      accessories: {
+        Row: {
+          code: string
+          compatible_categories: string[] | null
+          created_at: string | null
+          id: string
+          images: string[] | null
+          is_active: boolean | null
+          metadata: Json | null
+          price_rs: number
+          title: string
+          type: Database["public"]["Enums"]["accessory_type"]
+          updated_at: string | null
+        }
+        Insert: {
+          code: string
+          compatible_categories?: string[] | null
+          created_at?: string | null
+          id?: string
+          images?: string[] | null
+          is_active?: boolean | null
+          metadata?: Json | null
+          price_rs: number
+          title: string
+          type: Database["public"]["Enums"]["accessory_type"]
+          updated_at?: string | null
+        }
+        Update: {
+          code?: string
+          compatible_categories?: string[] | null
+          created_at?: string | null
+          id?: string
+          images?: string[] | null
+          is_active?: boolean | null
+          metadata?: Json | null
+          price_rs?: number
+          title?: string
+          type?: Database["public"]["Enums"]["accessory_type"]
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       accessories_prices: {
         Row: {
           created_at: string | null
@@ -584,6 +626,45 @@ export type Database = {
         }
         Relationships: []
       }
+      dropdown_options: {
+        Row: {
+          category: string
+          created_at: string | null
+          display_label: string | null
+          field_name: string
+          id: string
+          is_active: boolean | null
+          metadata: Json | null
+          option_value: string
+          sort_order: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          category: string
+          created_at?: string | null
+          display_label?: string | null
+          field_name: string
+          id?: string
+          is_active?: boolean | null
+          metadata?: Json | null
+          option_value: string
+          sort_order?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          category?: string
+          created_at?: string | null
+          display_label?: string | null
+          field_name?: string
+          id?: string
+          is_active?: boolean | null
+          metadata?: Json | null
+          option_value?: string
+          sort_order?: number | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       fabric_coding: {
         Row: {
           bom_price: number | null
@@ -635,6 +716,51 @@ export type Database = {
           upgrade?: number | null
           vendor?: string | null
           vendor_code?: string | null
+        }
+        Relationships: []
+      }
+      fabrics: {
+        Row: {
+          category: string | null
+          code: string
+          color_family: string | null
+          created_at: string | null
+          id: string
+          images: string[] | null
+          is_active: boolean | null
+          material: string | null
+          metadata: Json | null
+          price_per_mtr_rs: number
+          title: string
+          updated_at: string | null
+        }
+        Insert: {
+          category?: string | null
+          code: string
+          color_family?: string | null
+          created_at?: string | null
+          id?: string
+          images?: string[] | null
+          is_active?: boolean | null
+          material?: string | null
+          metadata?: Json | null
+          price_per_mtr_rs: number
+          title: string
+          updated_at?: string | null
+        }
+        Update: {
+          category?: string | null
+          code?: string
+          color_family?: string | null
+          created_at?: string | null
+          id?: string
+          images?: string[] | null
+          is_active?: boolean | null
+          material?: string | null
+          metadata?: Json | null
+          price_per_mtr_rs?: number
+          title?: string
+          updated_at?: string | null
         }
         Relationships: []
       }
@@ -773,6 +899,114 @@ export type Database = {
           price_per_unit?: number | null
           size?: string | null
           updated_at?: string | null
+        }
+        Relationships: []
+      }
+      pricing_formulas: {
+        Row: {
+          applies_to: Json | null
+          calculation_type: Database["public"]["Enums"]["calculation_type"]
+          category: string
+          created_at: string | null
+          description: string | null
+          formula_name: string
+          id: string
+          is_active: boolean | null
+          unit: Database["public"]["Enums"]["formula_unit"] | null
+          updated_at: string | null
+          value: number
+        }
+        Insert: {
+          applies_to?: Json | null
+          calculation_type: Database["public"]["Enums"]["calculation_type"]
+          category: string
+          created_at?: string | null
+          description?: string | null
+          formula_name: string
+          id?: string
+          is_active?: boolean | null
+          unit?: Database["public"]["Enums"]["formula_unit"] | null
+          updated_at?: string | null
+          value: number
+        }
+        Update: {
+          applies_to?: Json | null
+          calculation_type?: Database["public"]["Enums"]["calculation_type"]
+          category?: string
+          created_at?: string | null
+          description?: string | null
+          formula_name?: string
+          id?: string
+          is_active?: boolean | null
+          unit?: Database["public"]["Enums"]["formula_unit"] | null
+          updated_at?: string | null
+          value?: number
+        }
+        Relationships: []
+      }
+      products: {
+        Row: {
+          adjusted_bom_rs: number | null
+          available_armrest_types: string[] | null
+          bom_rs: number
+          category: Database["public"]["Enums"]["product_category"]
+          comes_with_headrest: boolean | null
+          created_at: string | null
+          description: string | null
+          discount_percent: number | null
+          fabric_requirements: Json | null
+          id: string
+          images: string[] | null
+          is_active: boolean | null
+          markup_percent: number | null
+          metadata: Json | null
+          net_price_rs: number | null
+          strike_price_rs: number | null
+          title: string
+          updated_at: string | null
+          wastage_percent: number | null
+        }
+        Insert: {
+          adjusted_bom_rs?: number | null
+          available_armrest_types?: string[] | null
+          bom_rs: number
+          category: Database["public"]["Enums"]["product_category"]
+          comes_with_headrest?: boolean | null
+          created_at?: string | null
+          description?: string | null
+          discount_percent?: number | null
+          fabric_requirements?: Json | null
+          id?: string
+          images?: string[] | null
+          is_active?: boolean | null
+          markup_percent?: number | null
+          metadata?: Json | null
+          net_price_rs?: number | null
+          strike_price_rs?: number | null
+          title: string
+          updated_at?: string | null
+          wastage_percent?: number | null
+        }
+        Update: {
+          adjusted_bom_rs?: number | null
+          available_armrest_types?: string[] | null
+          bom_rs?: number
+          category?: Database["public"]["Enums"]["product_category"]
+          comes_with_headrest?: boolean | null
+          created_at?: string | null
+          description?: string | null
+          discount_percent?: number | null
+          fabric_requirements?: Json | null
+          id?: string
+          images?: string[] | null
+          is_active?: boolean | null
+          markup_percent?: number | null
+          metadata?: Json | null
+          net_price_rs?: number | null
+          strike_price_rs?: number | null
+          title?: string
+          updated_at?: string | null
+          wastage_percent?: number | null
         }
         Relationships: []
       }
@@ -1147,7 +1381,20 @@ export type Database = {
       [_ in never]: never
     }
     Enums: {
-      [_ in never]: never
+      accessory_type: "leg" | "armrest" | "console" | "pillow" | "other"
+      calculation_type: "percentage" | "flat_rate" | "multiplier"
+      formula_unit: "percent" | "rupees" | "multiplier"
+      product_category:
+        | "sofa"
+        | "sofa_bed"
+        | "recliner"
+        | "cinema_chair"
+        | "bed"
+        | "kids_bed"
+        | "dining_chair"
+        | "arm_chair"
+        | "pouffe"
+        | "bench"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1274,6 +1521,22 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      accessory_type: ["leg", "armrest", "console", "pillow", "other"],
+      calculation_type: ["percentage", "flat_rate", "multiplier"],
+      formula_unit: ["percent", "rupees", "multiplier"],
+      product_category: [
+        "sofa",
+        "sofa_bed",
+        "recliner",
+        "cinema_chair",
+        "bed",
+        "kids_bed",
+        "dining_chair",
+        "arm_chair",
+        "pouffe",
+        "bench",
+      ],
+    },
   },
 } as const
