@@ -5,6 +5,8 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import FabricSelector from "./FabricSelector";
+import { useDropdownOptions } from "@/hooks/useDropdownOptions";
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface CinemaChairConfiguratorProps {
   product: any;
@@ -13,6 +15,15 @@ interface CinemaChairConfiguratorProps {
 }
 
 const CinemaChairConfigurator = ({ product, configuration, onConfigurationChange }: CinemaChairConfiguratorProps) => {
+  // Fetch dropdown options
+  const { data: seatCounts, isLoading: loadingSeats } = useDropdownOptions("cinema_chairs", "seat_count");
+  const { data: mechanismTypes, isLoading: loadingMechanisms } = useDropdownOptions("cinema_chairs", "mechanism_type");
+  const { data: consoleSizes, isLoading: loadingConsoles } = useDropdownOptions("common", "console_size");
+  const { data: foamTypes, isLoading: loadingFoam } = useDropdownOptions("common", "foam_type");
+  const { data: seatDepths } = useDropdownOptions("cinema_chairs", "seat_depth");
+  const { data: seatWidths } = useDropdownOptions("cinema_chairs", "seat_width");
+  const { data: seatHeights } = useDropdownOptions("cinema_chairs", "seat_height");
+  
   useEffect(() => {
     if (!configuration.productId) {
       onConfigurationChange({
@@ -186,11 +197,11 @@ const CinemaChairConfigurator = ({ product, configuration, onConfigurationChange
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="Firm">Firm</SelectItem>
-                <SelectItem value="Soft">Soft</SelectItem>
-                <SelectItem value="Super Soft">Super Soft</SelectItem>
-                <SelectItem value="Latex">Latex</SelectItem>
-                <SelectItem value="Memory">Memory Foam</SelectItem>
+                {foamTypes?.map((foam) => (
+                  <SelectItem key={foam.id} value={foam.option_value}>
+                    {foam.display_label || foam.option_value}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
@@ -208,10 +219,11 @@ const CinemaChairConfigurator = ({ product, configuration, onConfigurationChange
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="22">22"</SelectItem>
-                  <SelectItem value="24">24"</SelectItem>
-                  <SelectItem value="26">26"</SelectItem>
-                  <SelectItem value="28">28"</SelectItem>
+                  {seatDepths?.map((depth) => (
+                    <SelectItem key={depth.id} value={depth.option_value}>
+                      {depth.display_label || depth.option_value}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -228,10 +240,11 @@ const CinemaChairConfigurator = ({ product, configuration, onConfigurationChange
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="22">22"</SelectItem>
-                  <SelectItem value="24">24"</SelectItem>
-                  <SelectItem value="26">26"</SelectItem>
-                  <SelectItem value="30">30"</SelectItem>
+                  {seatWidths?.map((width) => (
+                    <SelectItem key={width.id} value={width.option_value}>
+                      {width.display_label || width.option_value}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -248,9 +261,11 @@ const CinemaChairConfigurator = ({ product, configuration, onConfigurationChange
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="16">16"</SelectItem>
-                  <SelectItem value="18">18"</SelectItem>
-                  <SelectItem value="20">20"</SelectItem>
+                  {seatHeights?.map((height) => (
+                    <SelectItem key={height.id} value={height.option_value}>
+                      {height.display_label || height.option_value}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>

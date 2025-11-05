@@ -4,6 +4,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import FabricSelector from "./FabricSelector";
+import { useDropdownOptions } from "@/hooks/useDropdownOptions";
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface BenchConfiguratorProps {
   product: any;
@@ -12,6 +14,13 @@ interface BenchConfiguratorProps {
 }
 
 const BenchConfigurator = ({ product, configuration, onConfigurationChange }: BenchConfiguratorProps) => {
+  // Fetch dropdown options
+  const { data: seatingCapacities, isLoading: loadingCapacities } = useDropdownOptions("benches", "seating_capacity");
+  const { data: storageTypes, isLoading: loadingStorage } = useDropdownOptions("benches", "storage_type");
+  const { data: benchLengths } = useDropdownOptions("benches", "bench_length");
+  const { data: benchDepths } = useDropdownOptions("benches", "bench_depth");
+  const { data: benchHeights } = useDropdownOptions("benches", "bench_height");
+  
   useEffect(() => {
     if (!configuration.productId) {
       onConfigurationChange({
@@ -60,9 +69,11 @@ const BenchConfigurator = ({ product, configuration, onConfigurationChange }: Be
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="2-seater">2-Seater</SelectItem>
-                <SelectItem value="3-seater">3-Seater</SelectItem>
-                <SelectItem value="custom">Custom Size</SelectItem>
+                {seatingCapacities?.map((capacity) => (
+                  <SelectItem key={capacity.id} value={capacity.option_value}>
+                    {capacity.display_label || capacity.option_value}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
@@ -97,13 +108,16 @@ const BenchConfigurator = ({ product, configuration, onConfigurationChange }: Be
                     storage: { ...configuration.storage, type: value }
                   })}
                 >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Lift-top">Lift-top Storage</SelectItem>
-                    <SelectItem value="Drawer">Drawer Storage</SelectItem>
-                  </SelectContent>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {storageTypes?.map((type) => (
+                    <SelectItem key={type.id} value={type.option_value}>
+                      {type.display_label || type.option_value}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
                 </Select>
               </div>
             )}
@@ -131,10 +145,11 @@ const BenchConfigurator = ({ product, configuration, onConfigurationChange }: Be
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="36">36" (Small)</SelectItem>
-                  <SelectItem value="48">48" (2-Seater)</SelectItem>
-                  <SelectItem value="60">60" (3-Seater)</SelectItem>
-                  <SelectItem value="72">72" (Large)</SelectItem>
+                  {benchLengths?.map((length) => (
+                    <SelectItem key={length.id} value={length.option_value}>
+                      {length.display_label || length.option_value}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -151,9 +166,11 @@ const BenchConfigurator = ({ product, configuration, onConfigurationChange }: Be
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="16">16"</SelectItem>
-                  <SelectItem value="18">18"</SelectItem>
-                  <SelectItem value="20">20"</SelectItem>
+                  {benchDepths?.map((depth) => (
+                    <SelectItem key={depth.id} value={depth.option_value}>
+                      {depth.display_label || depth.option_value}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -170,10 +187,11 @@ const BenchConfigurator = ({ product, configuration, onConfigurationChange }: Be
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="16">16"</SelectItem>
-                  <SelectItem value="18">18"</SelectItem>
-                  <SelectItem value="20">20"</SelectItem>
-                  <SelectItem value="22">22"</SelectItem>
+                  {benchHeights?.map((height) => (
+                    <SelectItem key={height.id} value={height.option_value}>
+                      {height.display_label || height.option_value}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>

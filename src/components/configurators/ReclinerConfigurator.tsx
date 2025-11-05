@@ -7,6 +7,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Plus, Trash2 } from "lucide-react";
 import FabricSelector from "./FabricSelector";
+import { useDropdownOptions } from "@/hooks/useDropdownOptions";
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface ReclinerConfiguratorProps {
   product: any;
@@ -16,6 +18,17 @@ interface ReclinerConfiguratorProps {
 
 const ReclinerConfigurator = ({ product, configuration, onConfigurationChange }: ReclinerConfiguratorProps) => {
   const [seats, setSeats] = useState<any[]>([]);
+  
+  // Fetch dropdown options
+  const { data: baseShapes, isLoading: loadingShapes } = useDropdownOptions("recliner", "base_shape");
+  const { data: seatTypes, isLoading: loadingSeats } = useDropdownOptions("recliner", "seat_type");
+  const { data: mechanismTypesFront, isLoading: loadingMechanismsFront } = useDropdownOptions("recliner", "mechanism_type");
+  const { data: mechanismTypesLeft, isLoading: loadingMechanismsLeft } = useDropdownOptions("recliner", "mechanism_type");
+  const { data: consoleSizes, isLoading: loadingConsoles } = useDropdownOptions("common", "console_size");
+  const { data: foamTypes, isLoading: loadingFoam } = useDropdownOptions("common", "foam_type");
+  const { data: seatDepths } = useDropdownOptions("recliner", "seat_depth");
+  const { data: seatWidths } = useDropdownOptions("recliner", "seat_width");
+  const { data: seatHeights } = useDropdownOptions("recliner", "seat_height");
 
   useEffect(() => {
     if (!configuration.productId) {
@@ -143,15 +156,16 @@ const ReclinerConfigurator = ({ product, configuration, onConfigurationChange }:
                       value={seat.type}
                       onValueChange={(value) => updateSeat(index, "type", value)}
                     >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="1-Seater">1-Seater</SelectItem>
-                        <SelectItem value="2-Seater">2-Seater</SelectItem>
-                        <SelectItem value="3-Seater">3-Seater</SelectItem>
-                        <SelectItem value="Corner">Corner</SelectItem>
-                      </SelectContent>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {seatTypes?.map((type) => (
+                        <SelectItem key={type.id} value={type.option_value}>
+                          {type.display_label || type.option_value}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
                     </Select>
                   </div>
                   <div className="space-y-2">
@@ -292,11 +306,11 @@ const ReclinerConfigurator = ({ product, configuration, onConfigurationChange }:
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="Firm">Firm</SelectItem>
-                <SelectItem value="Soft">Soft</SelectItem>
-                <SelectItem value="Super Soft">Super Soft</SelectItem>
-                <SelectItem value="Latex">Latex</SelectItem>
-                <SelectItem value="Memory">Memory Foam</SelectItem>
+                {foamTypes?.map((foam) => (
+                  <SelectItem key={foam.id} value={foam.option_value}>
+                    {foam.display_label || foam.option_value}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
@@ -314,10 +328,11 @@ const ReclinerConfigurator = ({ product, configuration, onConfigurationChange }:
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="22">22"</SelectItem>
-                  <SelectItem value="24">24"</SelectItem>
-                  <SelectItem value="26">26"</SelectItem>
-                  <SelectItem value="28">28"</SelectItem>
+                  {seatDepths?.map((depth) => (
+                    <SelectItem key={depth.id} value={depth.option_value}>
+                      {depth.display_label || depth.option_value}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -334,10 +349,11 @@ const ReclinerConfigurator = ({ product, configuration, onConfigurationChange }:
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="22">22"</SelectItem>
-                  <SelectItem value="24">24"</SelectItem>
-                  <SelectItem value="26">26"</SelectItem>
-                  <SelectItem value="30">30"</SelectItem>
+                  {seatWidths?.map((width) => (
+                    <SelectItem key={width.id} value={width.option_value}>
+                      {width.display_label || width.option_value}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -354,9 +370,11 @@ const ReclinerConfigurator = ({ product, configuration, onConfigurationChange }:
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="16">16"</SelectItem>
-                  <SelectItem value="18">18"</SelectItem>
-                  <SelectItem value="20">20"</SelectItem>
+                  {seatHeights?.map((height) => (
+                    <SelectItem key={height.id} value={height.option_value}>
+                      {height.display_label || height.option_value}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>

@@ -3,6 +3,8 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import FabricSelector from "./FabricSelector";
+import { useDropdownOptions } from "@/hooks/useDropdownOptions";
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface DiningChairConfiguratorProps {
   product: any;
@@ -11,6 +13,13 @@ interface DiningChairConfiguratorProps {
 }
 
 const DiningChairConfigurator = ({ product, configuration, onConfigurationChange }: DiningChairConfiguratorProps) => {
+  // Fetch dropdown options
+  const { data: setQuantities, isLoading: loadingQuantities } = useDropdownOptions("dining_chairs", "set_quantity");
+  const { data: foamTypes, isLoading: loadingFoam } = useDropdownOptions("dining_chairs", "foam_type");
+  const { data: seatDepths } = useDropdownOptions("dining_chairs", "seat_depth");
+  const { data: seatWidths } = useDropdownOptions("dining_chairs", "seat_width");
+  const { data: seatHeights } = useDropdownOptions("dining_chairs", "seat_height");
+  
   useEffect(() => {
     if (!configuration.productId) {
       onConfigurationChange({
@@ -58,10 +67,11 @@ const DiningChairConfigurator = ({ product, configuration, onConfigurationChange
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="2">Set of 2 Chairs</SelectItem>
-                <SelectItem value="4">Set of 4 Chairs</SelectItem>
-                <SelectItem value="6">Set of 6 Chairs</SelectItem>
-                <SelectItem value="8">Set of 8 Chairs</SelectItem>
+                {setQuantities?.map((qty) => (
+                  <SelectItem key={qty.id} value={qty.option_value}>
+                    {qty.display_label || qty.option_value}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
@@ -93,9 +103,11 @@ const DiningChairConfigurator = ({ product, configuration, onConfigurationChange
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="Firm">Firm</SelectItem>
-                <SelectItem value="Soft">Soft</SelectItem>
-                <SelectItem value="Super Soft">Super Soft</SelectItem>
+                {foamTypes?.map((foam) => (
+                  <SelectItem key={foam.id} value={foam.option_value}>
+                    {foam.display_label || foam.option_value}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
@@ -113,9 +125,11 @@ const DiningChairConfigurator = ({ product, configuration, onConfigurationChange
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="16">16"</SelectItem>
-                  <SelectItem value="18">18"</SelectItem>
-                  <SelectItem value="20">20"</SelectItem>
+                  {seatDepths?.map((depth) => (
+                    <SelectItem key={depth.id} value={depth.option_value}>
+                      {depth.display_label || depth.option_value}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -132,9 +146,11 @@ const DiningChairConfigurator = ({ product, configuration, onConfigurationChange
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="16">16"</SelectItem>
-                  <SelectItem value="18">18"</SelectItem>
-                  <SelectItem value="20">20"</SelectItem>
+                  {seatWidths?.map((width) => (
+                    <SelectItem key={width.id} value={width.option_value}>
+                      {width.display_label || width.option_value}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -151,9 +167,11 @@ const DiningChairConfigurator = ({ product, configuration, onConfigurationChange
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="16">16"</SelectItem>
-                  <SelectItem value="18">18"</SelectItem>
-                  <SelectItem value="20">20"</SelectItem>
+                  {seatHeights?.map((height) => (
+                    <SelectItem key={height.id} value={height.option_value}>
+                      {height.display_label || height.option_value}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>

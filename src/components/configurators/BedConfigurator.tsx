@@ -4,6 +4,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import FabricSelector from "./FabricSelector";
+import { useDropdownOptions } from "@/hooks/useDropdownOptions";
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface BedConfiguratorProps {
   product: any;
@@ -12,6 +14,14 @@ interface BedConfiguratorProps {
 }
 
 const BedConfigurator = ({ product, configuration, onConfigurationChange }: BedConfiguratorProps) => {
+  // Fetch dropdown options
+  const { data: bedSizes, isLoading: loadingSizes } = useDropdownOptions("bed", "bed_size");
+  const { data: storageTypes, isLoading: loadingStorage } = useDropdownOptions("bed", "storage_type");
+  const { data: mattressSupports, isLoading: loadingSupport } = useDropdownOptions("bed", "mattress_support");
+  const { data: bedLengths } = useDropdownOptions("bed", "bed_length");
+  const { data: bedWidths } = useDropdownOptions("bed", "bed_width");
+  const { data: headboardHeights } = useDropdownOptions("bed", "headboard_height");
+  
   useEffect(() => {
     if (!configuration.productId) {
       onConfigurationChange({
