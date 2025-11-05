@@ -9,6 +9,13 @@ import { ArrowLeft, ArrowRight, ShoppingCart, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { calculateSofaPrice, SofaConfiguration } from "@/lib/pricing-engine";
 import SofaConfigurator from "@/components/configurators/SofaConfigurator";
+import BedConfigurator from "@/components/configurators/BedConfigurator";
+import ReclinerConfigurator from "@/components/configurators/ReclinerConfigurator";
+import CinemaChairConfigurator from "@/components/configurators/CinemaChairConfigurator";
+import DiningChairConfigurator from "@/components/configurators/DiningChairConfigurator";
+import ArmChairConfigurator from "@/components/configurators/ArmChairConfigurator";
+import BenchConfigurator from "@/components/configurators/BenchConfigurator";
+import PlaceholderConfigurator from "@/components/configurators/PlaceholderConfigurator";
 import PricingSummary from "@/components/configurators/PricingSummary";
 
 const Configure = () => {
@@ -168,12 +175,55 @@ const Configure = () => {
                     onConfigurationChange={setConfiguration}
                   />
                 )}
-                {category !== "sofa" && (
-                  <div className="text-center py-12">
-                    <p className="text-muted-foreground">
-                      Configurator for {category} coming soon
-                    </p>
-                  </div>
+                {category === "bed" && (
+                  <BedConfigurator
+                    product={product}
+                    configuration={configuration}
+                    onConfigurationChange={setConfiguration}
+                  />
+                )}
+                {category === "recliner" && (
+                  <ReclinerConfigurator
+                    product={product}
+                    configuration={configuration}
+                    onConfigurationChange={setConfiguration}
+                  />
+                )}
+                {category === "cinema_chairs" && (
+                  <CinemaChairConfigurator
+                    product={product}
+                    configuration={configuration}
+                    onConfigurationChange={setConfiguration}
+                  />
+                )}
+                {category === "dining_chairs" && (
+                  <DiningChairConfigurator
+                    product={product}
+                    configuration={configuration}
+                    onConfigurationChange={setConfiguration}
+                  />
+                )}
+                {category === "arm_chairs" && (
+                  <ArmChairConfigurator
+                    product={product}
+                    configuration={configuration}
+                    onConfigurationChange={setConfiguration}
+                  />
+                )}
+                {category === "benches" && (
+                  <BenchConfigurator
+                    product={product}
+                    configuration={configuration}
+                    onConfigurationChange={setConfiguration}
+                  />
+                )}
+                {(category === "kids_bed" || category === "sofabed" || category === "database_pouffes") && (
+                  <PlaceholderConfigurator
+                    product={product}
+                    configuration={configuration}
+                    onConfigurationChange={setConfiguration}
+                    categoryName={category}
+                  />
                 )}
               </CardContent>
             </Card>

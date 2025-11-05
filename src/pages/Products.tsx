@@ -54,7 +54,7 @@ const Products = () => {
 
         {/* Category Tabs */}
         <Tabs value={category} onValueChange={setCategory} className="mb-8">
-          <TabsList>
+          <TabsList className="flex-wrap h-auto">
             <TabsTrigger value="sofa">Sofas</TabsTrigger>
             <TabsTrigger value="bed">Beds</TabsTrigger>
             <TabsTrigger value="recliner">Recliners</TabsTrigger>
@@ -62,6 +62,9 @@ const Products = () => {
             <TabsTrigger value="dining_chairs">Dining Chairs</TabsTrigger>
             <TabsTrigger value="arm_chairs">Arm Chairs</TabsTrigger>
             <TabsTrigger value="benches">Benches</TabsTrigger>
+            <TabsTrigger value="kids_bed">Kids Beds</TabsTrigger>
+            <TabsTrigger value="sofabed">Sofa Beds</TabsTrigger>
+            <TabsTrigger value="database_pouffes">Pouffes</TabsTrigger>
           </TabsList>
         </Tabs>
 
