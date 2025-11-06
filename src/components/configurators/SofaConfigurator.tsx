@@ -62,6 +62,10 @@ const SofaConfigurator = ({
   const modelHasHeadrestResult = useDropdownOptions("sofa", "model_has_headrest");
   const headrestRequiredResult = useDropdownOptions("sofa", "headrest_required");
 
+  // Read comes_with_headrest from product (sofa_database)
+  const productComesWithHeadrest = product?.comes_with_headrest || "No";
+  const canSelectHeadrest = productComesWithHeadrest === "Yes" || productComesWithHeadrest === "yes";
+
   // Safely extract data with defaults
   const shapes = Array.isArray(shapesResult.data) ? shapesResult.data : [];
   const frontSeatCounts = Array.isArray(frontSeatCountsResult.data) ? frontSeatCountsResult.data : [];
@@ -178,6 +182,14 @@ const SofaConfigurator = ({
       configuration.additionalPillows?.fabricColour2
     ),
   });
+
+  // Reset headrestRequired if model doesn't support headrest
+  useEffect(() => {
+    if (!canSelectHeadrest && configuration.headrestRequired === "Yes") {
+      const newConfig = { ...configuration, headrestRequired: "No" };
+      onConfigurationChange(newConfig);
+    }
+  }, [canSelectHeadrest, configuration.headrestRequired, configuration, onConfigurationChange]);
 
   // Calculate total seats dynamically (must be defined before useEffect)
   const getTotalSeats = (): number => {
@@ -315,9 +327,9 @@ const SofaConfigurator = ({
         stitch: {
           type: (stitchTypes && stitchTypes.length > 0) ? stitchTypes[0].option_value : "",
       },
-        comesWithHeadrest: "No", // Keep for backward compatibility
-        modelHasHeadrest: "No", // Whether model comes with headrest
-        headrestRequired: "No", // Whether headrest is required
+        comesWithHeadrest: productComesWithHeadrest || "No", // Keep for backward compatibility
+        modelHasHeadrest: productComesWithHeadrest || "No", // Read from product (sofa_database)
+        headrestRequired: "No", // Whether headrest is required (only if model has headrest)
         customerInfo: {
           fullName: "",
           email: "",
@@ -327,7 +339,7 @@ const SofaConfigurator = ({
       };
       onConfigurationChange(defaultConfig);
     }
-  }, [product?.id, shapes, frontSeatCounts, foamTypes, seatDepths, seatWidths, woodTypes, stitchTypes]);
+  }, [product?.id, product?.comes_with_headrest, shapes, frontSeatCounts, foamTypes, seatDepths, seatWidths, woodTypes, stitchTypes]);
 
   const updateConfiguration = (updates: any) => {
     const newConfig = { ...configuration, ...updates };
@@ -1621,42 +1633,25 @@ const SofaConfigurator = ({
                   )}
           </div>
 
-                {/* Model Has Headrest */}
+                {/* Model Has Headrest - Read-only from product */}
                 <div className="space-y-3">
                   <Label className="text-base font-semibold">Model Has Headrest</Label>
-                  <Select
-                    value={configuration.modelHasHeadrest || "No"}
-                    onValueChange={(value) =>
-                      updateConfiguration({
-                        modelHasHeadrest: value,
-                      })
-                    }
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select option" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {modelHasHeadrestResult.isLoading ? (
-                        <SelectItem value="loading" disabled>Loading...</SelectItem>
-                      ) : modelHasHeadrestOptions && modelHasHeadrestOptions.length > 0 ? (
-                        modelHasHeadrestOptions
-                          .filter((opt: any) => opt && opt.option_value)
-                          .map((opt: any) => (
-                            <SelectItem key={opt.id} value={opt.option_value}>
-                              {opt.display_label || opt.option_value}
-                            </SelectItem>
-                          ))
-                      ) : (
-                        <>
-                          <SelectItem value="Yes">Yes</SelectItem>
-                          <SelectItem value="No">No</SelectItem>
-                        </>
-                      )}
-                    </SelectContent>
-                  </Select>
+                  <div className="flex items-center gap-2">
+                    <Input
+                      value={productComesWithHeadrest || "No"}
+                      readOnly
+                      disabled
+                      className="bg-muted cursor-not-allowed"
+                    />
+                    <p className="text-sm text-muted-foreground">
+                      {canSelectHeadrest 
+                        ? "This model supports headrest selection" 
+                        : "This model does not support headrest"}
+                    </p>
+                  </div>
                 </div>
 
-                {/* Headrest Required */}
+                {/* Headrest Required - Only enabled if model has headrest */}
                 <div className="space-y-3">
                   <Label className="text-base font-semibold">Headrest Required</Label>
                   <Select
@@ -1666,9 +1661,10 @@ const SofaConfigurator = ({
                         headrestRequired: value,
                       })
                     }
+                    disabled={!canSelectHeadrest}
                   >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select option" />
+                    <SelectTrigger className={!canSelectHeadrest ? "bg-muted cursor-not-allowed" : ""}>
+                      <SelectValue placeholder={canSelectHeadrest ? "Select option" : "Not available for this model"} />
                     </SelectTrigger>
                     <SelectContent>
                       {headrestRequiredResult.isLoading ? (
@@ -1689,6 +1685,11 @@ const SofaConfigurator = ({
                       )}
                     </SelectContent>
                   </Select>
+                  {!canSelectHeadrest && (
+                    <p className="text-sm text-muted-foreground">
+                      Headrest is not available for this model. The model does not come with headrest support.
+                    </p>
+                  )}
                 </div>
               </AccordionContent>
             </AccordionItem>
