@@ -19,7 +19,7 @@ const PricingSummary = ({
   const isConfigComplete =
     configuration.productId &&
     configuration.fabric?.structureCode &&
-    configuration.seats?.length > 0;
+    (configuration.seats?.length > 0 || configuration.frontSeatCount);
 
   return (
     <Card className="luxury-card border-muted/50">

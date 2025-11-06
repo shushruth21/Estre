@@ -40,7 +40,7 @@ const navigation = [
 export function AdminLayout({ children }: AdminLayoutProps) {
   const location = useLocation();
   const navigate = useNavigate();
-  const { user, isAdmin } = useAuth();
+  const { user, isAdmin, loading, userRoles } = useAuth();
   const { toast } = useToast();
 
   const handleLogout = async () => {
@@ -52,13 +52,49 @@ export function AdminLayout({ children }: AdminLayoutProps) {
     navigate("/login");
   };
 
-  if (!isAdmin()) {
+  // Show loading state while checking authentication and roles
+  if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="text-center space-y-4">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
+          <p className="text-muted-foreground">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Check if user is authenticated
+  if (!user) {
+    navigate("/login");
+    return null;
+  }
+
+  // Check admin role after loading is complete
+  if (!isAdmin()) {
+    if (import.meta.env.DEV) {
+      console.warn("⚠️ Admin access denied:", {
+        user: user?.email,
+        userRoles,
+        isAdmin: isAdmin(),
+        loading
+      });
+    }
+    
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="text-center space-y-4 max-w-md">
           <h2 className="text-2xl font-bold">Access Denied</h2>
           <p className="text-muted-foreground">You don't have permission to access this page.</p>
-          <Button onClick={() => navigate("/")}>Go Home</Button>
+          <div className="bg-muted p-4 rounded-lg text-left text-sm space-y-2">
+            <p><strong>User:</strong> {user?.email || "Not logged in"}</p>
+            <p><strong>Roles:</strong> {userRoles.length > 0 ? userRoles.join(", ") : "None"}</p>
+            <p><strong>Required:</strong> admin, store_manager, or production_manager</p>
+          </div>
+          <div className="flex gap-2 justify-center">
+            <Button onClick={() => navigate("/")}>Go Home</Button>
+            <Button onClick={() => navigate("/login")} variant="outline">Login</Button>
+          </div>
         </div>
       </div>
     );

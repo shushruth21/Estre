@@ -39,6 +39,11 @@ const Configure = () => {
         .single() as any;
 
       if (error) throw error;
+      
+      // Keep original image data - ProductImageGallery will parse it
+      // This preserves arrays, strings, comma-separated, JSON arrays, etc.
+      // No normalization needed - ProductImageGallery handles all formats
+      
       return data;
     },
     enabled: !!category && !!productId,
@@ -173,7 +178,7 @@ const Configure = () => {
           <div className="lg:col-span-2">
             <div className="sticky top-24">
               <ProductImageGallery 
-                images={product.images}
+                images={product?.images || null}
                 productTitle={product.title}
               />
               

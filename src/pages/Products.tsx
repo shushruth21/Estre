@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
+import { getFirstImageUrl } from "@/lib/image-utils";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -91,16 +92,56 @@ const Products = () => {
 
       if (error) throw error;
       
+      // Debug: Log raw data from database in development only
+      if (import.meta.env.DEV && data && data.length > 0) {
+        console.log('📦 Raw product data from database:', {
+          count: data.length,
+          firstItem: {
+            id: data[0].id,
+            title: data[0].title,
+            images: data[0].images,
+            imagesType: typeof data[0].images,
+            isArray: Array.isArray(data[0].images)
+          }
+        });
+      }
+      
       // Normalize the data to use consistent property names
-      const normalizedData = (data || []).map((item: any) => ({
-        id: item.id,
-        title: item.title,
-        images: item.images,
-        netPrice: item[columns.netPrice],
-        strikePrice: item[columns.strikePrice],
-        discount_percent: item.discount_percent,
-        discount_rs: item.discount_rs
-      }));
+      const normalizedData = (data || []).map((item: any) => {
+        // Handle images - use utility function for consistent parsing
+        // Get first image for thumbnail, but store full image data for gallery
+        const imageUrl = getFirstImageUrl(item.images);
+        
+        // Debug logging in development
+        if (import.meta.env.DEV) {
+          if (item.images && !imageUrl) {
+            console.warn('⚠️ Image parsing failed for product:', {
+              id: item.id,
+              title: item.title,
+              rawImages: item.images,
+              imagesType: typeof item.images,
+              isArray: Array.isArray(item.images)
+            });
+          } else if (imageUrl) {
+            console.log('✅ Image parsed successfully:', {
+              product: item.title,
+              original: item.images,
+              parsed: imageUrl
+            });
+          }
+        }
+        
+        return {
+          id: item.id,
+          title: item.title,
+          images: imageUrl, // First image URL for thumbnail
+          imagesData: item.images, // Full image data for gallery (can be string, array, etc.)
+          netPrice: item[columns.netPrice],
+          strikePrice: item[columns.strikePrice],
+          discount_percent: item.discount_percent,
+          discount_rs: item.discount_rs
+        };
+      });
       
       return normalizedData as Product[];
     },
@@ -156,16 +197,43 @@ const Products = () => {
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
             {products?.map((product) => (
               <Card key={product.id} className="group overflow-hidden luxury-card border-muted/50">
-                {product.images && (
-                  <div className="aspect-[4/3] bg-gradient-to-br from-muted to-muted/50 overflow-hidden">
-                    <img
-                      src={product.images}
-                      alt={product.title}
-                      className="w-full h-full object-cover image-zoom"
-                      loading="lazy"
-                    />
-                  </div>
-                )}
+                <div className="aspect-[4/3] bg-gradient-to-br from-muted to-muted/50 overflow-hidden relative">
+                  <img
+                    src={product.images || '/placeholder.svg'}
+                    alt={product.title}
+                    className="w-full h-full object-cover image-zoom"
+                    loading="lazy"
+                    onError={(e) => {
+                      const target = e.target as HTMLImageElement;
+                      const currentSrc = target.src;
+                      
+                      // Log error in development
+                      if (import.meta.env.DEV) {
+                        console.error('❌ Image failed to load:', {
+                          product: product.title,
+                          attemptedUrl: product.images,
+                          failedUrl: currentSrc
+                        });
+                      }
+                      
+                      // Only set placeholder if not already placeholder
+                      if (!currentSrc.includes('placeholder.svg')) {
+                        target.src = '/placeholder.svg';
+                        target.onerror = null; // Prevent infinite loop
+                      }
+                    }}
+                    onLoad={() => {
+                      // Log successful load in development
+                      if (import.meta.env.DEV && product.images) {
+                        console.log('✅ Image loaded successfully:', {
+                          product: product.title,
+                          url: product.images
+                        });
+                      }
+                    }}
+                    referrerPolicy="no-referrer-when-downgrade"
+                  />
+                </div>
                 <CardContent className="p-6 space-y-3">
                   <h3 className="text-2xl font-serif font-semibold tracking-tight group-hover:text-primary transition-colors">
                     {product.title}

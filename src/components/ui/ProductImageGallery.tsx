@@ -2,9 +2,10 @@ import { useState } from "react";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { ChevronLeft, ChevronRight, Maximize2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { getAllImageUrls } from "@/lib/image-utils";
 
 interface ProductImageGalleryProps {
-  images: string | null;
+  images: string | null | string[] | any; // Accept any format from database
   productTitle: string;
   className?: string;
 }
@@ -13,10 +14,18 @@ const ProductImageGallery = ({ images, productTitle, className = "" }: ProductIm
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [isLightboxOpen, setIsLightboxOpen] = useState(false);
 
-  // Parse images - could be single URL or comma-separated URLs
-  const imageUrls = images 
-    ? images.split(',').map(url => url.trim()).filter(Boolean)
-    : ['/placeholder.svg'];
+  // Parse images using utility function - handles all formats
+  const imageUrls = getAllImageUrls(images);
+
+  // Handle image loading errors
+  const handleImageError = (e: React.SyntheticEvent<HTMLImageElement, Event>) => {
+    const target = e.target as HTMLImageElement;
+    // Only set placeholder if not already placeholder to prevent infinite loop
+    if (!target.src.includes('placeholder.svg')) {
+      target.src = '/placeholder.svg';
+      target.onerror = null; // Prevent infinite loop
+    }
+  };
 
   const handlePrevious = () => {
     setSelectedIndex((prev) => (prev === 0 ? imageUrls.length - 1 : prev - 1));
@@ -30,12 +39,15 @@ const ProductImageGallery = ({ images, productTitle, className = "" }: ProductIm
     <>
       <div className={`space-y-4 ${className}`}>
         {/* Main Image */}
-        <div className="relative aspect-square bg-muted rounded-xl overflow-hidden group">
+          <div className="relative aspect-square bg-muted rounded-xl overflow-hidden group">
           <img
             src={imageUrls[selectedIndex]}
             alt={`${productTitle} - View ${selectedIndex + 1}`}
             className="w-full h-full object-cover image-zoom cursor-pointer"
             onClick={() => setIsLightboxOpen(true)}
+            onError={handleImageError}
+            loading="lazy"
+            referrerPolicy="no-referrer-when-downgrade"
           />
           
           {/* Zoom Button */}
@@ -92,6 +104,10 @@ const ProductImageGallery = ({ images, productTitle, className = "" }: ProductIm
                   src={url}
                   alt={`${productTitle} thumbnail ${index + 1}`}
                   className="w-full h-full object-cover"
+                  onError={handleImageError}
+                  loading="lazy"
+                  crossOrigin="anonymous"
+                  referrerPolicy="no-referrer-when-downgrade"
                 />
               </button>
             ))}
@@ -107,6 +123,9 @@ const ProductImageGallery = ({ images, productTitle, className = "" }: ProductIm
               src={imageUrls[selectedIndex]}
               alt={`${productTitle} - View ${selectedIndex + 1}`}
               className="max-w-full max-h-full object-contain"
+              onError={handleImageError}
+              crossOrigin="anonymous"
+              referrerPolicy="no-referrer-when-downgrade"
             />
             
             {imageUrls.length > 1 && (

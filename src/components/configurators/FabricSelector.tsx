@@ -161,7 +161,7 @@ const FabricPartSelector = ({
   onSearchChange,
   onSelect,
 }: FabricPartSelectorProps) => {
-  const selectedFabric = fabrics?.find((f) => f.code === selectedCode);
+  const selectedFabric = fabrics?.find((f) => f.estre_code === selectedCode);
 
   return (
     <div>
@@ -171,10 +171,10 @@ const FabricPartSelector = ({
           <Button variant="outline" className="w-full justify-start">
             {selectedFabric ? (
               <div className="flex items-center gap-2">
-                <Badge>{selectedFabric.code}</Badge>
-                <span>{selectedFabric.title}</span>
+                <Badge>{selectedFabric.estre_code}</Badge>
+                <span>{selectedFabric.title || selectedFabric.description}</span>
                 <span className="ml-auto text-primary">
-                  ₹{selectedFabric.price_per_mtr_rs}/mtr
+                  ₹{selectedFabric.price || 0}/mtr
                 </span>
               </div>
             ) : (
@@ -215,7 +215,7 @@ const FabricPartSelector = ({
                         {fabric.colour_link && (
                           <img
                             src={fabric.colour_link}
-                            alt={fabric.title || ''}
+                            alt={fabric.title || fabric.description || ''}
                             className="w-16 h-16 object-cover rounded"
                           />
                         )}

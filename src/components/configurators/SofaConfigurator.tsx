@@ -2,8 +2,7 @@ import { useState, useEffect } from "react";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import {
   Select,
   SelectContent,
@@ -11,13 +10,18 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Plus, Trash2 } from "lucide-react";
-import FabricSelector from "./FabricSelector";
+import { Separator } from "@/components/ui/separator";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Textarea } from "@/components/ui/textarea";
 import { useDropdownOptions } from "@/hooks/useDropdownOptions";
-import { useAdminSettings } from "@/hooks/useAdminSettings";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { Checkbox } from "@/components/ui/checkbox";
+import FabricSelector from "./FabricSelector";
+import { SelectionCard } from "@/components/ui/SelectionCard";
+import { ChevronDown, Download, Info, Loader2, Square, LayoutGrid } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 interface SofaConfiguratorProps {
   product: any;
@@ -30,322 +34,579 @@ const SofaConfigurator = ({
   configuration,
   onConfigurationChange,
 }: SofaConfiguratorProps) => {
-  const [seats, setSeats] = useState([
-    { position: "F", type: "2-Seater", qty: 1, width: 48 },
-  ]);
+  // Load all dropdown options from database with error handling
+  const shapesResult = useDropdownOptions("sofa", "base_shape");
+  const frontSeatCountsResult = useDropdownOptions("sofa", "front_seat_count");
+  const foamTypesResult = useDropdownOptions("sofa", "foam_type");
+  const seatDepthsResult = useDropdownOptions("sofa", "seat_depth");
+  const seatWidthsResult = useDropdownOptions("sofa", "seat_width");
+  const legTypesResult = useDropdownOptions("sofa", "leg_type");
+  const woodTypesResult = useDropdownOptions("sofa", "wood_type");
+  const stitchTypesResult = useDropdownOptions("sofa", "stitch_type");
+  const loungerSizesResult = useDropdownOptions("sofa", "lounger_size");
+  const consoleSizesResult = useDropdownOptions("sofa", "console_size");
+  
+  // Shape-specific dropdown options
+  const l1OptionsResult = useDropdownOptions("sofa", "l1_option");
+  const r1OptionsResult = useDropdownOptions("sofa", "r1_option");
+  const l2SeatCountsResult = useDropdownOptions("sofa", "l2_seat_count");
+  const r2SeatCountsResult = useDropdownOptions("sofa", "r2_seat_count");
+  
+  // Headrest option
+  const headrestOptionsResult = useDropdownOptions("sofa", "comes_with_headrest");
 
-  // Load dropdown options from database
-  const { data: sofaTypes } = useDropdownOptions("sofa", "sofa_type");
-  const { data: seatTypes } = useDropdownOptions("sofa", "seat_type");
-  const { data: loungerSizes } = useDropdownOptions("sofa", "lounger_size");
-  const { data: consoleSizes } = useDropdownOptions("sofa", "console_size");
-  const { data: foamTypes } = useDropdownOptions("sofa", "foam_type");
-  const { data: seatDepths } = useDropdownOptions("sofa", "seat_depth");
-  const { data: seatWidths } = useDropdownOptions("sofa", "seat_width");
-  const { data: seatHeights } = useDropdownOptions("sofa", "seat_height");
-  const { data: backrestDepths } = useDropdownOptions("sofa", "backrest_depth");
+  // Safely extract data with defaults
+  const shapes = Array.isArray(shapesResult.data) ? shapesResult.data : [];
+  const frontSeatCounts = Array.isArray(frontSeatCountsResult.data) ? frontSeatCountsResult.data : [];
+  const foamTypes = Array.isArray(foamTypesResult.data) ? foamTypesResult.data : [];
+  const seatDepths = Array.isArray(seatDepthsResult.data) ? seatDepthsResult.data : [];
+  const seatWidths = Array.isArray(seatWidthsResult.data) ? seatWidthsResult.data : [];
+  const legTypes = Array.isArray(legTypesResult.data) ? legTypesResult.data : [];
+  const woodTypes = Array.isArray(woodTypesResult.data) ? woodTypesResult.data : [];
+  const stitchTypes = Array.isArray(stitchTypesResult.data) ? stitchTypesResult.data : [];
+  const loungerSizes = Array.isArray(loungerSizesResult.data) ? loungerSizesResult.data : [];
+  const consoleSizes = Array.isArray(consoleSizesResult.data) ? consoleSizesResult.data : [];
+  
+  const l1Options = Array.isArray(l1OptionsResult.data) ? l1OptionsResult.data : [];
+  const r1Options = Array.isArray(r1OptionsResult.data) ? r1OptionsResult.data : [];
+  const l2SeatCounts = Array.isArray(l2SeatCountsResult.data) ? l2SeatCountsResult.data : [];
+  const r2SeatCounts = Array.isArray(r2SeatCountsResult.data) ? r2SeatCountsResult.data : [];
+  const headrestOptions = Array.isArray(headrestOptionsResult.data) ? headrestOptionsResult.data : [];
 
-  // Load admin settings for defaults
-  const { data: adminSettings } = useAdminSettings("sofa");
+  // Helper: Convert shape to standardized format (must be defined before use)
+  const normalizeShape = (shape: string): 'standard' | 'l-shape' | 'u-shape' | 'combo' => {
+    if (!shape) return 'standard';
+    const lower = shape.toLowerCase();
+    if (lower.includes('l-shape') || lower.includes('l shape')) return 'l-shape';
+    if (lower.includes('u-shape') || lower.includes('u shape')) return 'u-shape';
+    if (lower.includes('combo')) return 'combo';
+    return 'standard';
+  };
 
-  // Fetch accessories from accessories_prices table
-  const { data: accessories, isLoading: accessoriesLoading } = useQuery({
-    queryKey: ["accessories-prices"],
+  // Helper: Convert seat count string to number (e.g., "2-Seater" -> 2)
+  const parseSeatCount = (value: string | number): number => {
+    if (typeof value === 'number') return value;
+    if (!value) return 2; // Default
+    const match = value.toString().match(/(\d+)/);
+    return match ? parseInt(match[1], 10) : 2;
+  };
+
+  // Get current shape and determine conditional fields
+  const currentShapeValue = configuration.shape || (shapes && shapes.length > 0 ? shapes[0].option_value : "Standard");
+  const normalizedShape = normalizeShape(currentShapeValue);
+  const currentShape = normalizedShape;
+  
+  const isStandard = normalizedShape === 'standard';
+  const isLShape = normalizedShape === 'l-shape';
+  const isUShape = normalizedShape === 'u-shape';
+  const isCombo = normalizedShape === 'combo';
+
+  const isLoadingDropdowns = shapesResult.isLoading || frontSeatCountsResult.isLoading || foamTypesResult.isLoading || 
+                              seatDepthsResult.isLoading || seatWidthsResult.isLoading || legTypesResult.isLoading || 
+                              woodTypesResult.isLoading || stitchTypesResult.isLoading || loungerSizesResult.isLoading || 
+                              consoleSizesResult.isLoading;
+
+  // Load legs prices for pricing display
+  const { data: legsPrices } = useQuery({
+    queryKey: ["legs-prices"],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from("accessories_prices")
+        .from("legs_prices")
         .select("*")
-        .eq("is_active", true)
-        .order("description", { ascending: true });
-
+        .eq("is_active", true);
       if (error) throw error;
       return data;
     },
   });
 
+  // Initialize configuration
   useEffect(() => {
-    updateConfiguration({
+    if (product?.id && !configuration.productId) {
+      const defaultShapeValue = (shapes && shapes.length > 0) ? shapes[0].option_value : "Standard";
+      const defaultShape = normalizeShape(defaultShapeValue);
+      const defaultFrontSeats = 2; // Default to 2-seater
+      
+      // Filter front seat counts to only 1-4
+      const validFrontSeatCounts = frontSeatCounts.filter((count: any) => {
+        if (!count || !count.option_value) return false;
+        const seatNum = parseInt(count.option_value.replace("-Seater", "") || "0");
+        return seatNum >= 1 && seatNum <= 4;
+      });
+      
+      const defaultFrontSeatValue = validFrontSeatCounts.length > 0 
+        ? validFrontSeatCounts[0].option_value 
+        : "2-Seater";
+      // Parse seat count - extract number from string like "2-Seater"
+      const defaultFrontSeatsNum = (() => {
+        const match = defaultFrontSeatValue.match(/(\d+)/);
+        return match ? parseInt(match[1], 10) : 2;
+      })();
+      
+      const defaultConfig = {
       productId: product.id,
-      sofaType: "Standard",
-      seats,
+        shape: defaultShape, // Normalized: 'standard' | 'l-shape' | 'u-shape' | 'combo'
+        frontSeats: defaultFrontSeatsNum, // Number 1-4
+        frontSeatCount: defaultFrontSeatValue, // Keep for display compatibility
+        // Shape-specific defaults
+        l1: "corner", // 'corner' | 'backrest'
+        r1: "corner", // 'corner' | 'backrest'
+        l2: 2, // Number 1-6
+        r2: 2, // Number 1-6
+        // Keep string versions for dropdown compatibility
+        l1Option: "Corner",
+        r1Option: "Corner",
+        l2SeatCount: "2",
+        r2SeatCount: "2",
+        console: { required: false },
+        lounger: { required: false },
+        additionalPillows: { required: false },
       fabric: {
         claddingPlan: "Single Colour",
         structureCode: "",
       },
       foam: {
-        type: "Firm",
+          type: (foamTypes && foamTypes.length > 0) 
+            ? (foamTypes.find((f: any) => f.metadata?.default)?.option_value || foamTypes[0].option_value)
+            : "Firm",
       },
       dimensions: {
-        seatDepth: 24,
-        seatWidth: 24,
-        seatHeight: 18,
+          seatDepth: (seatDepths && seatDepths.length > 0)
+            ? (seatDepths.find((d: any) => d.metadata?.default || d.option_value?.includes("22"))?.option_value?.replace(/["\s]/g, '')?.replace('in', '') || seatDepths[0].option_value?.replace(/["\s]/g, '')?.replace('in', ''))
+            : "22",
+          seatWidth: (seatWidths && seatWidths.length > 0)
+            ? (seatWidths.find((w: any) => w.metadata?.default || w.option_value?.includes("22"))?.option_value?.replace(/["\s]/g, '')?.replace('in', '') || seatWidths[0].option_value?.replace(/["\s]/g, '')?.replace('in', ''))
+            : "22",
+        },
+        legs: {
+          type: (legTypes && legTypes.length > 0) ? legTypes[0].option_value : "",
+        },
+        wood: {
+          type: (woodTypes && woodTypes.length > 0) ? woodTypes[0].option_value : "",
+        },
+        stitch: {
+          type: (stitchTypes && stitchTypes.length > 0) ? stitchTypes[0].option_value : "",
       },
-    });
-  }, [product.id]);
+        comesWithHeadrest: "NA", // Default to NA
+        headrest: "NA", // Keep for compatibility
+        customerInfo: {
+          fullName: "",
+          email: "",
+          phoneNumber: "",
+          specialRequests: "",
+        },
+      };
+      onConfigurationChange(defaultConfig);
+    }
+  }, [product?.id, shapes, frontSeatCounts, foamTypes, seatDepths, seatWidths, woodTypes, stitchTypes]);
 
   const updateConfiguration = (updates: any) => {
     const newConfig = { ...configuration, ...updates };
     onConfigurationChange(newConfig);
   };
 
-  const addSeat = () => {
-    const newSeats = [
-      ...seats,
-      { position: `S${seats.length + 1}`, type: "1-Seater", qty: 1, width: 24 },
-    ];
-    setSeats(newSeats);
-    updateConfiguration({ seats: newSeats });
-  };
-
-  const removeSeat = (index: number) => {
-    const newSeats = seats.filter((_, i) => i !== index);
-    setSeats(newSeats);
-    updateConfiguration({ seats: newSeats });
-  };
-
-  const updateSeat = (index: number, field: string, value: any) => {
-    const newSeats = [...seats];
-    newSeats[index] = { ...newSeats[index], [field]: value };
-    setSeats(newSeats);
-    updateConfiguration({ seats: newSeats });
-  };
-
-  const toggleAccessory = (accessoryId: string, checked: boolean) => {
-    const currentAccessories = configuration.accessories || [];
-    const newAccessories = checked
-      ? [...currentAccessories, accessoryId]
-      : currentAccessories.filter((id: string) => id !== accessoryId);
+  // Calculate total seats dynamically
+  const getTotalSeats = (): number => {
+    let total = 0;
+    const shape = normalizeShape(configuration.shape || 'standard');
     
-    updateConfiguration({ accessories: newAccessories });
+    // Front seats - selectable for ALL shapes (1-4)
+    const frontSeats = parseSeatCount(configuration.frontSeatCount || configuration.frontSeats || 2);
+    total += frontSeats;
+    
+    // Add left section seats (L2) - for L-Shape, U-Shape, and Combo
+    if (shape === 'l-shape' || shape === 'u-shape' || shape === 'combo') {
+      const l2 = parseSeatCount(configuration.l2SeatCount || configuration.l2 || 0);
+      total += l2;
+    }
+    
+    // Add right section seats (R2) - only for U-Shape and Combo
+    if (shape === 'u-shape' || shape === 'combo') {
+      const r2 = parseSeatCount(configuration.r2SeatCount || configuration.r2 || 0);
+      total += r2;
+    }
+    
+    return total;
   };
+
+  // Get foam type pricing from metadata
+  const getFoamPrice = (foamType: string) => {
+    if (!foamType || !Array.isArray(foamTypes) || foamTypes.length === 0) return 0;
+    const foam = foamTypes.find((f: any) => f && f.option_value === foamType);
+    return foam?.metadata?.price_adjustment || 0;
+  };
+
+  // Get dimension percentage from metadata
+  const getDimensionPercentage = (dimension: string, value: string) => {
+    if (!value) return 0;
+    const dim = dimension === "depth" ? seatDepths : seatWidths;
+    if (!Array.isArray(dim) || dim.length === 0) return 0;
+    // Normalize both the value and option_value for comparison
+    const normalizedValue = value.replace(/["\s]/g, '').replace('in', '').trim();
+    const option = dim.find((d: any) => {
+      if (!d || !d.option_value) return false;
+      const normalizedOption = d.option_value.replace(/["\s]/g, '').replace('in', '').trim();
+      return normalizedOption === normalizedValue || d.option_value === value;
+    });
+    return option?.metadata?.percentage || 0;
+  };
+
+  // Normalize dimension value for display/storage
+  const normalizeDimensionValue = (value: string) => {
+    if (!value) return "";
+    // Remove quotes, spaces, and 'in' suffix
+    return value.replace(/["\s]/g, '').replace('in', '').trim();
+  };
+
+  // Calculate dimensions for preview
+  const calculateDimensions = (): { width: number; depth: number; label: string } => {
+    try {
+      const totalSeats = getTotalSeats();
+      const baseWidth = 48; // Base width per seat
+      const totalWidth = totalSeats * baseWidth;
+      const depth = 95; // Standard depth
+      const shapeLabel = (configuration.shape || 'standard').toUpperCase().replace('-', ' ');
+      
+      return {
+        width: totalWidth,
+        depth: depth,
+        label: `${shapeLabel} • ${totalSeats}-Seater`,
+      };
+    } catch (error) {
+      console.error('Error calculating dimensions:', error);
+      return {
+        width: 96,
+        depth: 95,
+        label: 'STANDARD • 2-Seater',
+      };
+    }
+  };
+
+  const dimensions = calculateDimensions();
+
+  // Show loading state if all dropdowns are loading (but allow rendering if data exists)
+  // Don't block rendering if data is available - only show loading if we have NO data at all
+  if (isLoadingDropdowns && (!shapes || shapes.length === 0) && (!frontSeatCounts || frontSeatCounts.length === 0)) {
+  return (
+      <div className="flex items-center justify-center py-12">
+        <div className="text-center space-y-4">
+          <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto" />
+          <p className="text-muted-foreground">Loading configuration options...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <Tabs defaultValue="base" className="w-full">
-      <TabsList className="grid grid-cols-5 w-full">
-        <TabsTrigger value="base">Base</TabsTrigger>
-        <TabsTrigger value="features">Features</TabsTrigger>
-        <TabsTrigger value="fabric">Fabric</TabsTrigger>
-        <TabsTrigger value="specs">Specs</TabsTrigger>
-        <TabsTrigger value="accessories">Accessories</TabsTrigger>
-      </TabsList>
+    <div className="space-y-6">
+      {/* Configuration Section */}
+      <Card className="border-2">
+        <CardHeader>
+          <CardTitle className="text-2xl font-serif">Configuration</CardTitle>
+          <CardDescription>Customize your perfect sofa piece</CardDescription>
+          {isLoadingDropdowns && (
+            <Alert className="mt-4">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              <AlertDescription>Loading dropdown options from database...</AlertDescription>
+            </Alert>
+          )}
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {/* Shape Selection - Card Based */}
+          <div className="space-y-3">
+            <Label className="text-base font-semibold">Shape</Label>
+            {shapesResult.isLoading ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="h-6 w-6 animate-spin text-primary" />
+              </div>
+            ) : shapes && shapes.length > 0 ? (
+              <div className="grid grid-cols-3 gap-4">
+                {shapes
+                  .filter((shape: any) => shape && shape.option_value)
+                  .map((shape: any) => {
+                    const shapeValue = shape.option_value;
+                    const isSelected = configuration.shape === shapeValue;
+                    
+                    // Icon based on shape type
+                    const getShapeIcon = () => {
+                      const shapeLower = shapeValue.toLowerCase();
+                      if (shapeLower.includes("l-shape") || shapeLower.includes("l shape")) {
+                        return (
+                          <div className="relative w-12 h-12">
+                            <Square className="w-8 h-8 absolute top-0 left-0" />
+                            <Square className="w-6 h-6 absolute bottom-0 right-0" />
+                          </div>
+                        );
+                      } else if (shapeLower.includes("u-shape") || shapeLower.includes("u shape")) {
+                        return (
+                          <div className="relative w-12 h-12">
+                            <Square className="w-6 h-6 absolute top-0 left-0" />
+                            <Square className="w-8 h-8 absolute top-0 right-0" />
+                            <Square className="w-6 h-6 absolute bottom-0 right-0" />
+                          </div>
+                        );
+                      } else if (shapeLower.includes("combo")) {
+                        return <LayoutGrid className="w-12 h-12" />;
+                      } else {
+                        return <Square className="w-12 h-12" />;
+                      }
+                    };
+                    
+                    return (
+                      <SelectionCard
+                        key={shape.id}
+                        label={shape.display_label || shape.option_value}
+                        icon={getShapeIcon()}
+                        isSelected={isSelected}
+                        onClick={() => {
+                          const normalized = normalizeShape(shapeValue);
+                          updateConfiguration({ 
+                            shape: normalized,
+                            // Reset shape-specific fields when shape changes
+                            ...(normalized === 'standard' && {
+                              l1: undefined,
+                              l2: undefined,
+                              r1: undefined,
+                              r2: undefined,
+                            }),
+                            ...(normalized === 'l-shape' && {
+                              r1: undefined,
+                              r2: undefined,
+                            }),
+                          });
+                        }}
+                      />
+                    );
+                  })}
+              </div>
+            ) : (
+              <Alert>
+                <AlertDescription>No shape options available</AlertDescription>
+              </Alert>
+            )}
+          </div>
 
-      {/* Base Configuration */}
-      <TabsContent value="base" className="space-y-6">
-        <div className="space-y-4">
-          <div>
-            <Label>Sofa Type</Label>
+          <Separator />
+
+          {/* Front Seat Count - Available for ALL shapes (Standard, L, U, Combo) */}
+          <div className="space-y-3">
+            <Label className="text-base font-semibold">Front Seat Count</Label>
+            {frontSeatCountsResult.isLoading ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="h-6 w-6 animate-spin text-primary" />
+              </div>
+            ) : frontSeatCounts && frontSeatCounts.length > 0 ? (
+              <div className="grid grid-cols-4 gap-4">
+                {frontSeatCounts
+                  .filter((count: any) => {
+                    if (!count || !count.option_value) return false;
+                    // Only allow 1-4 seaters for front seat count
+                    const seatNumber = parseInt(count.option_value.replace("-Seater", "") || "0");
+                    return seatNumber >= 1 && seatNumber <= 4;
+                  })
+                  .map((count: any) => {
+                    const countValue = count.option_value;
+                    const isSelected = configuration.frontSeatCount === countValue;
+                    const seatNumber = parseInt(countValue.replace("-Seater", "") || "1");
+                    
+                    // Icon showing number of seats
+                    const getSeatIcon = () => {
+                      return (
+                        <div className="flex gap-1">
+                          {Array.from({ length: seatNumber }).map((_, i) => (
+                            <Square key={i} className="w-6 h-6" />
+                          ))}
+                        </div>
+                      );
+                    };
+                    
+                    return (
+                      <SelectionCard
+                        key={count.id}
+                        label={count.display_label || count.option_value}
+                        icon={getSeatIcon()}
+                        isSelected={isSelected}
+                        onClick={() => {
+                          const seatNum = parseSeatCount(countValue);
+                          updateConfiguration({ 
+                            frontSeats: seatNum,
+                            frontSeatCount: countValue // Keep for display
+                          });
+                        }}
+                      />
+                    );
+                  })}
+              </div>
+            ) : (
+              <Alert>
+                <AlertDescription>No seat count options available</AlertDescription>
+              </Alert>
+            )}
+          </div>
+
+          {/* Left Section - For L Shape, U Shape, Combo */}
+          {(isLShape || isUShape || isCombo) && (
+            <>
+              <Separator />
+              <div className="space-y-3">
+                <Label className="text-base font-semibold">Left Section</Label>
+                <div className="grid grid-cols-2 gap-4">
+                  {/* L1 Option */}
+                  <div className="space-y-2">
+                    <Label className="text-sm text-muted-foreground">L1 (Section Type)</Label>
             <Select
-              value={configuration.sofaType || "Standard"}
-              onValueChange={(value) => updateConfiguration({ sofaType: value })}
+                      value={configuration.l1Option || configuration.l1 || ""}
+                      onValueChange={(value) => {
+                        const normalized = value.toLowerCase();
+                        updateConfiguration({ 
+                          l1: normalized, // 'corner' | 'backrest'
+                          l1Option: value // Keep for display
+                        });
+                      }}
             >
               <SelectTrigger>
-                <SelectValue />
+                        <SelectValue placeholder="Select L1 option" />
               </SelectTrigger>
               <SelectContent>
-                {sofaTypes?.map((type) => (
-                  <SelectItem key={type.id} value={type.option_value}>
-                    {type.display_label || type.option_value}
+                        {l1OptionsResult.isLoading ? (
+                          <SelectItem value="loading" disabled>Loading...</SelectItem>
+                        ) : l1Options && l1Options.length > 0 ? (
+                          l1Options
+                            .filter((opt: any) => opt && opt.option_value)
+                            .map((opt: any) => (
+                              <SelectItem key={opt.id} value={opt.option_value}>
+                                {opt.display_label || opt.option_value}
                   </SelectItem>
-                )) || (
-                  <>
-                    <SelectItem value="Standard">Standard</SelectItem>
-                    <SelectItem value="L Shape">L Shape</SelectItem>
-                    <SelectItem value="U Shape">U Shape</SelectItem>
-                    <SelectItem value="Combo">Combo</SelectItem>
-                  </>
+                            ))
+                        ) : (
+                          <SelectItem value="no-data" disabled>No options available</SelectItem>
                 )}
               </SelectContent>
             </Select>
           </div>
 
-          <div>
-            <div className="flex items-center justify-between mb-2">
-              <Label>Seats Configuration</Label>
-              <Button onClick={addSeat} size="sm" variant="outline">
-                <Plus className="h-4 w-4 mr-2" />
-                Add Seat
-              </Button>
+                  {/* L2 Seat Count */}
+                  <div className="space-y-2">
+                    <Label className="text-sm text-muted-foreground">L2 (Seat Count)</Label>
+                    <Select
+                      value={configuration.l2SeatCount || configuration.l2?.toString() || ""}
+                      onValueChange={(value) => {
+                        const seatNum = parseSeatCount(value);
+                        updateConfiguration({ 
+                          l2: seatNum, // Number 1-6
+                          l2SeatCount: value // Keep for display
+                        });
+                      }}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select seat count" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {l2SeatCountsResult.isLoading ? (
+                          <SelectItem value="loading" disabled>Loading...</SelectItem>
+                        ) : l2SeatCounts && l2SeatCounts.length > 0 ? (
+                          l2SeatCounts
+                            .filter((count: any) => count && count.option_value)
+                            .map((count: any) => (
+                              <SelectItem key={count.id} value={count.option_value}>
+                                {count.display_label || count.option_value}
+                              </SelectItem>
+                            ))
+                        ) : (
+                          <SelectItem value="no-data" disabled>No options available</SelectItem>
+                        )}
+                      </SelectContent>
+                    </Select>
             </div>
-            <div className="space-y-3">
-              {seats.map((seat, index) => (
-                <Card key={index}>
-                  <CardContent className="pt-4">
-                    <div className="grid grid-cols-4 gap-3">
-                      <div>
-                        <Label className="text-xs">Position</Label>
-                        <Input
-                          value={seat.position}
-                          onChange={(e) =>
-                            updateSeat(index, "position", e.target.value)
-                          }
-                          placeholder="F, L1, R1"
-                        />
                       </div>
-                      <div>
-                        <Label className="text-xs">Type</Label>
+              </div>
+            </>
+          )}
+
+          {/* Right Section - For U Shape, Combo only */}
+          {(isUShape || isCombo) && (
+            <>
+              <Separator />
+              <div className="space-y-3">
+                <Label className="text-base font-semibold">Right Section</Label>
+                <div className="grid grid-cols-2 gap-4">
+                  {/* R1 Option */}
+                  <div className="space-y-2">
+                    <Label className="text-sm text-muted-foreground">R1 (Section Type)</Label>
                         <Select
-                          value={seat.type}
-                          onValueChange={(value) =>
-                            updateSeat(index, "type", value)
-                          }
+                      value={configuration.r1Option || configuration.r1 || ""}
+                      onValueChange={(value) => {
+                        const normalized = value.toLowerCase();
+                        updateConfiguration({ 
+                          r1: normalized, // 'corner' | 'backrest'
+                          r1Option: value // Keep for display
+                        });
+                      }}
                         >
                           <SelectTrigger>
-                            <SelectValue />
+                        <SelectValue placeholder="Select R1 option" />
                           </SelectTrigger>
                           <SelectContent>
-                            {seatTypes?.map((type) => (
-                              <SelectItem key={type.id} value={type.option_value}>
-                                {type.display_label || type.option_value}
+                        {r1OptionsResult.isLoading ? (
+                          <SelectItem value="loading" disabled>Loading...</SelectItem>
+                        ) : r1Options && r1Options.length > 0 ? (
+                          r1Options
+                            .filter((opt: any) => opt && opt.option_value)
+                            .map((opt: any) => (
+                              <SelectItem key={opt.id} value={opt.option_value}>
+                                {opt.display_label || opt.option_value}
                               </SelectItem>
-                            )) || (
-                              <>
-                                <SelectItem value="1-Seater">1-Seater</SelectItem>
-                                <SelectItem value="2-Seater">2-Seater</SelectItem>
-                                <SelectItem value="3-Seater">3-Seater</SelectItem>
-                                <SelectItem value="4-Seater">4-Seater</SelectItem>
-                                <SelectItem value="Corner">Corner</SelectItem>
-                                <SelectItem value="Backrest">Backrest</SelectItem>
-                              </>
+                            ))
+                        ) : (
+                          <SelectItem value="no-data" disabled>No options available</SelectItem>
                             )}
                           </SelectContent>
                         </Select>
                       </div>
-                      <div>
-                        <Label className="text-xs">Width (in)</Label>
-                        <Input
-                          type="number"
-                          value={seat.width}
-                          onChange={(e) =>
-                            updateSeat(index, "width", parseInt(e.target.value))
-                          }
-                        />
-                      </div>
-                      <div className="flex items-end">
-                        {seats.length > 1 && (
-                          <Button
-                            onClick={() => removeSeat(index)}
-                            size="sm"
-                            variant="destructive"
-                            className="w-full"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
+                  
+                  {/* R2 Seat Count */}
+                  <div className="space-y-2">
+                    <Label className="text-sm text-muted-foreground">R2 (Seat Count)</Label>
+                    <Select
+                      value={configuration.r2SeatCount || configuration.r2?.toString() || ""}
+                      onValueChange={(value) => {
+                        const seatNum = parseSeatCount(value);
+                        updateConfiguration({ 
+                          r2: seatNum, // Number 1-6
+                          r2SeatCount: value // Keep for display
+                        });
+                      }}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select seat count" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {r2SeatCountsResult.isLoading ? (
+                          <SelectItem value="loading" disabled>Loading...</SelectItem>
+                        ) : r2SeatCounts && r2SeatCounts.length > 0 ? (
+                          r2SeatCounts
+                            .filter((count: any) => count && count.option_value)
+                            .map((count: any) => (
+                              <SelectItem key={count.id} value={count.option_value}>
+                                {count.display_label || count.option_value}
+                              </SelectItem>
+                            ))
+                        ) : (
+                          <SelectItem value="no-data" disabled>No options available</SelectItem>
                         )}
+                      </SelectContent>
+                    </Select>
                       </div>
                     </div>
-                  </CardContent>
-                </Card>
-              ))}
             </div>
-          </div>
-        </div>
-      </TabsContent>
+            </>
+          )}
 
-      {/* Features */}
-      <TabsContent value="features" className="space-y-6">
-        {/* Lounger */}
-        <Card>
-          <CardContent className="pt-6 space-y-4">
+          <Separator />
+
+          {/* Console */}
+          <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <Label>Lounger</Label>
-              <Select
-                value={configuration.lounger?.required ? "Yes" : "No"}
-                onValueChange={(value) =>
-                  updateConfiguration({
-                    lounger: {
-                      ...configuration.lounger,
-                      required: value === "Yes",
-                    },
-                  })
-                }
-              >
-                <SelectTrigger className="w-32">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Yes">Yes</SelectItem>
-                  <SelectItem value="No">No</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            {configuration.lounger?.required && (
-              <>
-                <div>
-                  <Label>Lounger Size</Label>
-                  <Select
-                    value={configuration.lounger?.size}
-                    onValueChange={(value) =>
-                      updateConfiguration({
-                        lounger: { ...configuration.lounger, size: value },
-                      })
-                    }
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select size" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {loungerSizes?.map((option) => (
-                        <SelectItem key={option.id} value={option.option_value}>
-                          {option.display_label || option.option_value}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div>
-                  <Label>Quantity</Label>
-                  <Select
-                    value={configuration.lounger?.quantity?.toString() || "1"}
-                    onValueChange={(value) =>
-                      updateConfiguration({
-                        lounger: {
-                          ...configuration.lounger,
-                          quantity: parseInt(value),
-                        },
-                      })
-                    }
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="1">1</SelectItem>
-                      <SelectItem value="2">2</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div>
-                  <Label>Storage</Label>
-                  <Select
-                    value={configuration.lounger?.storage || "No"}
-                    onValueChange={(value) =>
-                      updateConfiguration({
-                        lounger: { ...configuration.lounger, storage: value },
-                      })
-                    }
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="Yes">Yes</SelectItem>
-                      <SelectItem value="No">No</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Console */}
-        <Card>
-          <CardContent className="pt-6 space-y-4">
-            <div className="flex items-center justify-between">
-              <Label>Console</Label>
+              <Label className="text-base font-semibold">Console</Label>
               <Select
                 value={configuration.console?.required ? "Yes" : "No"}
                 onValueChange={(value) =>
@@ -366,16 +627,14 @@ const SofaConfigurator = ({
                 </SelectContent>
               </Select>
             </div>
-
             {configuration.console?.required && (
-              <>
-                <div>
-                  <Label>Console Size</Label>
+              <div className="space-y-2 pt-2">
+                <Label>Console Size</Label>
                   <Select
-                    value={configuration.console?.size}
+                  value={configuration.console?.size || ""}
                     onValueChange={(value) =>
                       updateConfiguration({
-                        console: { ...configuration.console, size: value },
+                      console: { ...configuration.console, size: value },
                       })
                     }
                   >
@@ -383,236 +642,568 @@ const SofaConfigurator = ({
                       <SelectValue placeholder="Select size" />
                     </SelectTrigger>
                     <SelectContent>
-                      {consoleSizes?.map((option) => (
-                        <SelectItem key={option.id} value={option.option_value}>
-                          {option.display_label || option.option_value}
+                      {consoleSizesResult.isLoading ? (
+                        <SelectItem value="loading" disabled>Loading...</SelectItem>
+                      ) : consoleSizes && consoleSizes.length > 0 ? (
+                        consoleSizes
+                          .filter((size: any) => size && size.option_value)
+                          .map((size: any) => (
+                            <SelectItem key={size.id} value={size.option_value}>
+                            {size.display_label || size.option_value}
                         </SelectItem>
-                      ))}
+                        ))
+                      ) : (
+                        <SelectItem value="no-data" disabled>No options available</SelectItem>
+                      )}
                     </SelectContent>
                   </Select>
+              </div>
+            )}
                 </div>
 
-                <div>
-                  <Label>Quantity</Label>
-                  <Input
-                    type="number"
-                    min="1"
-                    max="12"
-                    value={configuration.console?.quantity || 1}
-                    onChange={(e) =>
+          <Separator />
+
+          {/* Lounger */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <Label className="text-base font-semibold">Lounger</Label>
+                  <Select
+                value={configuration.lounger?.required ? "Yes" : "No"}
+                    onValueChange={(value) =>
                       updateConfiguration({
-                        console: {
-                          ...configuration.console,
-                          quantity: parseInt(e.target.value),
+                        lounger: {
+                          ...configuration.lounger,
+                      required: value === "Yes",
                         },
                       })
                     }
-                  />
+                  >
+                <SelectTrigger className="w-32">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                  <SelectItem value="Yes">Yes</SelectItem>
+                  <SelectItem value="No">No</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
-              </>
+            {configuration.lounger?.required && (
+              <div className="space-y-2 pt-2">
+                <Label>Lounger Size</Label>
+                  <Select
+                  value={configuration.lounger?.size || ""}
+                    onValueChange={(value) =>
+                      updateConfiguration({
+                      lounger: { ...configuration.lounger, size: value },
+                      })
+                    }
+                  >
+                    <SelectTrigger>
+                    <SelectValue placeholder="Select size" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {loungerSizesResult.isLoading ? (
+                        <SelectItem value="loading" disabled>Loading...</SelectItem>
+                      ) : loungerSizes && loungerSizes.length > 0 ? (
+                        loungerSizes
+                          .filter((size: any) => size && size.option_value)
+                          .map((size: any) => (
+                            <SelectItem key={size.id} value={size.option_value}>
+                            {size.display_label || size.option_value}
+                          </SelectItem>
+                        ))
+                      ) : (
+                        <SelectItem value="no-data" disabled>No options available</SelectItem>
+                      )}
+                    </SelectContent>
+                  </Select>
+                </div>
             )}
-          </CardContent>
-        </Card>
-      </TabsContent>
-
-      {/* Fabric Selection */}
-      <TabsContent value="fabric">
-        <FabricSelector
-          configuration={configuration}
-          onConfigurationChange={updateConfiguration}
-        />
-      </TabsContent>
-
-      {/* Specifications */}
-      <TabsContent value="specs" className="space-y-6">
-        <div className="grid md:grid-cols-2 gap-4">
-          <div>
-            <Label>Foam Type</Label>
-            <Select
-              value={configuration.foam?.type || "Firm"}
-              onValueChange={(value) =>
-                updateConfiguration({ foam: { type: value } })
-              }
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {foamTypes?.map((option) => (
-                  <SelectItem key={option.id} value={option.option_value}>
-                    {option.option_value}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
           </div>
 
-          <div>
-            <Label>Seat Depth (inches)</Label>
-            <Select
-              value={configuration.dimensions?.seatDepth?.toString() || "24"}
-              onValueChange={(value) =>
-                updateConfiguration({
-                  dimensions: {
-                    ...configuration.dimensions,
-                    seatDepth: parseInt(value),
-                  },
-                })
-              }
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {seatDepths?.map((option) => (
-                  <SelectItem key={option.id} value={option.option_value}>
-                    {option.option_value}"
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+          <Separator />
 
-          <div>
-            <Label>Seat Width (inches)</Label>
-            <Select
-              value={configuration.dimensions?.seatWidth?.toString() || "24"}
-              onValueChange={(value) =>
-                updateConfiguration({
-                  dimensions: {
-                    ...configuration.dimensions,
-                    seatWidth: parseInt(value),
-                  },
-                })
-              }
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {seatWidths?.map((option) => (
-                  <SelectItem key={option.id} value={option.option_value}>
-                    {option.option_value}"
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div>
-            <Label>Seat Height (inches)</Label>
-            <Select
-              value={configuration.dimensions?.seatHeight?.toString() || "18"}
-              onValueChange={(value) =>
-                updateConfiguration({
-                  dimensions: {
-                    ...configuration.dimensions,
-                    seatHeight: parseInt(value),
-                  },
-                })
-              }
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {seatHeights?.map((option) => (
-                  <SelectItem key={option.id} value={option.option_value}>
-                    {option.option_value}"
-                  </SelectItem>
-                )) || (
-                  <>
-                    <SelectItem value="16">16"</SelectItem>
-                    <SelectItem value="18">18"</SelectItem>
-                    <SelectItem value="20">20"</SelectItem>
-                  </>
-                )}
-              </SelectContent>
-            </Select>
-          </div>
-
-          {backrestDepths && backrestDepths.length > 0 && (
-            <div>
-              <Label>Backrest Depth (inches)</Label>
+          {/* Additional Pillows */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <Label className="text-base font-semibold">Additional Pillows</Label>
               <Select
-                value={configuration.dimensions?.backrestDepth?.toString() || ""}
+                value={configuration.additionalPillows?.required ? "Yes" : "No"}
                 onValueChange={(value) =>
                   updateConfiguration({
-                    dimensions: {
-                      ...configuration.dimensions,
-                      backrestDepth: parseInt(value),
+                    additionalPillows: {
+                      ...configuration.additionalPillows,
+                      required: value === "Yes",
                     },
                   })
                 }
               >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select depth" />
+                <SelectTrigger className="w-32">
+                  <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {backrestDepths?.map((option) => (
-                    <SelectItem key={option.id} value={option.option_value}>
-                      {option.option_value}"
-                    </SelectItem>
-                  ))}
+                  <SelectItem value="Yes">Yes</SelectItem>
+                  <SelectItem value="No">No</SelectItem>
                 </SelectContent>
               </Select>
             </div>
+            </div>
+
+          <Separator />
+
+          {/* Fabric Cladding Plan */}
+          <div className="space-y-4">
+            <Label className="text-base font-semibold">Fabric Cladding Plan</Label>
+            <FabricSelector
+              configuration={configuration}
+              onConfigurationChange={updateConfiguration}
+            />
+          </div>
+
+          <Separator />
+
+          {/* Advanced Options */}
+          <Accordion type="single" collapsible className="w-full">
+            <AccordionItem value="advanced">
+              <AccordionTrigger className="text-base font-semibold">
+                Advanced Options
+              </AccordionTrigger>
+              <AccordionContent className="space-y-6 pt-4">
+                {/* Foam Types */}
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2">
+                    <Label className="text-base font-semibold">Foam Types & Pricing</Label>
+                    <Info className="h-4 w-4 text-muted-foreground" />
+                  </div>
+                  <Select
+                    value={configuration.foam?.type || ""}
+                    onValueChange={(value) =>
+                      updateConfiguration({ foam: { type: value } })
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select Foam Type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {foamTypesResult.isLoading ? (
+                        <SelectItem value="loading" disabled>Loading...</SelectItem>
+                      ) : foamTypes && foamTypes.length > 0 ? (
+                        foamTypes
+                          .filter((foam: any) => foam && foam.option_value)
+                          .map((foam: any) => (
+                            <SelectItem key={foam.id} value={foam.option_value}>
+                            <div className="flex items-center justify-between w-full">
+                              <span>{foam.display_label || foam.option_value}</span>
+                              {getFoamPrice(foam.option_value) > 0 && (
+                                <Badge variant="secondary" className="ml-2">
+                                  +₹{getFoamPrice(foam.option_value).toLocaleString()}
+                                </Badge>
+                              )}
+                            </div>
+                        </SelectItem>
+                        ))
+                      ) : (
+                        <SelectItem value="no-data" disabled>No options available</SelectItem>
+                      )}
+                    </SelectContent>
+                  </Select>
+                  {configuration.foam?.type && (
+                    <Alert>
+                      <AlertDescription>
+                        <strong>Selected: {configuration.foam.type}</strong>
+                        <br />
+                        {getFoamPrice(configuration.foam.type) === 0
+                          ? "Standard firmness - No extra cost"
+                          : `Additional charge: ₹${getFoamPrice(configuration.foam.type).toLocaleString()}`}
+                      </AlertDescription>
+                    </Alert>
+                  )}
+                </div>
+
+                {/* Seat Depth */}
+                <div className="space-y-3">
+                  <Label className="text-base font-semibold">Seat Depth Increase Charges</Label>
+                  <Select
+                    value={configuration.dimensions?.seatDepth?.toString() || (seatDepths && seatDepths.length > 0 && seatDepths[0]?.option_value ? normalizeDimensionValue(seatDepths[0].option_value) : "")}
+                    onValueChange={(value) =>
+                      updateConfiguration({
+                        dimensions: {
+                          ...configuration.dimensions,
+                          seatDepth: value,
+                        },
+                      })
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select Seat Depth" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {seatDepthsResult.isLoading ? (
+                        <SelectItem value="loading" disabled>Loading...</SelectItem>
+                      ) : seatDepths && seatDepths.length > 0 ? (
+                        seatDepths.map((depth: any) => {
+                          if (!depth || !depth.option_value) return null;
+                          const percentage = depth.metadata?.percentage || 0;
+                          const normalizedValue = normalizeDimensionValue(depth.option_value);
+                          return (
+                            <SelectItem key={depth.id || Math.random()} value={normalizedValue}>
+                              <div className="flex items-center justify-between w-full">
+                                <span>{depth.display_label || depth.option_value}</span>
+                                {percentage > 0 && (
+                                  <Badge variant="secondary" className="ml-2">
+                                    {percentage}%
+                                  </Badge>
+                                )}
+                </div>
+                            </SelectItem>
+                          );
+                        })
+                      ) : (
+                        <SelectItem value="no-data" disabled>No options available</SelectItem>
+                      )}
+                    </SelectContent>
+                  </Select>
+                  {configuration.dimensions?.seatDepth && (
+                    <Alert>
+                      <AlertDescription>
+                        <strong>Selected: {configuration.dimensions.seatDepth} in depth</strong>
+                        <br />
+                        {getDimensionPercentage("depth", configuration.dimensions.seatDepth) === 0
+                          ? "Standard depth - No extra cost"
+                          : `${getDimensionPercentage("depth", configuration.dimensions.seatDepth)}% increase`}
+                      </AlertDescription>
+                    </Alert>
+                  )}
+                </div>
+
+                {/* Seat Width */}
+                <div className="space-y-3">
+                  <Label className="text-base font-semibold">Seat Width Increase Charges</Label>
+            <Select
+                    value={configuration.dimensions?.seatWidth?.toString() || (seatWidths && seatWidths.length > 0 && seatWidths[0]?.option_value ? normalizeDimensionValue(seatWidths[0].option_value) : "")}
+              onValueChange={(value) =>
+                      updateConfiguration({
+                        dimensions: {
+                          ...configuration.dimensions,
+                          seatWidth: value,
+                        },
+                      })
+              }
+            >
+              <SelectTrigger>
+                      <SelectValue placeholder="Select Seat Width" />
+              </SelectTrigger>
+              <SelectContent>
+                      {seatWidthsResult.isLoading ? (
+                        <SelectItem value="loading" disabled>Loading...</SelectItem>
+                      ) : seatWidths && seatWidths.length > 0 ? (
+                        seatWidths.map((width: any) => {
+                          if (!width || !width.option_value) return null;
+                          const percentage = width.metadata?.percentage || 0;
+                          const normalizedValue = normalizeDimensionValue(width.option_value);
+                          return (
+                            <SelectItem key={width.id || Math.random()} value={normalizedValue}>
+                              <div className="flex items-center justify-between w-full">
+                                <span>{width.display_label || width.option_value}</span>
+                                {percentage > 0 && (
+                                  <Badge variant="secondary" className="ml-2">
+                                    {percentage}%
+                                  </Badge>
+                                )}
+                              </div>
+                  </SelectItem>
+                          );
+                        })
+                      ) : (
+                        <SelectItem value="no-data" disabled>No options available</SelectItem>
+                      )}
+              </SelectContent>
+            </Select>
+                  {configuration.dimensions?.seatWidth && (
+                    <Alert>
+                      <AlertDescription>
+                        <strong>Selected: {configuration.dimensions.seatWidth} in width</strong>
+                        <br />
+                        {getDimensionPercentage("width", configuration.dimensions.seatWidth) === 0
+                          ? "Standard width - No extra cost"
+                          : `${getDimensionPercentage("width", configuration.dimensions.seatWidth)}% increase`}
+                      </AlertDescription>
+                    </Alert>
+                  )}
+          </div>
+
+                {/* Leg Options */}
+                <div className="space-y-3">
+                  <Label className="text-base font-semibold">Leg Options</Label>
+            <Select
+                    value={configuration.legs?.type || ""}
+              onValueChange={(value) =>
+                updateConfiguration({
+                        legs: { ...configuration.legs, type: value },
+                })
+              }
+            >
+              <SelectTrigger>
+                      <SelectValue placeholder="Select Leg Type" />
+              </SelectTrigger>
+              <SelectContent>
+                      {legTypesResult.isLoading ? (
+                        <SelectItem value="loading" disabled>Loading...</SelectItem>
+                      ) : legTypes && legTypes.length > 0 ? (
+                        legTypes
+                          .filter((leg: any) => leg && leg.option_value)
+                          .map((leg: any) => (
+                            <SelectItem key={leg.id} value={leg.option_value}>
+                            {leg.display_label || leg.option_value}
+                  </SelectItem>
+                        ))
+                      ) : (
+                        <SelectItem value="no-data" disabled>No options available</SelectItem>
+                      )}
+              </SelectContent>
+            </Select>
+                  {configuration.legs?.type && (
+                    <p className="text-sm text-muted-foreground">
+                      Premium leg finish for your sofa
+                    </p>
+                  )}
+          </div>
+
+                {/* Wood Type */}
+                <div className="space-y-3">
+                  <Label className="text-base font-semibold">Wood Type</Label>
+            <Select
+                    value={configuration.wood?.type || ""}
+              onValueChange={(value) =>
+                updateConfiguration({
+                        wood: { ...configuration.wood, type: value },
+                })
+              }
+            >
+              <SelectTrigger>
+                      <SelectValue placeholder="Select Wood Type" />
+              </SelectTrigger>
+              <SelectContent>
+                      {woodTypesResult.isLoading ? (
+                        <SelectItem value="loading" disabled>Loading...</SelectItem>
+                      ) : woodTypes && woodTypes.length > 0 ? (
+                        woodTypes
+                          .filter((wood: any) => wood && wood.option_value)
+                          .map((wood: any) => (
+                            <SelectItem key={wood.id} value={wood.option_value}>
+                            {wood.display_label || wood.option_value}
+                  </SelectItem>
+                        ))
+                      ) : (
+                        <SelectItem value="no-data" disabled>No options available</SelectItem>
+                      )}
+              </SelectContent>
+            </Select>
+                  {configuration.wood?.type && (
+                    <p className="text-sm text-muted-foreground">
+                      High-quality wood for frame construction
+                    </p>
+                  )}
+          </div>
+
+                {/* Stitch Type */}
+                <div className="space-y-3">
+                  <Label className="text-base font-semibold">Stitch Type</Label>
+            <Select
+                    value={configuration.stitch?.type || ""}
+              onValueChange={(value) =>
+                updateConfiguration({
+                        stitch: { ...configuration.stitch, type: value },
+                })
+              }
+            >
+              <SelectTrigger>
+                      <SelectValue placeholder="Select Stitch Type" />
+              </SelectTrigger>
+              <SelectContent>
+                      {stitchTypesResult.isLoading ? (
+                        <SelectItem value="loading" disabled>Loading...</SelectItem>
+                      ) : stitchTypes && stitchTypes.length > 0 ? (
+                        stitchTypes
+                          .filter((stitch: any) => stitch && stitch.option_value)
+                          .map((stitch: any) => (
+                            <SelectItem key={stitch.id} value={stitch.option_value}>
+                            {stitch.display_label || stitch.option_value}
+                  </SelectItem>
+                        ))
+                      ) : (
+                        <SelectItem value="no-data" disabled>No options available</SelectItem>
+                )}
+              </SelectContent>
+            </Select>
+                  {configuration.stitch?.type && (
+                    <p className="text-sm text-muted-foreground">
+                      Professional stitching finish for durability
+                    </p>
+                  )}
+          </div>
+
+                {/* Headrest Option */}
+                <div className="space-y-3">
+                  <Label className="text-base font-semibold">Headrest / Backrest</Label>
+              <Select
+                    value={configuration.comesWithHeadrest || configuration.headrest || ""}
+                onValueChange={(value) =>
+                  updateConfiguration({
+                        comesWithHeadrest: value,
+                        headrest: value // Keep for compatibility
+                  })
+                }
+              >
+                <SelectTrigger>
+                      <SelectValue placeholder="Select headrest option" />
+                </SelectTrigger>
+                <SelectContent>
+                      {headrestOptionsResult.isLoading ? (
+                        <SelectItem value="loading" disabled>Loading...</SelectItem>
+                      ) : headrestOptions && headrestOptions.length > 0 ? (
+                        headrestOptions
+                          .filter((opt: any) => opt && opt.option_value)
+                          .map((opt: any) => (
+                            <SelectItem key={opt.id} value={opt.option_value}>
+                              {opt.display_label || opt.option_value}
+                    </SelectItem>
+                          ))
+                      ) : (
+                        <SelectItem value="no-data" disabled>No options available</SelectItem>
+                      )}
+                </SelectContent>
+              </Select>
+                  {configuration.comesWithHeadrest && (
+                    <Alert>
+                      <AlertDescription>
+                        <strong>Selected: {configuration.comesWithHeadrest}</strong>
+                        <br />
+                        {configuration.comesWithHeadrest === "NA" 
+                          ? "Not applicable for this configuration"
+                          : configuration.comesWithHeadrest === "Yes"
+                          ? "Headrest is included"
+                          : "No headrest"}
+                      </AlertDescription>
+                    </Alert>
           )}
         </div>
-      </TabsContent>
+              </AccordionContent>
+            </AccordionItem>
+          </Accordion>
+        </CardContent>
+      </Card>
 
-      {/* Accessories */}
-      <TabsContent value="accessories" className="space-y-6">
-        {accessoriesLoading ? (
-          <div className="text-center py-12 text-muted-foreground">
-            Loading accessories...
+      {/* Customer Information */}
+      <Card className="border-2">
+        <CardHeader>
+          <CardTitle className="text-2xl font-serif">Your Information</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="fullName">
+              Full Name <span className="text-destructive">*</span>
+            </Label>
+            <Input
+              id="fullName"
+              placeholder="Enter your full name"
+              value={configuration.customerInfo?.fullName || ""}
+              onChange={(e) =>
+                updateConfiguration({
+                  customerInfo: {
+                    ...configuration.customerInfo,
+                    fullName: e.target.value,
+                  },
+                })
+              }
+            />
           </div>
-        ) : accessories && accessories.length > 0 ? (
-          <div className="space-y-4">
-            <Label>Select Accessories</Label>
-            {accessories.map((accessory) => (
-              <Card key={accessory.id}>
-                <CardContent className="pt-6">
-                  <div className="flex items-start gap-4">
-                    <Checkbox
-                      id={accessory.id}
-                      checked={(configuration.accessories || []).includes(accessory.id)}
-                      onCheckedChange={(checked) => 
-                        toggleAccessory(accessory.id, checked as boolean)
+          <div className="space-y-2">
+            <Label htmlFor="email">
+              Email <span className="text-destructive">*</span>
+            </Label>
+            <Input
+              id="email"
+              type="email"
+              placeholder="Enter your email"
+              value={configuration.customerInfo?.email || ""}
+              onChange={(e) =>
+                updateConfiguration({
+                  customerInfo: {
+                    ...configuration.customerInfo,
+                    email: e.target.value,
+                  },
+                })
                       }
                     />
-                    <div className="flex-1">
-                      <label
-                        htmlFor={accessory.id}
-                        className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
-                      >
-                        {accessory.description}
-                      </label>
-                      {accessory.sale_price && (
-                        <p className="text-sm text-muted-foreground mt-1">
-                          ₹{Number(accessory.sale_price).toLocaleString()}
-                        </p>
-                      )}
-                      {accessory.images && (
-                        <img
-                          src={accessory.images}
-                          alt={accessory.description}
-                          className="mt-2 w-32 h-32 object-cover rounded"
-                        />
-                      )}
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="phone">Phone Number</Label>
+            <Input
+              id="phone"
+              type="tel"
+              placeholder="Enter your phone number"
+              value={configuration.customerInfo?.phoneNumber || ""}
+              onChange={(e) =>
+                updateConfiguration({
+                  customerInfo: {
+                    ...configuration.customerInfo,
+                    phoneNumber: e.target.value,
+                  },
+                })
+              }
+            />
                     </div>
+          <div className="space-y-2">
+            <Label htmlFor="specialRequests">Special Requests</Label>
+            <Textarea
+              id="specialRequests"
+              placeholder="Any special requests or notes..."
+              value={configuration.customerInfo?.specialRequests || ""}
+              onChange={(e) =>
+                updateConfiguration({
+                  customerInfo: {
+                    ...configuration.customerInfo,
+                    specialRequests: e.target.value,
+                  },
+                })
+              }
+              rows={3}
+            />
                   </div>
                 </CardContent>
               </Card>
-            ))}
+
+      {/* Configuration Preview */}
+      <Card className="border-2">
+        <CardHeader>
+          <CardTitle className="text-2xl font-serif">Configuration Preview & Export</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="bg-muted/50 rounded-lg p-8 flex flex-col items-center justify-center min-h-[300px]">
+            <div className="text-center space-y-4">
+              <div className="text-4xl font-bold">
+                {dimensions.width}cm × {dimensions.depth}cm
           </div>
-        ) : (
-          <div className="text-center py-12 text-muted-foreground">
-            No accessories available
+              <div className="text-lg font-semibold text-muted-foreground">
+                {dimensions.label}
           </div>
+              <div className="text-sm text-muted-foreground space-y-1 pt-4">
+                <p>Shape: {configuration.shape?.toUpperCase() || "STANDARD"}</p>
+                <p>Total Seats: {getTotalSeats()}</p>
+                {configuration.legs?.type && (
+                  <p>Legs: {configuration.legs.type}</p>
         )}
-      </TabsContent>
-    </Tabs>
+              </div>
+            </div>
+          </div>
+          <Button variant="outline" className="w-full">
+            <Download className="mr-2 h-4 w-4" />
+            Download Image
+          </Button>
+        </CardContent>
+      </Card>
+    </div>
   );
 };
 

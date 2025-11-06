@@ -1,9 +1,11 @@
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Sofa, Bed, Armchair, ChevronRight, MonitorPlay, UtensilsCrossed, Baby, SofaIcon, Box, Sparkles, Palette, Zap } from "lucide-react";
+import { Sofa, Bed, Armchair, ChevronRight, MonitorPlay, UtensilsCrossed, Baby, SofaIcon, Box, Sparkles, Palette, Zap, LayoutDashboard } from "lucide-react";
 import { Link } from "react-router-dom";
+import { useAuth } from "@/hooks/useAuth";
 
 const Index = () => {
+  const { user, isAdmin, loading } = useAuth();
   const categories = [
     {
       icon: Sofa,
@@ -87,9 +89,24 @@ const Index = () => {
             <Link to="/products">
               <Button variant="ghost" className="font-medium">Products</Button>
             </Link>
-            <Link to="/login">
-              <Button className="luxury-button">Login</Button>
-            </Link>
+            {!loading && user && isAdmin() && (
+              <Link to="/admin/dashboard">
+                <Button variant="outline" className="font-medium">
+                  <LayoutDashboard className="mr-2 h-4 w-4" />
+                  Admin Panel
+                </Button>
+              </Link>
+            )}
+            {!loading && !user && (
+              <Link to="/login">
+                <Button className="luxury-button">Login</Button>
+              </Link>
+            )}
+            {!loading && user && !isAdmin() && (
+              <Link to="/dashboard">
+                <Button variant="outline" className="font-medium">Dashboard</Button>
+              </Link>
+            )}
           </div>
         </div>
       </header>

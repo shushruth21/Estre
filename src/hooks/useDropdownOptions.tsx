@@ -16,6 +16,7 @@ export const useDropdownOptions = (category: string, fieldName?: string) => {
   return useQuery({
     queryKey: ["dropdown-options", category, fieldName],
     queryFn: async () => {
+      try {
       let query = supabase
         .from("dropdown_options")
         .select("*")
@@ -28,13 +29,23 @@ export const useDropdownOptions = (category: string, fieldName?: string) => {
       }
 
       const { data, error } = await query;
-      if (error) throw error;
-      return data as DropdownOption[];
+        
+        if (error) {
+          console.error(`Error loading dropdown options for ${category}.${fieldName || 'all'}:`, error);
+          return [];
+        }
+        
+        return (data || []) as DropdownOption[];
+      } catch (error) {
+        console.error(`Exception loading dropdown options for ${category}.${fieldName || 'all'}:`, error);
+        return [];
+      }
     },
     staleTime: 5 * 60 * 1000, // Cache for 5 minutes
-    retry: 1,
+    retry: 2,
     // Return empty array if query fails, don't block the page
     placeholderData: [],
+    enabled: !!category, // Only run if category is provided
   });
 };
 
