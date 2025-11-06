@@ -217,6 +217,34 @@ const SofaConfigurator = ({
     return total;
   };
 
+  // Get section-specific seat counts for console placement
+  const getSectionSeatCounts = () => {
+    const shape = normalizeShape(configuration.shape || 'standard');
+    const frontSeats = parseSeatCount(configuration.frontSeatCount || configuration.frontSeats || 2);
+    const leftSeats = (shape === 'l-shape' || shape === 'u-shape' || shape === 'combo') 
+      ? parseSeatCount(configuration.l2SeatCount || configuration.l2 || 0) 
+      : 0;
+    const rightSeats = (shape === 'u-shape' || shape === 'combo')
+      ? parseSeatCount(configuration.r2SeatCount || configuration.r2 || 0)
+      : 0;
+    
+    return {
+      front: frontSeats,
+      left: leftSeats,
+      right: rightSeats,
+      hasCorner: shape === 'l-shape' || shape === 'u-shape' || shape === 'combo'
+    };
+  };
+
+  // Generate console placement options for a specific section
+  const generateConsolePlacementOptions = (section: 'front' | 'left' | 'right', seatCount: number) => {
+    if (seatCount <= 1) return [];
+    return Array.from({ length: seatCount - 1 }, (_, i) => ({
+      value: (i + 1).toString(),
+      label: `After ${i + 1}${i === 0 ? 'st' : i === 1 ? 'nd' : i === 2 ? 'rd' : 'th'} Seat from Left (${section.charAt(0).toUpperCase() + section.slice(1)})`
+    }));
+  };
+
   // Auto-update console quantity when total seats change (if console is required)
   const totalSeats = getTotalSeats();
   useEffect(() => {
@@ -818,103 +846,154 @@ const SofaConfigurator = ({
                 </div>
 
                 {/* Console Placements & Accessories */}
-                {configuration.console?.quantity > 0 && Array.from({ length: configuration.console.quantity }, (_, index) => (
-                  <div key={index} className="space-y-3 p-4 bg-muted/30 rounded-lg border">
-                    <Label className="text-sm font-semibold">Console {index + 1} Configuration</Label>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="space-y-2">
-                        <Label className="text-xs text-muted-foreground">Placement Position</Label>
-                        <Select
-                          value={configuration.console?.placements?.[index]?.position || "front"}
-                          onValueChange={(value) => {
-                            const placements = [...(configuration.console?.placements || [])];
-                            placements[index] = {
-                              ...placements[index],
-                              position: value,
-                              afterSeat: placements[index]?.afterSeat || (index + 1)
-                            };
-                            updateConfiguration({
-                              console: { ...configuration.console, placements },
-                            });
-                          }}
-                        >
-                          <SelectTrigger>
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="front">Front</SelectItem>
-                            <SelectItem value="left">Left</SelectItem>
-                            <SelectItem value="right">Right</SelectItem>
-                            <SelectItem value="combo">Combo</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="space-y-2">
-                        <Label className="text-xs text-muted-foreground">After Seat</Label>
-                        <Select
-                          value={(configuration.console?.placements?.[index]?.afterSeat || (index + 1)).toString()}
-                          onValueChange={(value) => {
-                            const placements = [...(configuration.console?.placements || [])];
-                            const afterSeat = value === "none" ? null : parseInt(value, 10);
-                            placements[index] = {
-                              ...placements[index],
-                              afterSeat: afterSeat || (index + 1)
-                            };
-                            updateConfiguration({
-                              console: { ...configuration.console, placements },
-                            });
-                          }}
-                        >
-                          <SelectTrigger>
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="none">None (Unassigned)</SelectItem>
-                            {Array.from({ length: Math.max(getTotalSeats(), 4) }, (_, i) => i + 1).map((seat) => (
-                              <SelectItem key={seat} value={seat.toString()}>
-                                After {seat}{seat === 1 ? "st" : seat === 2 ? "nd" : seat === 3 ? "rd" : "th"} Seat from Left
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </div>
-                    <div className="space-y-2">
-                      <Label className="text-xs text-muted-foreground">Accessory</Label>
-                      <Select
-                        value={configuration.console?.placements?.[index]?.accessoryId || "none"}
-                        onValueChange={(value) => {
-                          const placements = [...(configuration.console?.placements || [])];
-                          placements[index] = {
-                            ...placements[index],
-                            accessoryId: value === "none" ? null : value
-                          };
-                          updateConfiguration({
-                            console: { ...configuration.console, placements },
-                          });
-                        }}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select accessory (optional)" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="none">None</SelectItem>
-                          {loadingAccessories ? (
-                            <SelectItem value="loading" disabled>Loading...</SelectItem>
-                          ) : consoleAccessories && consoleAccessories.length > 0 ? (
-                            consoleAccessories.map((acc: any) => (
-                              <SelectItem key={acc.id} value={acc.id}>
-                                {acc.description} - ₹{acc.sale_price?.toLocaleString() || 0}
-                              </SelectItem>
-                            ))
-                          ) : (
-                            <SelectItem value="no-data" disabled>No accessories available</SelectItem>
+                {configuration.console?.quantity > 0 && (() => {
+                  const sectionCounts = getSectionSeatCounts();
+                  return Array.from({ length: configuration.console.quantity }, (_, index) => {
+                    const currentPlacement = configuration.console?.placements?.[index] || { position: "front", afterSeat: 1, accessoryId: null };
+                    const currentSection = currentPlacement.position || "front";
+                    
+                    // Get valid placement options based on shape
+                    const validSections: Array<{ value: string; label: string }> = [];
+                    if (sectionCounts.front > 0) {
+                      validSections.push({ value: "front", label: "Front" });
+                    }
+                    if (sectionCounts.left > 0) {
+                      validSections.push({ value: "left", label: "Left" });
+                    }
+                    if (sectionCounts.right > 0) {
+                      validSections.push({ value: "right", label: "Right" });
+                    }
+                    if (sectionCounts.hasCorner) {
+                      validSections.push({ value: "corner", label: "Corner Junction" });
+                    }
+                    
+                    // Get placement options for current section
+                    let placementOptions: Array<{ value: string; label: string }> = [];
+                    if (currentSection === "corner") {
+                      // Corner console - no "after seat" needed
+                      placementOptions = [{ value: "corner", label: "At corner junction" }];
+                    } else if (currentSection === "front" && sectionCounts.front > 1) {
+                      placementOptions = generateConsolePlacementOptions("front", sectionCounts.front);
+                    } else if (currentSection === "left" && sectionCounts.left > 1) {
+                      placementOptions = generateConsolePlacementOptions("left", sectionCounts.left);
+                    } else if (currentSection === "right" && sectionCounts.right > 1) {
+                      placementOptions = generateConsolePlacementOptions("right", sectionCounts.right);
+                    }
+                    
+                    return (
+                      <div key={index} className="space-y-3 p-4 bg-muted/30 rounded-lg border">
+                        <Label className="text-sm font-semibold">Console {index + 1} Configuration</Label>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="space-y-2">
+                            <Label className="text-xs text-muted-foreground">Placement Position</Label>
+                            <Select
+                              value={currentSection}
+                              onValueChange={(value) => {
+                                const placements = [...(configuration.console?.placements || [])];
+                                placements[index] = {
+                                  position: value,
+                                  afterSeat: value === "corner" ? null : (placements[index]?.afterSeat || 1),
+                                  accessoryId: placements[index]?.accessoryId || null
+                                };
+                                updateConfiguration({
+                                  console: { ...configuration.console, placements },
+                                });
+                              }}
+                            >
+                              <SelectTrigger>
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {validSections.map((section) => (
+                                  <SelectItem key={section.value} value={section.value}>
+                                    {section.label}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          {currentSection !== "corner" && (
+                            <div className="space-y-2">
+                              <Label className="text-xs text-muted-foreground">After Seat</Label>
+                              <Select
+                                value={(currentPlacement.afterSeat || 1).toString()}
+                                onValueChange={(value) => {
+                                  const placements = [...(configuration.console?.placements || [])];
+                                  const afterSeat = value === "none" ? null : parseInt(value, 10);
+                                  placements[index] = {
+                                    ...placements[index],
+                                    afterSeat: afterSeat || 1
+                                  };
+                                  updateConfiguration({
+                                    console: { ...configuration.console, placements },
+                                  });
+                                }}
+                              >
+                                <SelectTrigger>
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="none">None (Unassigned)</SelectItem>
+                                  {placementOptions.map((option) => (
+                                    <SelectItem key={option.value} value={option.value}>
+                                      {option.label}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
                           )}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-                ))}
+                          {currentSection === "corner" && (
+                            <div className="space-y-2">
+                              <Label className="text-xs text-muted-foreground">Corner Type</Label>
+                              <div className="p-2 bg-muted rounded text-xs text-muted-foreground">
+                                {sectionCounts.left > 0 && sectionCounts.right > 0 
+                                  ? "Front-Left or Front-Right junction"
+                                  : sectionCounts.left > 0 
+                                    ? "Front-Left junction"
+                                    : "Front-Right junction"}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                        <div className="space-y-2">
+                          <Label className="text-xs text-muted-foreground">Accessory</Label>
+                          <Select
+                            value={currentPlacement.accessoryId || "none"}
+                            onValueChange={(value) => {
+                              const placements = [...(configuration.console?.placements || [])];
+                              placements[index] = {
+                                ...placements[index],
+                                accessoryId: value === "none" ? null : value
+                              };
+                              updateConfiguration({
+                                console: { ...configuration.console, placements },
+                              });
+                            }}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select accessory (optional)" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="none">None</SelectItem>
+                              {loadingAccessories ? (
+                                <SelectItem value="loading" disabled>Loading...</SelectItem>
+                              ) : consoleAccessories && consoleAccessories.length > 0 ? (
+                                consoleAccessories.map((acc: any) => (
+                                  <SelectItem key={acc.id} value={acc.id}>
+                                    {acc.description} - ₹{acc.sale_price?.toLocaleString() || 0}
+                                  </SelectItem>
+                                ))
+                              ) : (
+                                <SelectItem value="no-data" disabled>No accessories available</SelectItem>
+                              )}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+                    );
+                  });
+                })()}
               </div>
             )}
           </div>
