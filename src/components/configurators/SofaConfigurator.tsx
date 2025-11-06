@@ -146,6 +146,30 @@ const SofaConfigurator = ({
     },
   });
 
+  // Calculate total seats dynamically (must be defined before useEffect)
+  const getTotalSeats = (): number => {
+    let total = 0;
+    const shape = normalizeShape(configuration.shape || 'standard');
+    
+    // Front seats - selectable for ALL shapes (1-4)
+    const frontSeats = parseSeatCount(configuration.frontSeatCount || configuration.frontSeats || 2);
+    total += frontSeats;
+    
+    // Add left section seats (L2) - for L-Shape, U-Shape, and Combo
+    if (shape === 'l-shape' || shape === 'u-shape' || shape === 'combo') {
+      const l2 = parseSeatCount(configuration.l2SeatCount || configuration.l2 || 0);
+      total += l2;
+    }
+    
+    // Add right section seats (R2) - only for U-Shape and Combo
+    if (shape === 'u-shape' || shape === 'combo') {
+      const r2 = parseSeatCount(configuration.r2SeatCount || configuration.r2 || 0);
+      total += r2;
+    }
+    
+    return total;
+  };
+
   // Auto-update console quantity when total seats change (if console is required)
   const totalSeats = getTotalSeats();
   useEffect(() => {
@@ -275,30 +299,6 @@ const SofaConfigurator = ({
   const updateConfiguration = (updates: any) => {
     const newConfig = { ...configuration, ...updates };
     onConfigurationChange(newConfig);
-  };
-
-  // Calculate total seats dynamically
-  const getTotalSeats = (): number => {
-    let total = 0;
-    const shape = normalizeShape(configuration.shape || 'standard');
-    
-    // Front seats - selectable for ALL shapes (1-4)
-    const frontSeats = parseSeatCount(configuration.frontSeatCount || configuration.frontSeats || 2);
-    total += frontSeats;
-    
-    // Add left section seats (L2) - for L-Shape, U-Shape, and Combo
-    if (shape === 'l-shape' || shape === 'u-shape' || shape === 'combo') {
-      const l2 = parseSeatCount(configuration.l2SeatCount || configuration.l2 || 0);
-      total += l2;
-    }
-    
-    // Add right section seats (R2) - only for U-Shape and Combo
-    if (shape === 'u-shape' || shape === 'combo') {
-      const r2 = parseSeatCount(configuration.r2SeatCount || configuration.r2 || 0);
-      total += r2;
-    }
-    
-    return total;
   };
 
   // Get foam type pricing from metadata
