@@ -131,16 +131,15 @@ const SofaConfigurator = ({
     },
   });
 
-  // Load accessories for console dropdowns
+  // Load accessories for console dropdowns from accessories_prices table
   const { data: consoleAccessories, isLoading: loadingAccessories } = useQuery({
-    queryKey: ["console-accessories"],
+    queryKey: ["console-accessories-prices"],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from("accessories")
-        .select("*")
+        .from("accessories_prices")
+        .select("id, description, sale_price")
         .eq("is_active", true)
-        .or("type.eq.console,type.eq.other")
-        .order("title");
+        .order("description");
       if (error) throw error;
       return data || [];
     },
@@ -871,7 +870,7 @@ const SofaConfigurator = ({
                           ) : consoleAccessories && consoleAccessories.length > 0 ? (
                             consoleAccessories.map((acc: any) => (
                               <SelectItem key={acc.id} value={acc.id}>
-                                {acc.title} {acc.code && `(${acc.code})`} - ₹{acc.price_rs?.toLocaleString() || 0}
+                                {acc.description} - ₹{acc.sale_price?.toLocaleString() || 0}
                               </SelectItem>
                             ))
                           ) : (
