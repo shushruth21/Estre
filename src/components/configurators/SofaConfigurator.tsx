@@ -151,7 +151,7 @@ const SofaConfigurator = ({
   });
 
   // State for fabric library modals
-  const [openPillowFabricLibrary, setOpenPillowFabricLibrary] = useState<"colour1" | "colour2" | null>(null);
+  const [openPillowFabricLibrary, setOpenPillowFabricLibrary] = useState<"colour1" | "colour2" | "single" | null>(null);
 
   // Fetch selected pillow fabric details for display
   const { data: selectedPillowFabrics } = useQuery({
@@ -160,6 +160,7 @@ const SofaConfigurator = ({
       const codes = [
         configuration.additionalPillows?.fabricColour1,
         configuration.additionalPillows?.fabricColour2,
+        configuration.additionalPillows?.fabricColour, // Single colour
       ].filter(Boolean);
 
       if (codes.length === 0) return {};
@@ -179,7 +180,8 @@ const SofaConfigurator = ({
     },
     enabled: !!(
       configuration.additionalPillows?.fabricColour1 ||
-      configuration.additionalPillows?.fabricColour2
+      configuration.additionalPillows?.fabricColour2 ||
+      configuration.additionalPillows?.fabricColour
     ),
   });
 
@@ -1201,8 +1203,9 @@ const SofaConfigurator = ({
                           ...configuration.additionalPillows, 
                           fabricPlan: value,
                           // Reset fabric selections when changing plan
-                          fabricColour1: value === "Dual Colour" ? (configuration.additionalPillows?.fabricColour1 || "none") : undefined,
-                          fabricColour2: value === "Dual Colour" ? (configuration.additionalPillows?.fabricColour2 || "none") : undefined,
+                          fabricColour: value === "Single Colour" ? (configuration.additionalPillows?.fabricColour || undefined) : undefined,
+                          fabricColour1: value === "Dual Colour" ? (configuration.additionalPillows?.fabricColour1 || undefined) : undefined,
+                          fabricColour2: value === "Dual Colour" ? (configuration.additionalPillows?.fabricColour2 || undefined) : undefined,
                         },
                       })
                     }
@@ -1230,6 +1233,46 @@ const SofaConfigurator = ({
                     </SelectContent>
                   </Select>
                 </div>
+
+                {/* Single Colour Fabric Selection */}
+                {configuration.additionalPillows?.fabricPlan === "Single Colour" && (
+                  <div className="space-y-4 pt-2 pl-4 border-l-2 border-muted">
+                    <div className="space-y-2">
+                      <Label>Fabric Colour</Label>
+                      <Button
+                        variant="outline"
+                        className="w-full justify-start"
+                        onClick={() => setOpenPillowFabricLibrary("single")}
+                      >
+                        {selectedPillowFabrics?.[configuration.additionalPillows?.fabricColour || ""] ? (
+                          <div className="flex items-center gap-2 w-full">
+                            <div
+                              className="w-8 h-8 rounded-full border-2 border-gray-200 flex-shrink-0"
+                              style={{
+                                backgroundColor: selectedPillowFabrics[configuration.additionalPillows.fabricColour].colour_link || 
+                                  `hsl(${(selectedPillowFabrics[configuration.additionalPillows.fabricColour].estre_code.charCodeAt(0) || 0) % 360}, 70%, 75%)`,
+                              }}
+                            />
+                            <Badge variant="outline">
+                              {selectedPillowFabrics[configuration.additionalPillows.fabricColour].estre_code}
+                            </Badge>
+                            <span className="flex-1 truncate">
+                              {selectedPillowFabrics[configuration.additionalPillows.fabricColour].description || 
+                               selectedPillowFabrics[configuration.additionalPillows.fabricColour].colour || 
+                               selectedPillowFabrics[configuration.additionalPillows.fabricColour].estre_code}
+                            </span>
+                            <span className="ml-auto text-primary font-semibold">
+                              ₹{selectedPillowFabrics[configuration.additionalPillows.fabricColour].bom_price?.toLocaleString() || 
+                                 selectedPillowFabrics[configuration.additionalPillows.fabricColour].price?.toLocaleString() || 0}
+                            </span>
+                          </div>
+                        ) : (
+                          <span className="text-muted-foreground">Select fabric colour...</span>
+                        )}
+                      </Button>
+                    </div>
+                  </div>
+                )}
 
                 {/* Dual Colour Fabric Selection */}
                 {configuration.additionalPillows?.fabricPlan === "Dual Colour" && (
@@ -1305,6 +1348,21 @@ const SofaConfigurator = ({
                 )}
 
                 {/* Pillow Fabric Library Dialogs */}
+                <FabricLibrary
+                  open={openPillowFabricLibrary === "single"}
+                  onOpenChange={(open) => setOpenPillowFabricLibrary(open ? "single" : null)}
+                  onSelect={(code) => {
+                    updateConfiguration({
+                      additionalPillows: {
+                        ...configuration.additionalPillows,
+                        fabricColour: code,
+                      },
+                    });
+                    setOpenPillowFabricLibrary(null);
+                  }}
+                  selectedCode={configuration.additionalPillows?.fabricColour}
+                  title="Select Pillow Fabric Colour"
+                />
                 <FabricLibrary
                   open={openPillowFabricLibrary === "colour1"}
                   onOpenChange={(open) => setOpenPillowFabricLibrary(open ? "colour1" : null)}

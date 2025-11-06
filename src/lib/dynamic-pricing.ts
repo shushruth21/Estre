@@ -468,18 +468,18 @@ async function calculateSofaPricing(
 
   if (shape === "l-shape" || shape === "u-shape" || shape === "combo") {
     if (l1Option === "Corner" || l1Option?.toLowerCase().includes("corner")) {
-      cornerSeats += 1;
+      cornerSeats += l2Seats; // Count all seats in corner section
     } else if (l1Option === "Backrest" || l1Option?.toLowerCase().includes("backrest")) {
-      backrestSeats += 1;
+      backrestSeats += l2Seats; // Count all seats in backrest section
     }
     totalSeats += l2Seats;
   }
 
   if (shape === "u-shape" || shape === "combo") {
     if (r1Option === "Corner" || r1Option?.toLowerCase().includes("corner")) {
-      cornerSeats += 1;
+      cornerSeats += r2Seats; // Count all seats in corner section
     } else if (r1Option === "Backrest" || r1Option?.toLowerCase().includes("backrest")) {
-      backrestSeats += 1;
+      backrestSeats += r2Seats; // Count all seats in backrest section
     }
     totalSeats += r2Seats;
   }
@@ -505,11 +505,11 @@ async function calculateSofaPricing(
     totalPrice += breakdown.cornerSeatsPrice;
   }
 
-  // Backrest seats (L2/R2 seats when L1/R1 is backrest)
+  // Backrest seats (already counted in backrestSeats variable)
   if (backrestSeats > 0) {
     const backrestSeatPercent = getFormulaValue(formulas, "backrest_seat_percent", 20);
     const backrestSeatPrice = (basePrice * backrestSeatPercent) / 100;
-    breakdown.backrestSeatsPrice = backrestSeatPrice * (l2Seats + r2Seats);
+    breakdown.backrestSeatsPrice = backrestSeatPrice * backrestSeats; // Use the correctly counted backrestSeats
     totalPrice += breakdown.backrestSeatsPrice;
   }
 
