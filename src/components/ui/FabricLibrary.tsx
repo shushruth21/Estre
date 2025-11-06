@@ -76,7 +76,7 @@ export const FabricLibrary = ({
     },
   });
 
-  // Calculate statistics
+  // Calculate statistics from all fabrics (not just displayed)
   const stats = useMemo(() => {
     if (!allFabrics || allFabrics.length === 0) {
       return {
@@ -87,8 +87,9 @@ export const FabricLibrary = ({
       };
     }
 
+    // Use bom_price for statistics (fallback to price if bom_price is null)
     const prices = allFabrics
-      .map((f) => f.price || 0)
+      .map((f) => f.bom_price || f.price || 0)
       .filter((p) => p > 0);
 
     return {
@@ -275,16 +276,18 @@ export const FabricLibrary = ({
                       </p>
                     </div>
 
-                    {/* Price */}
+                    {/* BOM Price */}
                     <div className="text-center">
                       <p className="font-semibold text-sm">
-                        ₹{fabric.price?.toLocaleString() || "0"}
+                        ₹{fabric.bom_price?.toLocaleString() || fabric.price?.toLocaleString() || "0"}
                       </p>
                     </div>
 
-                    {/* Quantity/Value (placeholder) */}
+                    {/* Upgrade Value */}
                     <div className="text-center">
-                      <p className="text-xs text-muted-foreground">0</p>
+                      <p className="text-xs text-muted-foreground">
+                        {fabric.upgrade?.toLocaleString() || "0"}
+                      </p>
                     </div>
 
                     {/* Select Button */}
@@ -340,7 +343,10 @@ export const FabricLibrary = ({
                       </div>
                       <div className="text-right">
                         <p className="font-semibold">
-                          ₹{fabric.price?.toLocaleString() || "0"}
+                          ₹{fabric.bom_price?.toLocaleString() || fabric.price?.toLocaleString() || "0"}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          Upgrade: {fabric.upgrade?.toLocaleString() || "0"}
                         </p>
                         <Button
                           variant={selectedCode === fabric.estre_code ? "default" : "outline"}
