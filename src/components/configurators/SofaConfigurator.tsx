@@ -835,12 +835,12 @@ const SofaConfigurator = ({
                     <div className="space-y-2">
                       <Label className="text-xs text-muted-foreground">Accessory</Label>
                       <Select
-                        value={configuration.console?.placements?.[index]?.accessoryId || ""}
+                        value={configuration.console?.placements?.[index]?.accessoryId || "none"}
                         onValueChange={(value) => {
                           const placements = [...(configuration.console?.placements || [])];
                           placements[index] = {
                             ...placements[index],
-                            accessoryId: value || null
+                            accessoryId: value === "none" ? null : value
                           };
                           updateConfiguration({
                             console: { ...configuration.console, placements },
@@ -851,7 +851,7 @@ const SofaConfigurator = ({
                           <SelectValue placeholder="Select accessory (optional)" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="">None</SelectItem>
+                          <SelectItem value="none">None</SelectItem>
                           {loadingAccessories ? (
                             <SelectItem value="loading" disabled>Loading...</SelectItem>
                           ) : consoleAccessories && consoleAccessories.length > 0 ? (
