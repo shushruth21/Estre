@@ -22,7 +22,11 @@ interface ProductData {
   discount_percent?: number;
   discount_rs?: number;
   strike_price_rs?: number;
+  strike_price_1seater_rs?: number;
   net_price_rs?: number;
+  net_markup_1seater?: number; // Priority for sofa category
+  net_price_single_no_storage_rs?: number;
+  net_price?: number;
   [key: string]: any;
 }
 
@@ -366,11 +370,23 @@ export const calculateDynamicPrice = async (
       total: 0,
     };
 
-    // Get base price from product (use net_price_rs or bom_rs as fallback)
-    const basePrice = productData.net_price_rs || productData.bom_rs || 
-                     productData.adjusted_bom_rs || 
-                     productData.net_price_single_no_storage_rs || 
-                     productData.net_price || 0;
+    // Get base price from product
+    // For sofa category, prioritize net_markup_1seater
+    let basePrice = 0;
+    if (category === "sofa") {
+      basePrice = productData.net_markup_1seater || 
+                  productData.net_price_rs || 
+                  productData.strike_price_1seater_rs || 
+                  productData.bom_rs || 
+                  productData.adjusted_bom_rs || 0;
+    } else {
+      // For other categories, use existing fallback chain
+      basePrice = productData.net_price_rs || 
+                  productData.bom_rs || 
+                  productData.adjusted_bom_rs || 
+                  productData.net_price_single_no_storage_rs || 
+                  productData.net_price || 0;
+    }
 
     breakdown.basePrice = basePrice;
 
