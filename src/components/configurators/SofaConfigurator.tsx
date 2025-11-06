@@ -131,6 +131,49 @@ const SofaConfigurator = ({
     },
   });
 
+  // Load accessories for console dropdowns
+  const { data: consoleAccessories, isLoading: loadingAccessories } = useQuery({
+    queryKey: ["console-accessories"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("accessories")
+        .select("*")
+        .eq("is_active", true)
+        .or("type.eq.console,type.eq.other")
+        .order("title");
+      if (error) throw error;
+      return data || [];
+    },
+  });
+
+  // Auto-update console quantity when total seats change (if console is required)
+  const totalSeats = getTotalSeats();
+  useEffect(() => {
+    if (configuration.console?.required) {
+      const maxConsoles = Math.max(0, totalSeats - 1);
+      const currentQuantity = configuration.console?.quantity || 0;
+      
+      // Only update if quantity needs to change
+      if (currentQuantity !== maxConsoles) {
+        const placements = Array(maxConsoles).fill(null).map((_, i) => 
+          configuration.console?.placements?.[i] || { 
+            position: "front", 
+            afterSeat: i + 1,
+            accessoryId: null
+          }
+        );
+        
+        updateConfiguration({
+          console: {
+            ...configuration.console,
+            quantity: maxConsoles,
+            placements: placements
+          }
+        });
+      }
+    }
+  }, [totalSeats, configuration.console?.required, configuration.console?.quantity]);
+
   // Initialize configuration
   useEffect(() => {
     if (product?.id && !configuration.productId) {
@@ -354,7 +397,9 @@ const SofaConfigurator = ({
                   .filter((shape: any) => shape && shape.option_value)
                   .map((shape: any) => {
                     const shapeValue = shape.option_value;
-                    const isSelected = configuration.shape === shapeValue;
+                    const normalizedShapeValue = normalizeShape(shapeValue);
+                    const currentNormalizedShape = normalizeShape(configuration.shape || '');
+                    const isSelected = currentNormalizedShape === normalizedShapeValue;
                     
                     // Icon based on shape type
                     const getShapeIcon = () => {
@@ -417,9 +462,10 @@ const SofaConfigurator = ({
 
           <Separator />
 
-          {/* Front Seat Count - Available for ALL shapes (Standard, L, U, Combo) */}
-          <div className="space-y-3">
-            <Label className="text-base font-semibold">Front Seat Count</Label>
+          {/* Front Seat Count - Only show after shape is selected */}
+          {configuration.shape && (
+            <div className="space-y-3">
+              <Label className="text-base font-semibold">Front Seat Count</Label>
             {frontSeatCountsResult.isLoading ? (
               <div className="flex items-center justify-center py-8">
                 <Loader2 className="h-6 w-6 animate-spin text-primary" />
@@ -471,9 +517,10 @@ const SofaConfigurator = ({
                 <AlertDescription>No seat count options available</AlertDescription>
               </Alert>
             )}
-          </div>
+            </div>
+          )}
 
-          {/* Left Section - For L Shape, U Shape, Combo */}
+          {/* Left Section - For L Shape, U Shape, Combo - Only show after shape is selected */}
           {(isLShape || isUShape || isCombo) && (
             <>
               <Separator />
@@ -639,15 +686,32 @@ const SofaConfigurator = ({
               <Label className="text-base font-semibold">Console</Label>
               <Select
                 value={configuration.console?.required ? "Yes" : "No"}
-                onValueChange={(value) =>
+                onValueChange={(value) => {
+                  const isRequired = value === "Yes";
+                  const totalSeats = getTotalSeats();
+                  const maxConsoles = Math.max(0, totalSeats - 1);
+                  const autoQuantity = isRequired ? maxConsoles : 0;
+                  
+                  // Initialize placements array
+                  const placements = isRequired 
+                    ? Array(autoQuantity).fill(null).map((_, i) => 
+                        configuration.console?.placements?.[i] || { 
+                          position: "front", 
+                          afterSeat: i + 1,
+                          accessoryId: null
+                        }
+                      )
+                    : [];
+                  
                   updateConfiguration({
                     console: {
                       ...configuration.console,
-                      required: value === "Yes",
-                      quantity: value === "Yes" ? (configuration.console?.quantity || 1) : 0,
+                      required: isRequired,
+                      quantity: autoQuantity,
+                      placements: placements
                     },
-                  })
-                }
+                  });
+                }}
               >
                 <SelectTrigger className="w-32">
                   <SelectValue />
@@ -693,48 +757,90 @@ const SofaConfigurator = ({
                 
                 <div className="space-y-2">
                   <Label>Number of Consoles</Label>
-                  <Select
-                    value={(configuration.console?.quantity || 1).toString()}
-                    onValueChange={(value) => {
-                      const qty = parseInt(value, 10);
-                      const placements = Array(qty).fill(null).map((_, i) => 
-                        configuration.console?.placements?.[i] || { position: "front", afterSeat: 1 }
-                      );
-                      updateConfiguration({
-                        console: { 
-                          ...configuration.console, 
-                          quantity: qty,
-                          placements: placements
-                        },
-                      });
-                    }}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {Array.from({ length: Math.max(getTotalSeats(), 4) }, (_, i) => i + 1).map((num) => (
-                        <SelectItem key={num} value={num.toString()}>
-                          {num} {num === 1 ? "Console" : "Consoles"}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <div className="p-3 bg-muted/50 rounded-lg">
+                    <p className="text-sm font-medium">
+                      {configuration.console?.quantity || 0} Console{configuration.console?.quantity !== 1 ? 's' : ''} 
+                      <span className="text-muted-foreground ml-2">
+                        (Auto-calculated: Total Seats - 1 = {getTotalSeats()} - 1 = {Math.max(0, getTotalSeats() - 1)})
+                      </span>
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Console quantity is automatically set to (Total Seats - 1)
+                    </p>
+                  </div>
                 </div>
 
-                {/* Console Placements */}
+                {/* Console Placements & Accessories */}
                 {configuration.console?.quantity > 0 && Array.from({ length: configuration.console.quantity }, (_, index) => (
-                  <div key={index} className="space-y-2 p-3 bg-muted/30 rounded-lg">
-                    <Label className="text-sm font-medium">Console {index + 1} Placement</Label>
-                    <div className="grid grid-cols-2 gap-2">
+                  <div key={index} className="space-y-3 p-4 bg-muted/30 rounded-lg border">
+                    <Label className="text-sm font-semibold">Console {index + 1} Configuration</Label>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-2">
+                        <Label className="text-xs text-muted-foreground">Placement Position</Label>
+                        <Select
+                          value={configuration.console?.placements?.[index]?.position || "front"}
+                          onValueChange={(value) => {
+                            const placements = [...(configuration.console?.placements || [])];
+                            placements[index] = {
+                              ...placements[index],
+                              position: value,
+                              afterSeat: placements[index]?.afterSeat || (index + 1)
+                            };
+                            updateConfiguration({
+                              console: { ...configuration.console, placements },
+                            });
+                          }}
+                        >
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="front">Front</SelectItem>
+                            <SelectItem value="left">Left</SelectItem>
+                            <SelectItem value="right">Right</SelectItem>
+                            <SelectItem value="combo">Combo</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="text-xs text-muted-foreground">After Seat</Label>
+                        <Select
+                          value={(configuration.console?.placements?.[index]?.afterSeat || (index + 1)).toString()}
+                          onValueChange={(value) => {
+                            const placements = [...(configuration.console?.placements || [])];
+                            const afterSeat = value === "none" ? null : parseInt(value, 10);
+                            placements[index] = {
+                              ...placements[index],
+                              afterSeat: afterSeat || (index + 1)
+                            };
+                            updateConfiguration({
+                              console: { ...configuration.console, placements },
+                            });
+                          }}
+                        >
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="none">None (Unassigned)</SelectItem>
+                            {Array.from({ length: Math.max(getTotalSeats(), 4) }, (_, i) => i + 1).map((seat) => (
+                              <SelectItem key={seat} value={seat.toString()}>
+                                After {seat}{seat === 1 ? "st" : seat === 2 ? "nd" : seat === 3 ? "rd" : "th"} Seat from Left
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-xs text-muted-foreground">Accessory</Label>
                       <Select
-                        value={configuration.console?.placements?.[index]?.position || "front"}
+                        value={configuration.console?.placements?.[index]?.accessoryId || ""}
                         onValueChange={(value) => {
                           const placements = [...(configuration.console?.placements || [])];
                           placements[index] = {
                             ...placements[index],
-                            position: value,
-                            afterSeat: placements[index]?.afterSeat || 1
+                            accessoryId: value || null
                           };
                           updateConfiguration({
                             console: { ...configuration.console, placements },
@@ -742,39 +848,21 @@ const SofaConfigurator = ({
                         }}
                       >
                         <SelectTrigger>
-                          <SelectValue />
+                          <SelectValue placeholder="Select accessory (optional)" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="front">Front</SelectItem>
-                          <SelectItem value="left">Left</SelectItem>
-                          <SelectItem value="right">Right</SelectItem>
-                          <SelectItem value="combo">Combo</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <Select
-                        value={(configuration.console?.placements?.[index]?.afterSeat || 1).toString()}
-                        onValueChange={(value) => {
-                          const placements = [...(configuration.console?.placements || [])];
-                          const afterSeat = value === "none" ? null : parseInt(value, 10);
-                          placements[index] = {
-                            ...placements[index],
-                            afterSeat: afterSeat || 1
-                          };
-                          updateConfiguration({
-                            console: { ...configuration.console, placements },
-                          });
-                        }}
-                      >
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="none">None (Unassigned)</SelectItem>
-                          {Array.from({ length: Math.max(getTotalSeats(), 4) }, (_, i) => i + 1).map((seat) => (
-                            <SelectItem key={seat} value={seat.toString()}>
-                              After {seat}{seat === 1 ? "st" : seat === 2 ? "nd" : seat === 3 ? "rd" : "th"} Seat from Left
-                            </SelectItem>
-                          ))}
+                          <SelectItem value="">None</SelectItem>
+                          {loadingAccessories ? (
+                            <SelectItem value="loading" disabled>Loading...</SelectItem>
+                          ) : consoleAccessories && consoleAccessories.length > 0 ? (
+                            consoleAccessories.map((acc: any) => (
+                              <SelectItem key={acc.id} value={acc.id}>
+                                {acc.title} {acc.code && `(${acc.code})`} - ₹{acc.price_rs?.toLocaleString() || 0}
+                              </SelectItem>
+                            ))
+                          ) : (
+                            <SelectItem value="no-data" disabled>No accessories available</SelectItem>
+                          )}
                         </SelectContent>
                       </Select>
                     </div>
@@ -878,15 +966,19 @@ const SofaConfigurator = ({
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      {loungerPlacements && loungerPlacements.length > 0 ? (
-                        loungerPlacements
-                          .filter((p: any) => p && p.option_value)
-                          .map((p: any) => (
-                            <SelectItem key={p.id} value={p.option_value}>
-                              {p.display_label || p.option_value}
-                            </SelectItem>
-                          ))
+                      {configuration.lounger?.quantity === 2 ? (
+                        // If 2 loungers, only show "Both"
+                        <>
+                          <SelectItem value="Both">Both LHS & RHS</SelectItem>
+                        </>
+                      ) : configuration.lounger?.quantity === 1 ? (
+                        // If 1 lounger, only show LHS and RHS
+                        <>
+                          <SelectItem value="LHS">Left Hand Side (LHS)</SelectItem>
+                          <SelectItem value="RHS">Right Hand Side (RHS)</SelectItem>
+                        </>
                       ) : (
+                        // Fallback: show all options
                         <>
                           <SelectItem value="LHS">Left Hand Side (LHS)</SelectItem>
                           <SelectItem value="RHS">Right Hand Side (RHS)</SelectItem>
@@ -915,6 +1007,11 @@ const SofaConfigurator = ({
                       <SelectItem value="No">No</SelectItem>
                     </SelectContent>
                   </Select>
+                  {configuration.lounger?.storage === "No" && (
+                    <p className="text-xs text-muted-foreground">
+                      Storage-related options are disabled when Storage is set to "No"
+                    </p>
+                  )}
                 </div>
               </div>
             )}
@@ -994,6 +1091,7 @@ const SofaConfigurator = ({
                       ) : pillowTypes && pillowTypes.length > 0 ? (
                         pillowTypes
                           .filter((type: any) => type && type.option_value)
+                          .sort((a: any, b: any) => (a.sort_order || 0) - (b.sort_order || 0))
                           .map((type: any) => (
                             <SelectItem key={type.id} value={type.option_value}>
                               {type.display_label || type.option_value}
@@ -1002,9 +1100,11 @@ const SofaConfigurator = ({
                       ) : (
                         <>
                           <SelectItem value="Simple">Simple</SelectItem>
-                          <SelectItem value="Diamond Quilted">Diamond Quilted</SelectItem>
+                          <SelectItem value="Diamond Quilted pillow">Diamond Quilted pillow</SelectItem>
                           <SelectItem value="Belt Quilted">Belt Quilted</SelectItem>
-                          <SelectItem value="Tassels">Tassels</SelectItem>
+                          <SelectItem value="Diamond with pipen quilting pillow">Diamond with pipen quilting pillow</SelectItem>
+                          <SelectItem value="Tassels with pillow">Tassels with pillow</SelectItem>
+                          <SelectItem value="Tassels without a pillow">Tassels without a pillow</SelectItem>
                         </>
                       )}
                     </SelectContent>
