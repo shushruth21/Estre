@@ -78,7 +78,11 @@ const Login = () => {
 
       if (rolesError) {
         console.warn("Error fetching roles:", rolesError);
-        // Continue with redirect even if roles fetch fails
+      }
+
+      // Log roles for debugging
+      if (import.meta.env.DEV) {
+        console.log("🔐 Login successful - User roles:", roles);
       }
 
       toast({
@@ -86,22 +90,40 @@ const Login = () => {
         description: "Logged in successfully",
       });
 
-      // Small delay to ensure session is set
-      await new Promise(resolve => setTimeout(resolve, 100));
+      // Wait a bit longer to ensure session and auth state are fully updated
+      await new Promise(resolve => setTimeout(resolve, 300));
 
-      // Role-based redirect
+      // Determine redirect path based on roles
+      let redirectPath = "/"; // Default to home
+      
       if (roles && roles.length > 0) {
         const userRole = roles[0].role;
-        if (userRole === 'admin' || userRole === 'store_manager' || userRole === 'production_manager') {
-          navigate("/admin/dashboard", { replace: true });
-        } else if (userRole === 'factory_staff') {
-          navigate("/staff/job-cards", { replace: true });
-        } else {
-          navigate("/", { replace: true });
+        
+        if (import.meta.env.DEV) {
+          console.log("🎯 Redirecting based on role:", userRole);
         }
-      } else {
-        // Default redirect for users without roles (customers)
-        navigate("/", { replace: true });
+        
+        if (userRole === 'admin' || userRole === 'store_manager' || userRole === 'production_manager') {
+          redirectPath = "/admin/dashboard";
+        } else if (userRole === 'factory_staff') {
+          redirectPath = "/staff/job-cards";
+        }
+      }
+
+      // Force navigation with replace to prevent back button issues
+      if (import.meta.env.DEV) {
+        console.log("🚀 Navigating to:", redirectPath);
+      }
+      
+      // Use navigate first (React Router)
+      navigate(redirectPath, { replace: true });
+      
+      // Also use window.location as immediate fallback for admin pages
+      // This ensures the redirect happens even if React Router is slow
+      if (redirectPath.startsWith("/admin") || redirectPath.startsWith("/staff")) {
+        setTimeout(() => {
+          window.location.href = redirectPath;
+        }, 200);
       }
     } catch (error: any) {
       console.error("Login error:", error);
