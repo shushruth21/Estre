@@ -135,6 +135,19 @@ const FabricSelector = ({
                 selectFabric(code);
               }}
             />
+
+            <FabricPartSelector
+              label="Headrest Fabric"
+              selectedCode={configuration.fabric?.headrestCode}
+              fabrics={fabrics}
+              isLoading={isLoading}
+              searchTerm={searchTerm}
+              onSearchChange={setSearchTerm}
+              onSelect={(code) => {
+                setSelectedPart("headrest");
+                selectFabric(code);
+              }}
+            />
           </>
         )}
       </div>

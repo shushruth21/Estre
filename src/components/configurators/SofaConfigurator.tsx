@@ -49,6 +49,7 @@ const SofaConfigurator = ({
   const consolePlacementsResult = useDropdownOptions("sofa", "console_placement");
   const pillowTypesResult = useDropdownOptions("sofa", "pillow_type");
   const pillowSizesResult = useDropdownOptions("sofa", "pillow_size");
+  const pillowFabricPlanResult = useDropdownOptions("sofa", "pillow_fabric_plan");
   
   // Shape-specific dropdown options
   const l1OptionsResult = useDropdownOptions("sofa", "l1_option");
@@ -56,8 +57,9 @@ const SofaConfigurator = ({
   const l2SeatCountsResult = useDropdownOptions("sofa", "l2_seat_count");
   const r2SeatCountsResult = useDropdownOptions("sofa", "r2_seat_count");
   
-  // Headrest option
-  const headrestOptionsResult = useDropdownOptions("sofa", "comes_with_headrest");
+  // Headrest options - separate fields
+  const modelHasHeadrestResult = useDropdownOptions("sofa", "model_has_headrest");
+  const headrestRequiredResult = useDropdownOptions("sofa", "headrest_required");
 
   // Safely extract data with defaults
   const shapes = Array.isArray(shapesResult.data) ? shapesResult.data : [];
@@ -74,12 +76,14 @@ const SofaConfigurator = ({
   const consolePlacements = Array.isArray(consolePlacementsResult.data) ? consolePlacementsResult.data : [];
   const pillowTypes = Array.isArray(pillowTypesResult.data) ? pillowTypesResult.data : [];
   const pillowSizes = Array.isArray(pillowSizesResult.data) ? pillowSizesResult.data : [];
+  const pillowFabricPlans = Array.isArray(pillowFabricPlanResult.data) ? pillowFabricPlanResult.data : [];
   
   const l1Options = Array.isArray(l1OptionsResult.data) ? l1OptionsResult.data : [];
   const r1Options = Array.isArray(r1OptionsResult.data) ? r1OptionsResult.data : [];
   const l2SeatCounts = Array.isArray(l2SeatCountsResult.data) ? l2SeatCountsResult.data : [];
   const r2SeatCounts = Array.isArray(r2SeatCountsResult.data) ? r2SeatCountsResult.data : [];
-  const headrestOptions = Array.isArray(headrestOptionsResult.data) ? headrestOptionsResult.data : [];
+  const modelHasHeadrestOptions = Array.isArray(modelHasHeadrestResult.data) ? modelHasHeadrestResult.data : [];
+  const headrestRequiredOptions = Array.isArray(headrestRequiredResult.data) ? headrestRequiredResult.data : [];
 
   // Helper: Convert shape to standardized format (must be defined before use)
   const normalizeShape = (shape: string): 'standard' | 'l-shape' | 'u-shape' | 'combo' => {
@@ -211,8 +215,9 @@ const SofaConfigurator = ({
         stitch: {
           type: (stitchTypes && stitchTypes.length > 0) ? stitchTypes[0].option_value : "",
       },
-        comesWithHeadrest: "NA", // Default to NA
-        headrest: "NA", // Keep for compatibility
+        comesWithHeadrest: "No", // Keep for backward compatibility
+        modelHasHeadrest: "No", // Whether model comes with headrest
+        headrestRequired: "No", // Whether headrest is required
         customerInfo: {
           fullName: "",
           email: "",
@@ -1055,8 +1060,22 @@ const SofaConfigurator = ({
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="Single Colour">Single Colour</SelectItem>
-                      <SelectItem value="Dual Colour">Dual Colour</SelectItem>
+                      {pillowFabricPlanResult.isLoading ? (
+                        <SelectItem value="loading" disabled>Loading...</SelectItem>
+                      ) : pillowFabricPlans && pillowFabricPlans.length > 0 ? (
+                        pillowFabricPlans
+                          .filter((plan: any) => plan && plan.option_value)
+                          .map((plan: any) => (
+                            <SelectItem key={plan.id} value={plan.option_value}>
+                              {plan.display_label || plan.option_value}
+                            </SelectItem>
+                          ))
+                      ) : (
+                        <>
+                          <SelectItem value="Single Colour">Single Colour</SelectItem>
+                          <SelectItem value="Dual Colour">Dual Colour</SelectItem>
+                        </>
+                      )}
                     </SelectContent>
                   </Select>
                 </div>
@@ -1137,7 +1156,7 @@ const SofaConfigurator = ({
 
                 {/* Seat Depth */}
                 <div className="space-y-3">
-                  <Label className="text-base font-semibold">Seat Depth Increase Charges</Label>
+                  <Label className="text-base font-semibold">Seat Depth Upgrade Charges</Label>
                   <Select
                     value={configuration.dimensions?.seatDepth?.toString() || (seatDepths && seatDepths.length > 0 && seatDepths[0]?.option_value ? normalizeDimensionValue(seatDepths[0].option_value) : "")}
                     onValueChange={(value) =>
@@ -1166,10 +1185,10 @@ const SofaConfigurator = ({
                                 <span>{depth.display_label || depth.option_value}</span>
                                 {percentage > 0 && (
                                   <Badge variant="secondary" className="ml-2">
-                                    {percentage}%
+                                    Upgrade: {percentage}%
                                   </Badge>
                                 )}
-                </div>
+                              </div>
                             </SelectItem>
                           );
                         })
@@ -1185,7 +1204,7 @@ const SofaConfigurator = ({
                         <br />
                         {getDimensionPercentage("depth", configuration.dimensions.seatDepth) === 0
                           ? "Standard depth - No extra cost"
-                          : `${getDimensionPercentage("depth", configuration.dimensions.seatDepth)}% increase`}
+                          : `Upgrade charge: ${getDimensionPercentage("depth", configuration.dimensions.seatDepth)}%`}
                       </AlertDescription>
                     </Alert>
                   )}
@@ -1193,7 +1212,7 @@ const SofaConfigurator = ({
 
                 {/* Seat Width */}
                 <div className="space-y-3">
-                  <Label className="text-base font-semibold">Seat Width Increase Charges</Label>
+                  <Label className="text-base font-semibold">Seat Width Upgrade Charges</Label>
             <Select
                     value={configuration.dimensions?.seatWidth?.toString() || (seatWidths && seatWidths.length > 0 && seatWidths[0]?.option_value ? normalizeDimensionValue(seatWidths[0].option_value) : "")}
               onValueChange={(value) =>
@@ -1222,7 +1241,7 @@ const SofaConfigurator = ({
                                 <span>{width.display_label || width.option_value}</span>
                                 {percentage > 0 && (
                                   <Badge variant="secondary" className="ml-2">
-                                    {percentage}%
+                                    Upgrade: {percentage}%
                                   </Badge>
                                 )}
                               </div>
@@ -1241,7 +1260,7 @@ const SofaConfigurator = ({
                         <br />
                         {getDimensionPercentage("width", configuration.dimensions.seatWidth) === 0
                           ? "Standard width - No extra cost"
-                          : `${getDimensionPercentage("width", configuration.dimensions.seatWidth)}% increase`}
+                          : `Upgrade charge: ${getDimensionPercentage("width", configuration.dimensions.seatWidth)}%`}
                       </AlertDescription>
                     </Alert>
                   )}
@@ -1358,51 +1377,75 @@ const SofaConfigurator = ({
                   )}
           </div>
 
-                {/* Headrest Option */}
+                {/* Model Has Headrest */}
                 <div className="space-y-3">
-                  <Label className="text-base font-semibold">Headrest / Backrest</Label>
-              <Select
-                    value={configuration.comesWithHeadrest || configuration.headrest || ""}
-                onValueChange={(value) =>
-                  updateConfiguration({
-                        comesWithHeadrest: value,
-                        headrest: value // Keep for compatibility
-                  })
-                }
-              >
-                <SelectTrigger>
-                      <SelectValue placeholder="Select headrest option" />
-                </SelectTrigger>
-                <SelectContent>
-                      {headrestOptionsResult.isLoading ? (
+                  <Label className="text-base font-semibold">Model Has Headrest</Label>
+                  <Select
+                    value={configuration.modelHasHeadrest || "No"}
+                    onValueChange={(value) =>
+                      updateConfiguration({
+                        modelHasHeadrest: value,
+                      })
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select option" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {modelHasHeadrestResult.isLoading ? (
                         <SelectItem value="loading" disabled>Loading...</SelectItem>
-                      ) : headrestOptions && headrestOptions.length > 0 ? (
-                        headrestOptions
+                      ) : modelHasHeadrestOptions && modelHasHeadrestOptions.length > 0 ? (
+                        modelHasHeadrestOptions
                           .filter((opt: any) => opt && opt.option_value)
                           .map((opt: any) => (
                             <SelectItem key={opt.id} value={opt.option_value}>
                               {opt.display_label || opt.option_value}
-                    </SelectItem>
+                            </SelectItem>
                           ))
                       ) : (
-                        <SelectItem value="no-data" disabled>No options available</SelectItem>
+                        <>
+                          <SelectItem value="Yes">Yes</SelectItem>
+                          <SelectItem value="No">No</SelectItem>
+                        </>
                       )}
-                </SelectContent>
-              </Select>
-                  {configuration.comesWithHeadrest && (
-                    <Alert>
-                      <AlertDescription>
-                        <strong>Selected: {configuration.comesWithHeadrest}</strong>
-                        <br />
-                        {configuration.comesWithHeadrest === "NA" 
-                          ? "Not applicable for this configuration"
-                          : configuration.comesWithHeadrest === "Yes"
-                          ? "Headrest is included"
-                          : "No headrest"}
-                      </AlertDescription>
-                    </Alert>
-          )}
-        </div>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Headrest Required */}
+                <div className="space-y-3">
+                  <Label className="text-base font-semibold">Headrest Required</Label>
+                  <Select
+                    value={configuration.headrestRequired || "No"}
+                    onValueChange={(value) =>
+                      updateConfiguration({
+                        headrestRequired: value,
+                      })
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select option" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {headrestRequiredResult.isLoading ? (
+                        <SelectItem value="loading" disabled>Loading...</SelectItem>
+                      ) : headrestRequiredOptions && headrestRequiredOptions.length > 0 ? (
+                        headrestRequiredOptions
+                          .filter((opt: any) => opt && opt.option_value)
+                          .map((opt: any) => (
+                            <SelectItem key={opt.id} value={opt.option_value}>
+                              {opt.display_label || opt.option_value}
+                            </SelectItem>
+                          ))
+                      ) : (
+                        <>
+                          <SelectItem value="Yes">Yes</SelectItem>
+                          <SelectItem value="No">No</SelectItem>
+                        </>
+                      )}
+                    </SelectContent>
+                  </Select>
+                </div>
               </AccordionContent>
             </AccordionItem>
           </Accordion>
