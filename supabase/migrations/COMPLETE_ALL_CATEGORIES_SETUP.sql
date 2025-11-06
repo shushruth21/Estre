@@ -177,6 +177,11 @@ INSERT INTO dropdown_options (category, field_name, option_value, display_label,
 ('sofa', 'stitch_type', 'French Seam', 'French Seam', 5, true, '{}'),
 ('sofa', 'stitch_type', 'Felled Seam', 'Felled Seam', 6, true, '{}')
 ON CONFLICT (category, field_name, option_value) DO NOTHING;
+-- Wood Types
+INSERT INTO dropdown_options (category, field_name, option_value, display_label, sort_order, is_active, metadata) VALUES
+('sofa', 'wood_type', 'Pine', 'Pine (Default)', 1, true, '{"default": true}'),
+('sofa', 'wood_type', 'Neem', 'Neem', 2, true, '{}')
+ON CONFLICT (category, field_name, option_value) DO NOTHING;
 -- Headrest Required
 INSERT INTO dropdown_options (category, field_name, option_value, display_label, sort_order, is_active, metadata) VALUES
 ('sofa', 'headrest_required', 'NA', 'Not Applicable', 1, true, '{"default": true}'),
