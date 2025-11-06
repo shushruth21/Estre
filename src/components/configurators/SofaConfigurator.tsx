@@ -19,6 +19,7 @@ import { useDropdownOptions } from "@/hooks/useDropdownOptions";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import FabricSelector from "./FabricSelector";
+import { FabricLibrary } from "@/components/ui/FabricLibrary";
 import { SelectionCard } from "@/components/ui/SelectionCard";
 import { ChevronDown, Download, Info, Loader2, Square, LayoutGrid } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -145,18 +146,37 @@ const SofaConfigurator = ({
     },
   });
 
-  // Load fabrics for pillow dual colour selection
-  const { data: pillowFabrics, isLoading: loadingPillowFabrics } = useQuery({
-    queryKey: ["pillow-fabrics"],
+  // State for fabric library modals
+  const [openPillowFabricLibrary, setOpenPillowFabricLibrary] = useState<"colour1" | "colour2" | null>(null);
+
+  // Fetch selected pillow fabric details for display
+  const { data: selectedPillowFabrics } = useQuery({
+    queryKey: ["selected-pillow-fabrics", configuration.additionalPillows],
     queryFn: async () => {
+      const codes = [
+        configuration.additionalPillows?.fabricColour1,
+        configuration.additionalPillows?.fabricColour2,
+      ].filter(Boolean);
+
+      if (codes.length === 0) return {};
+
       const { data, error } = await supabase
         .from("fabric_coding")
         .select("*")
-        .eq("is_active", true)
-        .order("collection, brand, colour");
+        .in("estre_code", codes);
+
       if (error) throw error;
-      return data || [];
+
+      const fabricMap: Record<string, any> = {};
+      data?.forEach((f) => {
+        fabricMap[f.estre_code] = f;
+      });
+      return fabricMap;
     },
+    enabled: !!(
+      configuration.additionalPillows?.fabricColour1 ||
+      configuration.additionalPillows?.fabricColour2
+    ),
   });
 
   // Calculate total seats dynamically (must be defined before useEffect)
@@ -1204,95 +1224,105 @@ const SofaConfigurator = ({
                   <div className="space-y-4 pt-2 pl-4 border-l-2 border-muted">
                     <div className="space-y-2">
                       <Label>Colour 1</Label>
-                      <Select
-                        value={configuration.additionalPillows?.fabricColour1 || "none"}
-                        onValueChange={(value) =>
-                          updateConfiguration({
-                            additionalPillows: {
-                              ...configuration.additionalPillows,
-                              fabricColour1: value === "none" ? undefined : value,
-                            },
-                          })
-                        }
+                      <Button
+                        variant="outline"
+                        className="w-full justify-start"
+                        onClick={() => setOpenPillowFabricLibrary("colour1")}
                       >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select Colour 1" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="none" disabled>Select Colour 1</SelectItem>
-                          {loadingPillowFabrics ? (
-                            <SelectItem value="loading" disabled>Loading fabrics...</SelectItem>
-                          ) : pillowFabrics && pillowFabrics.length > 0 ? (
-                            pillowFabrics
-                              .filter((fabric: any) => fabric && fabric.estre_code)
-                              .map((fabric: any) => {
-                                const displayName = `${fabric.collection || ''} - ${fabric.brand || ''} - ${fabric.colour || fabric.colour_link || fabric.estre_code}`.replace(/^[\s-]+|[\s-]+$/g, '');
-                                return (
-                                  <SelectItem key={fabric.id} value={fabric.estre_code}>
-                                    <div className="flex items-center justify-between w-full">
-                                      <span>{displayName}</span>
-                                      {fabric.upgrade && fabric.upgrade > 0 && (
-                                        <Badge variant="secondary" className="ml-2 text-xs">
-                                          +₹{fabric.upgrade.toLocaleString()}
-                                        </Badge>
-                                      )}
-                                    </div>
-                                  </SelectItem>
-                                );
-                              })
-                          ) : (
-                            <SelectItem value="no-data" disabled>No fabrics available</SelectItem>
-                          )}
-                        </SelectContent>
-                      </Select>
+                        {selectedPillowFabrics?.[configuration.additionalPillows?.fabricColour1 || ""] ? (
+                          <div className="flex items-center gap-2 w-full">
+                            <div
+                              className="w-8 h-8 rounded-full border-2 border-gray-200 flex-shrink-0"
+                              style={{
+                                backgroundColor: selectedPillowFabrics[configuration.additionalPillows.fabricColour1].colour_link || 
+                                  `hsl(${(selectedPillowFabrics[configuration.additionalPillows.fabricColour1].estre_code.charCodeAt(0) || 0) % 360}, 70%, 75%)`,
+                              }}
+                            />
+                            <Badge variant="outline">
+                              {selectedPillowFabrics[configuration.additionalPillows.fabricColour1].estre_code}
+                            </Badge>
+                            <span className="flex-1 truncate">
+                              {selectedPillowFabrics[configuration.additionalPillows.fabricColour1].description || 
+                               selectedPillowFabrics[configuration.additionalPillows.fabricColour1].colour || 
+                               selectedPillowFabrics[configuration.additionalPillows.fabricColour1].estre_code}
+                            </span>
+                            <span className="ml-auto text-primary font-semibold">
+                              ₹{selectedPillowFabrics[configuration.additionalPillows.fabricColour1].price?.toLocaleString() || 0}
+                            </span>
+                          </div>
+                        ) : (
+                          <span className="text-muted-foreground">Select Colour 1...</span>
+                        )}
+                      </Button>
                     </div>
 
                     <div className="space-y-2">
                       <Label>Colour 2</Label>
-                      <Select
-                        value={configuration.additionalPillows?.fabricColour2 || "none"}
-                        onValueChange={(value) =>
-                          updateConfiguration({
-                            additionalPillows: {
-                              ...configuration.additionalPillows,
-                              fabricColour2: value === "none" ? undefined : value,
-                            },
-                          })
-                        }
+                      <Button
+                        variant="outline"
+                        className="w-full justify-start"
+                        onClick={() => setOpenPillowFabricLibrary("colour2")}
                       >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select Colour 2" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="none" disabled>Select Colour 2</SelectItem>
-                          {loadingPillowFabrics ? (
-                            <SelectItem value="loading" disabled>Loading fabrics...</SelectItem>
-                          ) : pillowFabrics && pillowFabrics.length > 0 ? (
-                            pillowFabrics
-                              .filter((fabric: any) => fabric && fabric.estre_code)
-                              .map((fabric: any) => {
-                                const displayName = `${fabric.collection || ''} - ${fabric.brand || ''} - ${fabric.colour || fabric.colour_link || fabric.estre_code}`.replace(/^[\s-]+|[\s-]+$/g, '');
-                                return (
-                                  <SelectItem key={fabric.id} value={fabric.estre_code}>
-                                    <div className="flex items-center justify-between w-full">
-                                      <span>{displayName}</span>
-                                      {fabric.upgrade && fabric.upgrade > 0 && (
-                                        <Badge variant="secondary" className="ml-2 text-xs">
-                                          +₹{fabric.upgrade.toLocaleString()}
-                                        </Badge>
-                                      )}
-                                    </div>
-                                  </SelectItem>
-                                );
-                              })
-                          ) : (
-                            <SelectItem value="no-data" disabled>No fabrics available</SelectItem>
-                          )}
-                        </SelectContent>
-                      </Select>
+                        {selectedPillowFabrics?.[configuration.additionalPillows?.fabricColour2 || ""] ? (
+                          <div className="flex items-center gap-2 w-full">
+                            <div
+                              className="w-8 h-8 rounded-full border-2 border-gray-200 flex-shrink-0"
+                              style={{
+                                backgroundColor: selectedPillowFabrics[configuration.additionalPillows.fabricColour2].colour_link || 
+                                  `hsl(${(selectedPillowFabrics[configuration.additionalPillows.fabricColour2].estre_code.charCodeAt(0) || 0) % 360}, 70%, 75%)`,
+                              }}
+                            />
+                            <Badge variant="outline">
+                              {selectedPillowFabrics[configuration.additionalPillows.fabricColour2].estre_code}
+                            </Badge>
+                            <span className="flex-1 truncate">
+                              {selectedPillowFabrics[configuration.additionalPillows.fabricColour2].description || 
+                               selectedPillowFabrics[configuration.additionalPillows.fabricColour2].colour || 
+                               selectedPillowFabrics[configuration.additionalPillows.fabricColour2].estre_code}
+                            </span>
+                            <span className="ml-auto text-primary font-semibold">
+                              ₹{selectedPillowFabrics[configuration.additionalPillows.fabricColour2].price?.toLocaleString() || 0}
+                            </span>
+                          </div>
+                        ) : (
+                          <span className="text-muted-foreground">Select Colour 2...</span>
+                        )}
+                      </Button>
                     </div>
                   </div>
                 )}
+
+                {/* Pillow Fabric Library Dialogs */}
+                <FabricLibrary
+                  open={openPillowFabricLibrary === "colour1"}
+                  onOpenChange={(open) => setOpenPillowFabricLibrary(open ? "colour1" : null)}
+                  onSelect={(code) => {
+                    updateConfiguration({
+                      additionalPillows: {
+                        ...configuration.additionalPillows,
+                        fabricColour1: code,
+                      },
+                    });
+                    setOpenPillowFabricLibrary(null);
+                  }}
+                  selectedCode={configuration.additionalPillows?.fabricColour1}
+                  title="Select Pillow Colour 1"
+                />
+                <FabricLibrary
+                  open={openPillowFabricLibrary === "colour2"}
+                  onOpenChange={(open) => setOpenPillowFabricLibrary(open ? "colour2" : null)}
+                  onSelect={(code) => {
+                    updateConfiguration({
+                      additionalPillows: {
+                        ...configuration.additionalPillows,
+                        fabricColour2: code,
+                      },
+                    });
+                    setOpenPillowFabricLibrary(null);
+                  }}
+                  selectedCode={configuration.additionalPillows?.fabricColour2}
+                  title="Select Pillow Colour 2"
+                />
               </div>
             )}
           </div>
