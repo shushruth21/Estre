@@ -44,7 +44,11 @@ const SofaConfigurator = ({
   const woodTypesResult = useDropdownOptions("sofa", "wood_type");
   const stitchTypesResult = useDropdownOptions("sofa", "stitch_type");
   const loungerSizesResult = useDropdownOptions("sofa", "lounger_size");
+  const loungerPlacementsResult = useDropdownOptions("sofa", "lounger_placement");
   const consoleSizesResult = useDropdownOptions("sofa", "console_size");
+  const consolePlacementsResult = useDropdownOptions("sofa", "console_placement");
+  const pillowTypesResult = useDropdownOptions("sofa", "pillow_type");
+  const pillowSizesResult = useDropdownOptions("sofa", "pillow_size");
   
   // Shape-specific dropdown options
   const l1OptionsResult = useDropdownOptions("sofa", "l1_option");
@@ -65,7 +69,11 @@ const SofaConfigurator = ({
   const woodTypes = Array.isArray(woodTypesResult.data) ? woodTypesResult.data : [];
   const stitchTypes = Array.isArray(stitchTypesResult.data) ? stitchTypesResult.data : [];
   const loungerSizes = Array.isArray(loungerSizesResult.data) ? loungerSizesResult.data : [];
+  const loungerPlacements = Array.isArray(loungerPlacementsResult.data) ? loungerPlacementsResult.data : [];
   const consoleSizes = Array.isArray(consoleSizesResult.data) ? consoleSizesResult.data : [];
+  const consolePlacements = Array.isArray(consolePlacementsResult.data) ? consolePlacementsResult.data : [];
+  const pillowTypes = Array.isArray(pillowTypesResult.data) ? pillowTypesResult.data : [];
+  const pillowSizes = Array.isArray(pillowSizesResult.data) ? pillowSizesResult.data : [];
   
   const l1Options = Array.isArray(l1OptionsResult.data) ? l1OptionsResult.data : [];
   const r1Options = Array.isArray(r1OptionsResult.data) ? r1OptionsResult.data : [];
@@ -157,9 +165,26 @@ const SofaConfigurator = ({
         r1Option: "Corner",
         l2SeatCount: "2",
         r2SeatCount: "2",
-        console: { required: false },
-        lounger: { required: false },
-        additionalPillows: { required: false },
+        console: { 
+          required: false,
+          quantity: 0,
+          size: "",
+          placements: [] // Array of { position: "front"|"left"|"right", afterSeat: number }
+        },
+        lounger: { 
+          required: false,
+          quantity: 1,
+          size: "",
+          placement: "LHS", // LHS, RHS, Both
+          storage: "No"
+        },
+        additionalPillows: { 
+          required: false,
+          quantity: 1,
+          type: "",
+          size: "",
+          fabricPlan: "Single Colour"
+        },
       fabric: {
         claddingPlan: "Single Colour",
         structureCode: "",
@@ -604,7 +629,7 @@ const SofaConfigurator = ({
           <Separator />
 
           {/* Console */}
-          <div className="space-y-2">
+          <div className="space-y-4">
             <div className="flex items-center justify-between">
               <Label className="text-base font-semibold">Console</Label>
               <Select
@@ -614,6 +639,7 @@ const SofaConfigurator = ({
                     console: {
                       ...configuration.console,
                       required: value === "Yes",
+                      quantity: value === "Yes" ? (configuration.console?.quantity || 1) : 0,
                     },
                   })
                 }
@@ -628,13 +654,14 @@ const SofaConfigurator = ({
               </Select>
             </div>
             {configuration.console?.required && (
-              <div className="space-y-2 pt-2">
-                <Label>Console Size</Label>
+              <div className="space-y-4 pt-2 pl-4 border-l-2 border-muted">
+                <div className="space-y-2">
+                  <Label>Console Size</Label>
                   <Select
-                  value={configuration.console?.size || ""}
+                    value={configuration.console?.size || ""}
                     onValueChange={(value) =>
                       updateConfiguration({
-                      console: { ...configuration.console, size: value },
+                        console: { ...configuration.console, size: value },
                       })
                     }
                   >
@@ -649,91 +676,123 @@ const SofaConfigurator = ({
                           .filter((size: any) => size && size.option_value)
                           .map((size: any) => (
                             <SelectItem key={size.id} value={size.option_value}>
-                            {size.display_label || size.option_value}
-                        </SelectItem>
-                        ))
+                              {size.display_label || size.option_value}
+                            </SelectItem>
+                          ))
                       ) : (
                         <SelectItem value="no-data" disabled>No options available</SelectItem>
                       )}
                     </SelectContent>
                   </Select>
-              </div>
-            )}
                 </div>
-
-          <Separator />
-
-          {/* Lounger */}
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <Label className="text-base font-semibold">Lounger</Label>
+                
+                <div className="space-y-2">
+                  <Label>Number of Consoles</Label>
                   <Select
-                value={configuration.lounger?.required ? "Yes" : "No"}
-                    onValueChange={(value) =>
+                    value={(configuration.console?.quantity || 1).toString()}
+                    onValueChange={(value) => {
+                      const qty = parseInt(value, 10);
+                      const placements = Array(qty).fill(null).map((_, i) => 
+                        configuration.console?.placements?.[i] || { position: "front", afterSeat: 1 }
+                      );
                       updateConfiguration({
-                        lounger: {
-                          ...configuration.lounger,
-                      required: value === "Yes",
+                        console: { 
+                          ...configuration.console, 
+                          quantity: qty,
+                          placements: placements
                         },
-                      })
-                    }
+                      });
+                    }}
                   >
-                <SelectTrigger className="w-32">
+                    <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                  <SelectItem value="Yes">Yes</SelectItem>
-                  <SelectItem value="No">No</SelectItem>
+                      {Array.from({ length: Math.max(getTotalSeats(), 4) }, (_, i) => i + 1).map((num) => (
+                        <SelectItem key={num} value={num.toString()}>
+                          {num} {num === 1 ? "Console" : "Consoles"}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
-            {configuration.lounger?.required && (
-              <div className="space-y-2 pt-2">
-                <Label>Lounger Size</Label>
-                  <Select
-                  value={configuration.lounger?.size || ""}
-                    onValueChange={(value) =>
-                      updateConfiguration({
-                      lounger: { ...configuration.lounger, size: value },
-                      })
-                    }
-                  >
-                    <SelectTrigger>
-                    <SelectValue placeholder="Select size" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {loungerSizesResult.isLoading ? (
-                        <SelectItem value="loading" disabled>Loading...</SelectItem>
-                      ) : loungerSizes && loungerSizes.length > 0 ? (
-                        loungerSizes
-                          .filter((size: any) => size && size.option_value)
-                          .map((size: any) => (
-                            <SelectItem key={size.id} value={size.option_value}>
-                            {size.display_label || size.option_value}
-                          </SelectItem>
-                        ))
-                      ) : (
-                        <SelectItem value="no-data" disabled>No options available</SelectItem>
-                      )}
-                    </SelectContent>
-                  </Select>
-                </div>
+
+                {/* Console Placements */}
+                {configuration.console?.quantity > 0 && Array.from({ length: configuration.console.quantity }, (_, index) => (
+                  <div key={index} className="space-y-2 p-3 bg-muted/30 rounded-lg">
+                    <Label className="text-sm font-medium">Console {index + 1} Placement</Label>
+                    <div className="grid grid-cols-2 gap-2">
+                      <Select
+                        value={configuration.console?.placements?.[index]?.position || "front"}
+                        onValueChange={(value) => {
+                          const placements = [...(configuration.console?.placements || [])];
+                          placements[index] = {
+                            ...placements[index],
+                            position: value,
+                            afterSeat: placements[index]?.afterSeat || 1
+                          };
+                          updateConfiguration({
+                            console: { ...configuration.console, placements },
+                          });
+                        }}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="front">Front</SelectItem>
+                          <SelectItem value="left">Left</SelectItem>
+                          <SelectItem value="right">Right</SelectItem>
+                          <SelectItem value="combo">Combo</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <Select
+                        value={(configuration.console?.placements?.[index]?.afterSeat || 1).toString()}
+                        onValueChange={(value) => {
+                          const placements = [...(configuration.console?.placements || [])];
+                          const afterSeat = value === "none" ? null : parseInt(value, 10);
+                          placements[index] = {
+                            ...placements[index],
+                            afterSeat: afterSeat || 1
+                          };
+                          updateConfiguration({
+                            console: { ...configuration.console, placements },
+                          });
+                        }}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">None (Unassigned)</SelectItem>
+                          {Array.from({ length: Math.max(getTotalSeats(), 4) }, (_, i) => i + 1).map((seat) => (
+                            <SelectItem key={seat} value={seat.toString()}>
+                              After {seat}{seat === 1 ? "st" : seat === 2 ? "nd" : seat === 3 ? "rd" : "th"} Seat from Left
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                ))}
+              </div>
             )}
           </div>
 
           <Separator />
 
-          {/* Additional Pillows */}
-          <div className="space-y-2">
+          {/* Lounger */}
+          <div className="space-y-4">
             <div className="flex items-center justify-between">
-              <Label className="text-base font-semibold">Additional Pillows</Label>
+              <Label className="text-base font-semibold">Lounger</Label>
               <Select
-                value={configuration.additionalPillows?.required ? "Yes" : "No"}
+                value={configuration.lounger?.required ? "Yes" : "No"}
                 onValueChange={(value) =>
                   updateConfiguration({
-                    additionalPillows: {
-                      ...configuration.additionalPillows,
+                    lounger: {
+                      ...configuration.lounger,
                       required: value === "Yes",
+                      quantity: value === "Yes" ? (configuration.lounger?.quantity || 1) : 0,
                     },
                   })
                 }
@@ -747,7 +806,263 @@ const SofaConfigurator = ({
                 </SelectContent>
               </Select>
             </div>
+            {configuration.lounger?.required && (
+              <div className="space-y-4 pt-2 pl-4 border-l-2 border-muted">
+                <div className="space-y-2">
+                  <Label>Number of Loungers</Label>
+                  <Select
+                    value={(configuration.lounger?.quantity || 1).toString()}
+                    onValueChange={(value) =>
+                      updateConfiguration({
+                        lounger: { ...configuration.lounger, quantity: parseInt(value, 10) },
+                      })
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="1">1 No.</SelectItem>
+                      <SelectItem value="2">2 Nos.</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Lounger Size</Label>
+                  <Select
+                    value={configuration.lounger?.size || ""}
+                    onValueChange={(value) =>
+                      updateConfiguration({
+                        lounger: { ...configuration.lounger, size: value },
+                      })
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select size" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {loungerSizesResult.isLoading ? (
+                        <SelectItem value="loading" disabled>Loading...</SelectItem>
+                      ) : loungerSizes && loungerSizes.length > 0 ? (
+                        loungerSizes
+                          .filter((size: any) => size && size.option_value)
+                          .map((size: any) => (
+                            <SelectItem key={size.id} value={size.option_value}>
+                              {size.display_label || size.option_value}
+                            </SelectItem>
+                          ))
+                      ) : (
+                        <SelectItem value="no-data" disabled>No options available</SelectItem>
+                      )}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Placement</Label>
+                  <Select
+                    value={configuration.lounger?.placement || "LHS"}
+                    onValueChange={(value) =>
+                      updateConfiguration({
+                        lounger: { ...configuration.lounger, placement: value },
+                      })
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {loungerPlacements && loungerPlacements.length > 0 ? (
+                        loungerPlacements
+                          .filter((p: any) => p && p.option_value)
+                          .map((p: any) => (
+                            <SelectItem key={p.id} value={p.option_value}>
+                              {p.display_label || p.option_value}
+                            </SelectItem>
+                          ))
+                      ) : (
+                        <>
+                          <SelectItem value="LHS">Left Hand Side (LHS)</SelectItem>
+                          <SelectItem value="RHS">Right Hand Side (RHS)</SelectItem>
+                          <SelectItem value="Both">Both LHS & RHS</SelectItem>
+                        </>
+                      )}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Storage</Label>
+                  <Select
+                    value={configuration.lounger?.storage || "No"}
+                    onValueChange={(value) =>
+                      updateConfiguration({
+                        lounger: { ...configuration.lounger, storage: value },
+                      })
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Yes">Yes</SelectItem>
+                      <SelectItem value="No">No</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <Separator />
+
+          {/* Additional Pillows */}
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <Label className="text-base font-semibold">Additional Pillows</Label>
+              <Select
+                value={configuration.additionalPillows?.required ? "Yes" : "No"}
+                onValueChange={(value) =>
+                  updateConfiguration({
+                    additionalPillows: {
+                      ...configuration.additionalPillows,
+                      required: value === "Yes",
+                      quantity: value === "Yes" ? (configuration.additionalPillows?.quantity || 1) : 0,
+                    },
+                  })
+                }
+              >
+                <SelectTrigger className="w-32">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Yes">Yes</SelectItem>
+                  <SelectItem value="No">No</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
+            {configuration.additionalPillows?.required && (
+              <div className="space-y-4 pt-2 pl-4 border-l-2 border-muted">
+                <div className="space-y-2">
+                  <Label>Number of Pillows</Label>
+                  <Select
+                    value={(configuration.additionalPillows?.quantity || 1).toString()}
+                    onValueChange={(value) =>
+                      updateConfiguration({
+                        additionalPillows: { 
+                          ...configuration.additionalPillows, 
+                          quantity: parseInt(value, 10) 
+                        },
+                      })
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {Array.from({ length: 4 }, (_, i) => i + 1).map((num) => (
+                        <SelectItem key={num} value={num.toString()}>
+                          {num} No.
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Pillow Type</Label>
+                  <Select
+                    value={configuration.additionalPillows?.type || ""}
+                    onValueChange={(value) =>
+                      updateConfiguration({
+                        additionalPillows: { ...configuration.additionalPillows, type: value },
+                      })
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {pillowTypesResult.isLoading ? (
+                        <SelectItem value="loading" disabled>Loading...</SelectItem>
+                      ) : pillowTypes && pillowTypes.length > 0 ? (
+                        pillowTypes
+                          .filter((type: any) => type && type.option_value)
+                          .map((type: any) => (
+                            <SelectItem key={type.id} value={type.option_value}>
+                              {type.display_label || type.option_value}
+                            </SelectItem>
+                          ))
+                      ) : (
+                        <>
+                          <SelectItem value="Simple">Simple</SelectItem>
+                          <SelectItem value="Diamond Quilted">Diamond Quilted</SelectItem>
+                          <SelectItem value="Belt Quilted">Belt Quilted</SelectItem>
+                          <SelectItem value="Tassels">Tassels</SelectItem>
+                        </>
+                      )}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Pillow Size</Label>
+                  <Select
+                    value={configuration.additionalPillows?.size || ""}
+                    onValueChange={(value) =>
+                      updateConfiguration({
+                        additionalPillows: { ...configuration.additionalPillows, size: value },
+                      })
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select size" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {pillowSizesResult.isLoading ? (
+                        <SelectItem value="loading" disabled>Loading...</SelectItem>
+                      ) : pillowSizes && pillowSizes.length > 0 ? (
+                        pillowSizes
+                          .filter((size: any) => size && size.option_value)
+                          .map((size: any) => (
+                            <SelectItem key={size.id} value={size.option_value}>
+                              {size.display_label || size.option_value}
+                            </SelectItem>
+                          ))
+                      ) : (
+                        <>
+                          <SelectItem value='18"x18"'>18"x18"</SelectItem>
+                          <SelectItem value='20"x20"'>20"x20"</SelectItem>
+                          <SelectItem value='16"x24"'>16"x24"</SelectItem>
+                        </>
+                      )}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Fabric Plan</Label>
+                  <Select
+                    value={configuration.additionalPillows?.fabricPlan || "Single Colour"}
+                    onValueChange={(value) =>
+                      updateConfiguration({
+                        additionalPillows: { ...configuration.additionalPillows, fabricPlan: value },
+                      })
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Single Colour">Single Colour</SelectItem>
+                      <SelectItem value="Dual Colour">Dual Colour</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            )}
+          </div>
 
           <Separator />
 

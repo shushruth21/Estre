@@ -49,13 +49,7 @@ const Configure = () => {
     enabled: !!category && !!productId,
   });
 
-  // Recalculate price when configuration changes
-  useEffect(() => {
-    if (configuration.productId && category && productId) {
-      calculatePrice();
-    }
-  }, [configuration, category, productId]);
-
+  // Real-time price calculation with debouncing
   const calculatePrice = async () => {
     if (!category || !productId || !configuration.productId) return;
 
@@ -68,15 +62,30 @@ const Configure = () => {
       });
     } catch (error: any) {
       console.error("Price calculation error:", error);
-      toast({
-        title: "Calculation Error",
-        description: error.message,
-        variant: "destructive",
-      });
+      // Don't show toast for calculation errors during typing - only show final error
+      if (import.meta.env.DEV) {
+        console.warn("Price calculation failed:", error.message);
+      }
     } finally {
       setIsCalculating(false);
     }
   };
+
+  // Real-time price calculation with debouncing
+  useEffect(() => {
+    if (!configuration.productId || !category || !productId) {
+      setPricing(null);
+      return;
+    }
+
+    // Debounce price calculation to avoid too many API calls
+    const timeoutId = setTimeout(() => {
+      calculatePrice();
+    }, 500); // 500ms debounce
+
+    return () => clearTimeout(timeoutId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [configuration, category, productId]);
 
   const handleAddToCart = async () => {
     const { data: { user } } = await supabase.auth.getUser();
