@@ -146,6 +146,20 @@ const SofaConfigurator = ({
     },
   });
 
+  // Load fabrics for pillow dual colour selection
+  const { data: pillowFabrics, isLoading: loadingPillowFabrics } = useQuery({
+    queryKey: ["pillow-fabrics"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("fabric_coding")
+        .select("*")
+        .eq("is_active", true)
+        .order("collection, brand, colour");
+      if (error) throw error;
+      return data || [];
+    },
+  });
+
   // Calculate total seats dynamically (must be defined before useEffect)
   const getTotalSeats = (): number => {
     let total = 0;
@@ -1152,7 +1166,13 @@ const SofaConfigurator = ({
                     value={configuration.additionalPillows?.fabricPlan || "Single Colour"}
                     onValueChange={(value) =>
                       updateConfiguration({
-                        additionalPillows: { ...configuration.additionalPillows, fabricPlan: value },
+                        additionalPillows: { 
+                          ...configuration.additionalPillows, 
+                          fabricPlan: value,
+                          // Reset fabric selections when changing plan
+                          fabricColour1: value === "Dual Colour" ? (configuration.additionalPillows?.fabricColour1 || "none") : undefined,
+                          fabricColour2: value === "Dual Colour" ? (configuration.additionalPillows?.fabricColour2 || "none") : undefined,
+                        },
                       })
                     }
                   >
@@ -1179,6 +1199,101 @@ const SofaConfigurator = ({
                     </SelectContent>
                   </Select>
                 </div>
+
+                {/* Dual Colour Fabric Selection */}
+                {configuration.additionalPillows?.fabricPlan === "Dual Colour" && (
+                  <div className="space-y-4 pt-2 pl-4 border-l-2 border-muted">
+                    <div className="space-y-2">
+                      <Label>Colour 1</Label>
+                      <Select
+                        value={configuration.additionalPillows?.fabricColour1 || "none"}
+                        onValueChange={(value) =>
+                          updateConfiguration({
+                            additionalPillows: {
+                              ...configuration.additionalPillows,
+                              fabricColour1: value === "none" ? undefined : value,
+                            },
+                          })
+                        }
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select Colour 1" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none" disabled>Select Colour 1</SelectItem>
+                          {loadingPillowFabrics ? (
+                            <SelectItem value="loading" disabled>Loading fabrics...</SelectItem>
+                          ) : pillowFabrics && pillowFabrics.length > 0 ? (
+                            pillowFabrics
+                              .filter((fabric: any) => fabric && fabric.estre_code)
+                              .map((fabric: any) => {
+                                const displayName = `${fabric.collection || ''} - ${fabric.brand || ''} - ${fabric.colour || fabric.colour_link || fabric.estre_code}`.replace(/^[\s-]+|[\s-]+$/g, '');
+                                return (
+                                  <SelectItem key={fabric.id} value={fabric.estre_code}>
+                                    <div className="flex items-center justify-between w-full">
+                                      <span>{displayName}</span>
+                                      {fabric.upgrade && fabric.upgrade > 0 && (
+                                        <Badge variant="secondary" className="ml-2 text-xs">
+                                          +₹{fabric.upgrade.toLocaleString()}
+                                        </Badge>
+                                      )}
+                                    </div>
+                                  </SelectItem>
+                                );
+                              })
+                          ) : (
+                            <SelectItem value="no-data" disabled>No fabrics available</SelectItem>
+                          )}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label>Colour 2</Label>
+                      <Select
+                        value={configuration.additionalPillows?.fabricColour2 || "none"}
+                        onValueChange={(value) =>
+                          updateConfiguration({
+                            additionalPillows: {
+                              ...configuration.additionalPillows,
+                              fabricColour2: value === "none" ? undefined : value,
+                            },
+                          })
+                        }
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select Colour 2" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none" disabled>Select Colour 2</SelectItem>
+                          {loadingPillowFabrics ? (
+                            <SelectItem value="loading" disabled>Loading fabrics...</SelectItem>
+                          ) : pillowFabrics && pillowFabrics.length > 0 ? (
+                            pillowFabrics
+                              .filter((fabric: any) => fabric && fabric.estre_code)
+                              .map((fabric: any) => {
+                                const displayName = `${fabric.collection || ''} - ${fabric.brand || ''} - ${fabric.colour || fabric.colour_link || fabric.estre_code}`.replace(/^[\s-]+|[\s-]+$/g, '');
+                                return (
+                                  <SelectItem key={fabric.id} value={fabric.estre_code}>
+                                    <div className="flex items-center justify-between w-full">
+                                      <span>{displayName}</span>
+                                      {fabric.upgrade && fabric.upgrade > 0 && (
+                                        <Badge variant="secondary" className="ml-2 text-xs">
+                                          +₹{fabric.upgrade.toLocaleString()}
+                                        </Badge>
+                                      )}
+                                    </div>
+                                  </SelectItem>
+                                );
+                              })
+                          ) : (
+                            <SelectItem value="no-data" disabled>No fabrics available</SelectItem>
+                          )}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>
