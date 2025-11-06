@@ -214,7 +214,13 @@ export const FabricLibrary = ({
 
             <div className="flex items-center justify-between">
               <p className="text-sm text-muted-foreground">
-                {displayedFabrics.length} of {allFabrics?.length || 0} fabrics
+                {isLoading ? (
+                  <span className="animate-pulse">Loading...</span>
+                ) : (
+                  <>
+                    {displayedFabrics.length} of {stats.total.toLocaleString()} fabrics
+                  </>
+                )}
               </p>
             </div>
 
