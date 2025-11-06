@@ -166,7 +166,14 @@ export function AdminLayout({ children }: AdminLayoutProps) {
   }
 
   // Check admin role after loading is complete
-  if (!isAdmin()) {
+  // Also check if roles are still being fetched (userRoles might be empty initially)
+  const hasAdminRole = isAdmin() || 
+    userRoles.includes('admin') || 
+    userRoles.includes('store_manager') || 
+    userRoles.includes('production_manager');
+
+  if (!hasAdminRole && userRoles.length > 0) {
+    // Only deny access if roles have been loaded and user doesn't have admin role
     if (import.meta.env.DEV) {
       console.warn("⚠️ Admin access denied:", {
         user: user?.email,
@@ -189,7 +196,7 @@ export function AdminLayout({ children }: AdminLayoutProps) {
             </p>
             <p>
               <strong>Roles:</strong>{" "}
-              {userRoles.length > 0 ? userRoles.join(", ") : "None"}
+              {userRoles.length > 0 ? userRoles.join(", ") : "None (still loading...)"}
             </p>
             <p>
               <strong>Required:</strong> admin, store_manager, or
@@ -202,6 +209,19 @@ export function AdminLayout({ children }: AdminLayoutProps) {
               Login
             </Button>
           </div>
+        </div>
+      </div>
+    );
+  }
+
+  // If roles are still loading, show loading state instead of denying access
+  if (userRoles.length === 0 && !loading) {
+    // Give it a moment for roles to load
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="text-center space-y-4">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
+          <p className="text-muted-foreground">Verifying access...</p>
         </div>
       </div>
     );
