@@ -244,13 +244,34 @@ export const calculateFabricMeters = (
 };
 
 /**
+ * Pricing breakdown interface
+ */
+export interface PricingBreakdown {
+  baseSeatPrice: number;
+  additionalSeatsPrice: number;
+  cornerSeatsPrice: number;
+  backrestSeatsPrice: number;
+  loungerPrice: number;
+  consolePrice: number;
+  pillowsPrice: number;
+  fabricCharges: number;
+  foamUpgrade: number;
+  dimensionUpgrade: number;
+  accessoriesPrice: number;
+  discountAmount: number;
+  subtotal: number;
+  total: number;
+}
+
+/**
  * Calculate dynamic price based on configuration
+ * Returns detailed breakdown for pricing summary display
  */
 export const calculateDynamicPrice = async (
   category: string,
   productId: string,
   configuration: any
-): Promise<number> => {
+): Promise<{ breakdown: PricingBreakdown; total: number }> => {
   try {
     // Fetch all required data
     const [formulas, settings, productData] = await Promise.all([
@@ -259,44 +280,331 @@ export const calculateDynamicPrice = async (
       fetchProductData(category, productId),
     ]);
 
-    // Start with base BOM
-    let basePrice = productData.adjusted_bom_rs || productData.bom_rs || 0;
+    // Initialize breakdown
+    const breakdown: PricingBreakdown = {
+      baseSeatPrice: 0,
+      additionalSeatsPrice: 0,
+      cornerSeatsPrice: 0,
+      backrestSeatsPrice: 0,
+      loungerPrice: 0,
+      consolePrice: 0,
+      pillowsPrice: 0,
+      fabricCharges: 0,
+      foamUpgrade: 0,
+      dimensionUpgrade: 0,
+      accessoriesPrice: 0,
+      discountAmount: 0,
+      subtotal: 0,
+      total: 0,
+    };
+
+    // Get base price from product (use net_price_rs or bom_rs as fallback)
+    const basePrice = productData.net_price_rs || productData.bom_rs || 
+                     productData.adjusted_bom_rs || 0;
+
+    // Calculate category-specific pricing
+    if (category === "sofa") {
+      return await calculateSofaPricing(
+        configuration,
+        productData,
+        formulas,
+        settings,
+        basePrice
+      );
+    }
+
+    // For other categories, use simplified calculation
+    let totalPrice = basePrice;
 
     // Calculate fabric cost
     const fabricMeters = calculateFabricMeters(category, configuration, settings);
-    const fabricPricePerMeter = configuration.fabric?.price || 0;
-    const fabricCost = fabricMeters * fabricPricePerMeter;
-
-    // Add fabric cost to base
-    basePrice += fabricCost;
+    const fabricPricePerMeter = configuration.fabric?.structureCode 
+      ? await getFabricPrice(configuration.fabric.structureCode)
+      : 0;
+    breakdown.fabricCharges = fabricMeters * fabricPricePerMeter;
+    totalPrice += breakdown.fabricCharges;
 
     // Apply category-specific adjustments
-    basePrice = applyCategoryAdjustments(category, configuration, basePrice, formulas);
+    totalPrice = applyCategoryAdjustments(category, configuration, totalPrice, formulas);
 
     // Apply wastage, delivery, GST
     const wastagePercent = getFormulaValue(formulas, "wastage_delivery_gst_percent", 
       productData.wastage_delivery_gst_percent || 20);
-    const wastageAmount = (basePrice * wastagePercent) / 100;
-    basePrice += wastageAmount;
+    const wastageAmount = (totalPrice * wastagePercent) / 100;
+    totalPrice += wastageAmount;
 
     // Apply markup
     const markupPercent = getFormulaValue(formulas, "markup_percent", 
       productData.markup_percent || 270);
-    const markupAmount = (basePrice * markupPercent) / 100;
-    basePrice += markupAmount;
+    const markupAmount = (totalPrice * markupPercent) / 100;
+    totalPrice += markupAmount;
 
     // Apply discount
     const discountPercent = getFormulaValue(formulas, "discount_percent", 
       productData.discount_percent || 10);
-    const discountAmount = (basePrice * discountPercent) / 100;
-    const finalPrice = basePrice - discountAmount;
+    breakdown.discountAmount = (totalPrice * discountPercent) / 100;
+    totalPrice -= breakdown.discountAmount;
 
-    return Math.round(finalPrice);
+    breakdown.subtotal = totalPrice;
+    breakdown.total = Math.round(totalPrice);
+
+    return {
+      breakdown,
+      total: breakdown.total,
+    };
   } catch (error) {
     console.error("Error calculating dynamic price:", error);
     throw error;
   }
 };
+
+/**
+ * Get fabric price by code
+ */
+async function getFabricPrice(fabricCode: string): Promise<number> {
+  const { data, error } = await supabase
+    .from("fabric_coding")
+    .select("price")
+    .eq("estre_code", fabricCode)
+    .single();
+
+  if (error || !data) return 0;
+  return data.price || 0;
+}
+
+/**
+ * Calculate sofa-specific pricing with detailed breakdown
+ */
+async function calculateSofaPricing(
+  configuration: any,
+  productData: ProductData,
+  formulas: PricingFormula[],
+  settings: AdminSetting[],
+  basePrice: number
+): Promise<{ breakdown: PricingBreakdown; total: number }> {
+  const breakdown: PricingBreakdown = {
+    baseSeatPrice: 0,
+    additionalSeatsPrice: 0,
+    cornerSeatsPrice: 0,
+    backrestSeatsPrice: 0,
+    loungerPrice: 0,
+    consolePrice: 0,
+    pillowsPrice: 0,
+    fabricCharges: 0,
+    foamUpgrade: 0,
+    dimensionUpgrade: 0,
+    accessoriesPrice: 0,
+    discountAmount: 0,
+    subtotal: 0,
+    total: 0,
+  };
+
+  // Parse seat configuration from SofaConfigurator format
+  const shape = configuration.shape || "standard";
+  const frontSeats = configuration.frontSeats || parseSeatCount(configuration.frontSeatCount) || 2;
+  const l1Option = configuration.l1Option || configuration.l1 || "";
+  const r1Option = configuration.r1Option || configuration.r1 || "";
+  const l2Seats = parseSeatCount(configuration.l2SeatCount || configuration.l2 || 0);
+  const r2Seats = parseSeatCount(configuration.r2SeatCount || configuration.r2 || 0);
+
+  // Calculate total seats
+  let totalSeats = frontSeats;
+  let cornerSeats = 0;
+  let backrestSeats = 0;
+
+  if (shape === "l-shape" || shape === "u-shape" || shape === "combo") {
+    if (l1Option === "Corner" || l1Option?.toLowerCase().includes("corner")) {
+      cornerSeats += 1;
+    } else if (l1Option === "Backrest" || l1Option?.toLowerCase().includes("backrest")) {
+      backrestSeats += 1;
+    }
+    totalSeats += l2Seats;
+  }
+
+  if (shape === "u-shape" || shape === "combo") {
+    if (r1Option === "Corner" || r1Option?.toLowerCase().includes("corner")) {
+      cornerSeats += 1;
+    } else if (r1Option === "Backrest" || r1Option?.toLowerCase().includes("backrest")) {
+      backrestSeats += 1;
+    }
+    totalSeats += r2Seats;
+  }
+
+  // Base seat price (first seat)
+  const firstSeatPercent = getFormulaValue(formulas, "first_seat_percent", 100);
+  breakdown.baseSeatPrice = (basePrice * firstSeatPercent) / 100;
+  let totalPrice = breakdown.baseSeatPrice;
+
+  // Additional front seats (beyond first)
+  if (frontSeats > 1) {
+    const additionalSeatPercent = getFormulaValue(formulas, "additional_seat_percent", 70);
+    const additionalSeatPrice = (basePrice * additionalSeatPercent) / 100;
+    breakdown.additionalSeatsPrice = additionalSeatPrice * (frontSeats - 1);
+    totalPrice += breakdown.additionalSeatsPrice;
+  }
+
+  // Corner seats
+  if (cornerSeats > 0) {
+    const cornerSeatPercent = getFormulaValue(formulas, "corner_seat_percent", 100);
+    const cornerSeatPrice = (basePrice * cornerSeatPercent) / 100;
+    breakdown.cornerSeatsPrice = cornerSeatPrice * cornerSeats;
+    totalPrice += breakdown.cornerSeatsPrice;
+  }
+
+  // Backrest seats (L2/R2 seats when L1/R1 is backrest)
+  if (backrestSeats > 0) {
+    const backrestSeatPercent = getFormulaValue(formulas, "backrest_seat_percent", 20);
+    const backrestSeatPrice = (basePrice * backrestSeatPercent) / 100;
+    breakdown.backrestSeatsPrice = backrestSeatPrice * (l2Seats + r2Seats);
+    totalPrice += breakdown.backrestSeatsPrice;
+  }
+
+  // Lounger pricing
+  if (configuration.lounger?.required) {
+    let loungerPrice = getFormulaValue(formulas, "lounger_base", 15000);
+    const loungerSize = configuration.lounger?.size || "";
+    const quantity = configuration.lounger?.quantity || 1;
+
+    // Size-based pricing
+    if (loungerSize.includes("5 ft 6 in") || loungerSize.includes("5'6")) {
+      loungerPrice += getFormulaValue(formulas, "lounger_additional_6_inch", 1000);
+    } else if (loungerSize.includes("6 ft 6 in") || loungerSize.includes("6'6")) {
+      loungerPrice += getFormulaValue(formulas, "lounger_additional_6_inch", 1000) * 3;
+    } else if (loungerSize.includes("6 ft") || loungerSize.includes("6'")) {
+      loungerPrice += getFormulaValue(formulas, "lounger_additional_6_inch", 1000) * 2;
+    } else if (loungerSize.includes("7 ft") || loungerSize.includes("7'")) {
+      loungerPrice += getFormulaValue(formulas, "lounger_additional_6_inch", 1000) * 4;
+    }
+
+    // Storage option
+    if (configuration.lounger?.storage === "Yes") {
+      loungerPrice += getFormulaValue(formulas, "lounger_storage", 3000);
+    }
+
+    breakdown.loungerPrice = loungerPrice * quantity;
+    totalPrice += breakdown.loungerPrice;
+  }
+
+  // Console pricing
+  if (configuration.console?.required) {
+    const consoleSize = configuration.console?.size || "";
+    const quantity = configuration.console?.quantity || 1;
+
+    let consolePrice = 0;
+    if (consoleSize.includes("6") || consoleSize === "6 in" || consoleSize === "Console-6 in") {
+      consolePrice = getFormulaValue(formulas, "console_6_inch", 8000);
+    } else if (consoleSize.includes("10") || consoleSize === "10 in" || consoleSize === "Console-10 in") {
+      consolePrice = getFormulaValue(formulas, "console_10_inch", 12000);
+    }
+
+    breakdown.consolePrice = consolePrice * quantity;
+    totalPrice += breakdown.consolePrice;
+  }
+
+  // Pillows pricing
+  if (configuration.additionalPillows?.required) {
+    const pillowType = configuration.additionalPillows?.type || "Simple";
+    const quantity = configuration.additionalPillows?.quantity || 1;
+
+    let pillowPrice = 1200; // Default
+    if (pillowType === "Diamond" || pillowType === "Diamond Quilted") {
+      pillowPrice = 3500;
+    } else if (pillowType === "Belt" || pillowType === "Belt Quilted") {
+      pillowPrice = 4000;
+    } else if (pillowType === "Tassels") {
+      pillowPrice = 2500;
+    }
+
+    breakdown.pillowsPrice = pillowPrice * quantity;
+    totalPrice += breakdown.pillowsPrice;
+  }
+
+  // Fabric charges
+  const fabricMeters = calculateFabricMeters("sofa", configuration, settings);
+  const fabricCodes = [
+    configuration.fabric?.structureCode,
+    configuration.fabric?.backrestCode,
+    configuration.fabric?.seatCode,
+    configuration.fabric?.headrestCode,
+  ].filter(Boolean);
+
+  if (fabricCodes.length > 0) {
+    const { data: fabrics } = await supabase
+      .from("fabric_coding")
+      .select("estre_code, price")
+      .in("estre_code", fabricCodes);
+
+    if (fabrics && fabrics.length > 0) {
+      const primaryFabric = fabrics.find(f => f.estre_code === configuration.fabric?.structureCode) || fabrics[0];
+      const fabricPricePerMeter = primaryFabric.price || 0;
+      breakdown.fabricCharges = fabricMeters * fabricPricePerMeter;
+      totalPrice += breakdown.fabricCharges;
+    }
+  }
+
+  // Foam upgrade
+  const foamType = configuration.foam?.type || "";
+  if (foamType) {
+    const foamKey = `foam_${foamType.toLowerCase().replace(/\s+/g, "_")}`;
+    breakdown.foamUpgrade = getFormulaValue(formulas, foamKey, 0);
+    totalPrice += breakdown.foamUpgrade;
+  }
+
+  // Dimension upgrades
+  const seatDepth = configuration.seatDepth || configuration.dimensions?.seatDepth || 22;
+  const seatWidth = configuration.seatWidth || configuration.dimensions?.seatWidth || 22;
+  
+  const depthKey = `seat_depth_${seatDepth}`;
+  const widthKey = `seat_width_${seatWidth}`;
+  const depthUpgradePercent = getFormulaValue(formulas, depthKey, 0);
+  const widthUpgradePercent = getFormulaValue(formulas, widthKey, 0);
+  
+  breakdown.dimensionUpgrade = totalPrice * ((depthUpgradePercent + widthUpgradePercent) / 100);
+  totalPrice += breakdown.dimensionUpgrade;
+
+  // Accessories (legs)
+  if (configuration.legType || configuration.legsCode) {
+    const legCode = configuration.legsCode || configuration.legType;
+    const { data: leg } = await supabase
+      .from("legs_prices")
+      .select("price_rs")
+      .eq("code", legCode)
+      .eq("is_active", true)
+      .single();
+
+    if (leg) {
+      breakdown.accessoriesPrice = leg.price_rs || 0;
+      totalPrice += breakdown.accessoriesPrice;
+    }
+  }
+
+  breakdown.subtotal = totalPrice;
+
+  // Discount
+  if (configuration.discount?.code) {
+    const discountKey = `discount_${configuration.discount.code.toLowerCase()}`;
+    const discountPercent = getFormulaValue(formulas, discountKey, 0);
+    breakdown.discountAmount = (totalPrice * discountPercent) / 100;
+    totalPrice -= breakdown.discountAmount;
+  }
+
+  breakdown.total = Math.round(totalPrice);
+
+  return {
+    breakdown,
+    total: breakdown.total,
+  };
+}
+
+/**
+ * Helper: Parse seat count from string or number
+ */
+function parseSeatCount(value: string | number | undefined): number {
+  if (typeof value === "number") return value;
+  if (!value) return 0;
+  const match = value.toString().match(/(\d+)/);
+  return match ? parseInt(match[1], 10) : 0;
+}
 
 /**
  * Apply category-specific price adjustments

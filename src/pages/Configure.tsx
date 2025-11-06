@@ -61,14 +61,10 @@ const Configure = () => {
 
     setIsCalculating(true);
     try {
-      const totalPrice = await calculateDynamicPrice(category, productId, configuration);
+      const result = await calculateDynamicPrice(category, productId, configuration);
       setPricing({ 
-        total: totalPrice,
-        breakdown: {
-          basePrice: totalPrice,
-          fabricCost: 0, // Can be extracted from calculation if needed
-          adjustments: 0,
-        }
+        total: result.total,
+        breakdown: result.breakdown
       });
     } catch (error: any) {
       console.error("Price calculation error:", error);
