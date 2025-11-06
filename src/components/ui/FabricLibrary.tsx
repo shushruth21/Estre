@@ -56,6 +56,21 @@ export const FabricLibrary = ({
   const [page, setPage] = useState(0);
   const pageSize = 100;
 
+  // Fetch all fabrics for statistics (always fetch all, regardless of search)
+  const { data: allFabricsForStats, isLoading: isLoadingStats } = useQuery({
+    queryKey: ["fabric-library-stats"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("fabric_coding")
+        .select("bom_price, price, upgrade")
+        .eq("is_active", true);
+
+      if (error) throw error;
+      return (data || []) as Fabric[];
+    },
+  });
+
+  // Fetch fabrics for display (with search filter)
   const { data: allFabrics, isLoading, refetch } = useQuery({
     queryKey: ["fabric-library", searchTerm],
     queryFn: async () => {
@@ -76,9 +91,11 @@ export const FabricLibrary = ({
     },
   });
 
-  // Calculate statistics from all fabrics (not just displayed)
+  // Calculate statistics from ALL active fabrics in database (not filtered by search)
   const stats = useMemo(() => {
-    if (!allFabrics || allFabrics.length === 0) {
+    const fabricsForStats = allFabricsForStats || [];
+    
+    if (fabricsForStats.length === 0) {
       return {
         total: 0,
         avgPrice: 0,
@@ -88,17 +105,22 @@ export const FabricLibrary = ({
     }
 
     // Use bom_price for statistics (fallback to price if bom_price is null)
-    const prices = allFabrics
+    const prices = fabricsForStats
       .map((f) => f.bom_price || f.price || 0)
       .filter((p) => p > 0);
 
+    const total = fabricsForStats.length;
+    const avgPrice = prices.length > 0 ? prices.reduce((a, b) => a + b, 0) / prices.length : 0;
+    const minPrice = prices.length > 0 ? Math.min(...prices) : 0;
+    const maxPrice = prices.length > 0 ? Math.max(...prices) : 0;
+
     return {
-      total: allFabrics.length,
-      avgPrice: prices.length > 0 ? prices.reduce((a, b) => a + b, 0) / prices.length : 0,
-      minPrice: prices.length > 0 ? Math.min(...prices) : 0,
-      maxPrice: prices.length > 0 ? Math.max(...prices) : 0,
+      total,
+      avgPrice,
+      minPrice,
+      maxPrice,
     };
-  }, [allFabrics]);
+  }, [allFabricsForStats]);
 
   // Paginate fabrics
   const displayedFabrics = useMemo(() => {
@@ -200,33 +222,49 @@ export const FabricLibrary = ({
             <div className="grid grid-cols-4 gap-4">
               <Card>
                 <CardContent className="p-4">
-                  <div className="text-2xl font-bold text-primary">
-                    {stats.total.toLocaleString()}
-                  </div>
+                  {isLoadingStats ? (
+                    <div className="text-2xl font-bold text-primary animate-pulse">...</div>
+                  ) : (
+                    <div className="text-2xl font-bold text-primary">
+                      {stats.total.toLocaleString()}
+                    </div>
+                  )}
                   <div className="text-sm text-muted-foreground">Total Fabrics</div>
                 </CardContent>
               </Card>
               <Card>
                 <CardContent className="p-4">
-                  <div className="text-2xl font-bold text-primary">
-                    ₹{Math.round(stats.avgPrice).toLocaleString()}
-                  </div>
+                  {isLoadingStats ? (
+                    <div className="text-2xl font-bold text-primary animate-pulse">...</div>
+                  ) : (
+                    <div className="text-2xl font-bold text-primary">
+                      ₹{Math.round(stats.avgPrice).toLocaleString()}
+                    </div>
+                  )}
                   <div className="text-sm text-muted-foreground">Avg Price</div>
                 </CardContent>
               </Card>
               <Card>
                 <CardContent className="p-4">
-                  <div className="text-2xl font-bold text-primary">
-                    ₹{Math.round(stats.minPrice).toLocaleString()}
-                  </div>
+                  {isLoadingStats ? (
+                    <div className="text-2xl font-bold text-primary animate-pulse">...</div>
+                  ) : (
+                    <div className="text-2xl font-bold text-primary">
+                      ₹{Math.round(stats.minPrice).toLocaleString()}
+                    </div>
+                  )}
                   <div className="text-sm text-muted-foreground">Min Price</div>
                 </CardContent>
               </Card>
               <Card>
                 <CardContent className="p-4">
-                  <div className="text-2xl font-bold text-primary">
-                    ₹{Math.round(stats.maxPrice).toLocaleString()}
-                  </div>
+                  {isLoadingStats ? (
+                    <div className="text-2xl font-bold text-primary animate-pulse">...</div>
+                  ) : (
+                    <div className="text-2xl font-bold text-primary">
+                      ₹{Math.round(stats.maxPrice).toLocaleString()}
+                    </div>
+                  )}
                   <div className="text-sm text-muted-foreground">Max Price</div>
                 </CardContent>
               </Card>
