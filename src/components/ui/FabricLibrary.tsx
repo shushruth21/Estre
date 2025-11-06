@@ -60,13 +60,34 @@ export const FabricLibrary = ({
   const { data: allFabricsForStats, isLoading: isLoadingStats } = useQuery({
     queryKey: ["fabric-library-stats"],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("fabric_coding")
-        .select("bom_price, price, upgrade")
-        .eq("is_active", true);
+      // Fetch all rows without limit - Supabase default limit is 1000, so we need to handle pagination
+      let allData: Fabric[] = [];
+      let from = 0;
+      const batchSize = 1000;
+      let hasMore = true;
 
-      if (error) throw error;
-      return (data || []) as Fabric[];
+      while (hasMore) {
+        const { data, error, count } = await supabase
+          .from("fabric_coding")
+          .select("bom_price, price, upgrade", { count: "exact" })
+          .eq("is_active", true)
+          .range(from, from + batchSize - 1);
+
+        if (error) throw error;
+        
+        if (data) {
+          allData = [...allData, ...data];
+        }
+
+        // Check if we got less than batchSize, meaning we've reached the end
+        if (!data || data.length < batchSize) {
+          hasMore = false;
+        } else {
+          from += batchSize;
+        }
+      }
+
+      return allData as Fabric[];
     },
   });
 
@@ -74,20 +95,42 @@ export const FabricLibrary = ({
   const { data: allFabrics, isLoading, refetch } = useQuery({
     queryKey: ["fabric-library", searchTerm],
     queryFn: async () => {
-      let query = supabase
-        .from("fabric_coding")
-        .select("*")
-        .eq("is_active", true);
+      // Fetch all matching rows without limit
+      let allData: Fabric[] = [];
+      let from = 0;
+      const batchSize = 1000;
+      let hasMore = true;
 
-      if (searchTerm) {
-        query = query.or(
-          `estre_code.ilike.%${searchTerm}%,description.ilike.%${searchTerm}%,collection.ilike.%${searchTerm}%,brand.ilike.%${searchTerm}%,vendor.ilike.%${searchTerm}%,colour.ilike.%${searchTerm}%`
-        );
+      while (hasMore) {
+        let query = supabase
+          .from("fabric_coding")
+          .select("*")
+          .eq("is_active", true)
+          .range(from, from + batchSize - 1)
+          .order("collection, brand, colour");
+
+        if (searchTerm) {
+          query = query.or(
+            `estre_code.ilike.%${searchTerm}%,description.ilike.%${searchTerm}%,collection.ilike.%${searchTerm}%,brand.ilike.%${searchTerm}%,vendor.ilike.%${searchTerm}%,colour.ilike.%${searchTerm}%`
+          );
+        }
+
+        const { data, error } = await query;
+        if (error) throw error;
+        
+        if (data) {
+          allData = [...allData, ...data];
+        }
+
+        // Check if we got less than batchSize, meaning we've reached the end
+        if (!data || data.length < batchSize) {
+          hasMore = false;
+        } else {
+          from += batchSize;
+        }
       }
 
-      const { data, error } = await query.order("collection, brand, colour");
-      if (error) throw error;
-      return (data || []) as Fabric[];
+      return allData as Fabric[];
     },
   });
 
