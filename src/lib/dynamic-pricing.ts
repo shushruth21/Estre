@@ -143,46 +143,69 @@ export const calculateFabricMeters = (
 
   switch (category) {
     case "sofa": {
-      const seatCount = configuration.seatCount || 1;
-      const hasCorner = configuration.cornerSeat || false;
-      const backrestCount = configuration.backrestCount || 0;
-      const loungerSize = configuration.loungerSize || null;
-      const consoleSize = configuration.consoleSize || null;
-
-      // First seat
-      const firstSeatMeters = getSettingValue(settings, "fabric_first_seat_mtrs", 5.0);
-      totalMeters += firstSeatMeters;
-
-      // Additional seats
-      if (seatCount > 1) {
-        const additionalSeatMeters = getSettingValue(settings, "fabric_additional_seat_mtrs", 3.0);
-        totalMeters += (seatCount - 1) * additionalSeatMeters;
+      // Calculate total seats from configuration
+      const shape = configuration.shape || "standard";
+      const frontSeats = configuration.frontSeats || parseSeatCount(configuration.frontSeatCount) || 1;
+      const l2Seats = parseSeatCount(configuration.l2SeatCount || configuration.l2 || 0);
+      const r2Seats = parseSeatCount(configuration.r2SeatCount || configuration.r2 || 0);
+      
+      let totalSeats = frontSeats;
+      if (shape === "l-shape" || shape === "u-shape" || shape === "combo") {
+        totalSeats += l2Seats;
+      }
+      if (shape === "u-shape" || shape === "combo") {
+        totalSeats += r2Seats;
       }
 
-      // Corner seat
-      if (hasCorner) {
-        const cornerMeters = getSettingValue(settings, "fabric_corner_seat_mtrs", 4.0);
-        totalMeters += cornerMeters;
+      // Determine if recliner or standard (check mechanism or default to standard)
+      const isRecliner = configuration.mechanism?.toLowerCase().includes("recliner") || 
+                        configuration.mechanism?.toLowerCase().includes("electric") ||
+                        false;
+
+      // Base fabric: 6m (standard) or 8m (recliner) for 1-seater
+      const baseFabricMeters = isRecliner ? 8.0 : 6.0;
+      totalMeters += baseFabricMeters;
+
+      // Additional seats: +3m (standard) or +7m (recliner) per seat
+      if (totalSeats > 1) {
+        const additionalSeatMeters = isRecliner ? 7.0 : 3.0;
+        totalMeters += (totalSeats - 1) * additionalSeatMeters;
       }
 
-      // Backrests
-      if (backrestCount > 0) {
-        const backrestMeters = getSettingValue(settings, "fabric_backrest_mtrs", 2.0);
-        totalMeters += backrestCount * backrestMeters;
+      // Lounger fabric (by size in inches)
+      if (configuration.lounger?.required && configuration.lounger?.size) {
+        const loungerSize = configuration.lounger.size;
+        const quantity = configuration.lounger?.quantity || 1;
+        let loungerMeters = 0;
+
+        // Map lounger sizes to meters
+        if (loungerSize.includes("65") || loungerSize.includes("5 ft 5 in") || loungerSize.includes("5'5")) {
+          loungerMeters = 6.5;
+        } else if (loungerSize.includes("72") || loungerSize.includes("6 ft") || loungerSize.includes("6'")) {
+          loungerMeters = 7.2;
+        } else if (loungerSize.includes("78") || loungerSize.includes("6 ft 6 in") || loungerSize.includes("6'6")) {
+          loungerMeters = 7.8;
+        } else if (loungerSize.includes("84") || loungerSize.includes("7 ft") || loungerSize.includes("7'")) {
+          loungerMeters = 8.4;
+        }
+
+        totalMeters += loungerMeters * quantity;
       }
 
-      // Lounger
-      if (loungerSize === "6ft") {
-        totalMeters += getSettingValue(settings, "fabric_lounger_6ft_mtrs", 5.0);
-      } else if (loungerSize === "additional_6") {
-        totalMeters += getSettingValue(settings, "fabric_lounger_additional_6_mtrs", 3.0);
-      }
+      // Console fabric (by size and quantity)
+      if (configuration.console?.required && configuration.console?.size) {
+        const consoleSize = configuration.console.size;
+        const quantity = configuration.console?.quantity || 1;
+        let consoleMeters = 0;
 
-      // Console
-      if (consoleSize === "6") {
-        totalMeters += getSettingValue(settings, "fabric_console_6_mtrs", 1.5);
-      } else if (consoleSize === "10") {
-        totalMeters += getSettingValue(settings, "fabric_console_10_mtrs", 2.0);
+        // 6-inch console: 1.5 meters, 10-inch console: 2 meters
+        if (consoleSize.includes("6") || consoleSize === "6 in" || consoleSize === "Console-6 in") {
+          consoleMeters = 1.5;
+        } else if (consoleSize.includes("10") || consoleSize === "10 in" || consoleSize === "Console-10 in") {
+          consoleMeters = 2.0;
+        }
+
+        totalMeters += consoleMeters * quantity;
       }
 
       break;
