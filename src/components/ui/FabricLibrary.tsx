@@ -147,15 +147,15 @@ export const FabricLibrary = ({
       };
     }
 
-    // Use bom_price for statistics (fallback to price if bom_price is null)
-    const prices = fabricsForStats
-      .map((f) => f.bom_price || f.price || 0)
-      .filter((p) => p > 0);
+    // Use bom_price for all statistics (only bom_price, no fallback to price)
+    const bomPrices = fabricsForStats
+      .map((f) => f.bom_price)
+      .filter((p) => p !== null && p !== undefined && p > 0);
 
     const total = fabricsForStats.length;
-    const avgPrice = prices.length > 0 ? prices.reduce((a, b) => a + b, 0) / prices.length : 0;
-    const minPrice = prices.length > 0 ? Math.min(...prices) : 0;
-    const maxPrice = prices.length > 0 ? Math.max(...prices) : 0;
+    const avgPrice = bomPrices.length > 0 ? bomPrices.reduce((a, b) => a + b, 0) / bomPrices.length : 0;
+    const minPrice = bomPrices.length > 0 ? Math.min(...bomPrices) : 0;
+    const maxPrice = bomPrices.length > 0 ? Math.max(...bomPrices) : 0;
 
     return {
       total,
