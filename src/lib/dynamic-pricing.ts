@@ -616,28 +616,30 @@ async function calculateSofaPricing(
     totalPrice += breakdown.additionalSeatsPrice;
   }
 
-  // Lounger pricing - Formula: 100% base + 10% per additional 6"
+  // Lounger pricing - Formula: 5ft = 100% base, each additional 6" = +10% base
   if (configuration.lounger?.required) {
-    let loungerBasePrice = basePrice; // 100% of base price
     const loungerSize = configuration.lounger?.size || "";
     const quantity = configuration.lounger?.quantity || 1;
 
-    // Calculate additional 6" increments
-    // Base sizes: 5 ft = 0%, 5'6" = +10%, 6 ft = +20%, 6'6" = +30%, 7 ft = +40%
-    let additionalPercent = 0;
+    // Calculate lounger price based on size
+    // 5ft = 100% of base price
+    // Each additional 6 inches = +10% of base price
+    let loungerPercent = 100; // Base: 5ft = 100%
+    
     if (loungerSize.includes("5 ft 6 in") || loungerSize.includes("5'6") || loungerSize.includes("5.5")) {
-      additionalPercent = 10; // 1 additional 6"
+      loungerPercent = 110; // 5'6" = 100% + 10% (1 additional 6")
+    } else if (loungerSize.includes("6 ft") && !loungerSize.includes("6 in") && !loungerSize.includes("6'6")) {
+      loungerPercent = 120; // 6ft = 100% + 20% (2 additional 6")
     } else if (loungerSize.includes("6 ft 6 in") || loungerSize.includes("6'6") || loungerSize.includes("6.5")) {
-      additionalPercent = 30; // 3 additional 6"
-    } else if (loungerSize.includes("6 ft") || loungerSize.includes("6'")) {
-      additionalPercent = 20; // 2 additional 6"
+      loungerPercent = 130; // 6'6" = 100% + 30% (3 additional 6")
     } else if (loungerSize.includes("7 ft") || loungerSize.includes("7'")) {
-      additionalPercent = 40; // 4 additional 6"
+      loungerPercent = 140; // 7ft = 100% + 40% (4 additional 6")
+    } else if (loungerSize.includes("5 ft") && !loungerSize.includes("6 in")) {
+      loungerPercent = 100; // 5ft = 100% (base)
     }
 
-    // Apply additional percentage (10% per additional 6")
-    const additionalPrice = (loungerBasePrice * additionalPercent) / 100;
-    let loungerPrice = loungerBasePrice + additionalPrice;
+    // Calculate lounger price as percentage of base price
+    let loungerPrice = (basePrice * loungerPercent) / 100;
 
     // Storage option
     if (configuration.lounger?.storage === "Yes") {
@@ -1608,30 +1610,30 @@ async function calculateSofabedPricing(
     totalPrice += sectionPrice;
   }
 
-  // Lounger pricing
+  // Lounger pricing - Formula: 5ft = 100% base, each additional 6" = +10% base
   if (configuration.lounger?.required === "Yes") {
     const numLoungers = configuration.lounger?.numberOfLoungers === "2 Nos." ? 2 : 1;
-    const loungerSize = configuration.lounger?.size || "Lounger-5 ft 6 in";
+    const loungerSize = configuration.lounger?.size || "";
     
-    // Base: 40% for 5'6"
-    let loungerMultiplier = 0.40;
+    // Calculate lounger price based on size
+    // 5ft = 100% of base price
+    // Each additional 6 inches = +10% of base price
+    let loungerPercent = 100; // Base: 5ft = 100%
     
-    // Add 4% for each additional 6 inches beyond 5'6"
-    if (loungerSize.includes("6 ft") && !loungerSize.includes("6 in") && !loungerSize.includes("6'6")) {
-      loungerMultiplier += 0.04; // 6'0" = 44%
-    }
-    if (loungerSize.includes("6 ft 6") || loungerSize.includes("6'6")) {
-      loungerMultiplier += 0.08; // 6'6" = 48%
-    }
-    if (loungerSize.includes("7 ft") || loungerSize.includes("7'")) {
-      loungerMultiplier += 0.12; // 7'0" = 52%
-    }
-    // 5 ft (less than 5'6") = 36% (40% - 4%)
-    if (loungerSize.includes("5 ft") && !loungerSize.includes("6 in")) {
-      loungerMultiplier = 0.36;
+    if (loungerSize.includes("5 ft 6 in") || loungerSize.includes("5'6") || loungerSize.includes("5.5")) {
+      loungerPercent = 110; // 5'6" = 100% + 10% (1 additional 6")
+    } else if (loungerSize.includes("6 ft") && !loungerSize.includes("6 in") && !loungerSize.includes("6'6")) {
+      loungerPercent = 120; // 6ft = 100% + 20% (2 additional 6")
+    } else if (loungerSize.includes("6 ft 6 in") || loungerSize.includes("6'6") || loungerSize.includes("6.5")) {
+      loungerPercent = 130; // 6'6" = 100% + 30% (3 additional 6")
+    } else if (loungerSize.includes("7 ft") || loungerSize.includes("7'")) {
+      loungerPercent = 140; // 7ft = 100% + 40% (4 additional 6")
+    } else if (loungerSize.includes("5 ft") && !loungerSize.includes("6 in")) {
+      loungerPercent = 100; // 5ft = 100% (base)
     }
     
-    breakdown.loungerPrice = loungerMultiplier * basePriceFor2Seater * numLoungers;
+    // Calculate lounger price as percentage of base price
+    breakdown.loungerPrice = (basePriceFor2Seater * loungerPercent / 100) * numLoungers;
     totalPrice += breakdown.loungerPrice;
   }
 
