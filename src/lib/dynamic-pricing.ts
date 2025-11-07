@@ -391,6 +391,8 @@ export interface PricingBreakdown {
   accessoriesPrice: number;
   mechanismUpgrade: number;
   storagePrice: number;
+  armrestUpgrade: number;
+  stitchTypePrice: number;
   discountAmount: number;
   subtotal: number;
   total: number;
@@ -429,6 +431,8 @@ export const calculateDynamicPrice = async (
       accessoriesPrice: 0,
       mechanismUpgrade: 0,
       storagePrice: 0,
+      armrestUpgrade: 0,
+      stitchTypePrice: 0,
       discountAmount: 0,
       subtotal: 0,
       total: 0,
@@ -535,6 +539,8 @@ async function calculateSofaPricing(
     accessoriesPrice: 0,
     mechanismUpgrade: 0,
     storagePrice: 0,
+    armrestUpgrade: 0,
+    stitchTypePrice: 0,
     discountAmount: 0,
     subtotal: 0,
     total: 0,
@@ -654,21 +660,44 @@ async function calculateSofaPricing(
     totalPrice += breakdown.loungerPrice;
   }
 
-  // Console pricing - Fixed price per console based on size
+  // Console pricing - Fixed price per console based on size + accessory prices
   if (configuration.console?.required) {
     const consoleSize = configuration.console?.size || "";
     const quantity = configuration.console?.quantity || 1;
 
-    let consolePrice = 0;
+    // Base console price (per console)
+    let baseConsolePrice = 0;
     if (consoleSize.includes("6") || consoleSize === "6 in" || consoleSize === "Console-6 in") {
-      consolePrice = getFormulaValue(formulas, "console_6_inch", 8000);
+      baseConsolePrice = getFormulaValue(formulas, "console_6_inch", 8000);
     } else if (consoleSize.includes("10") || consoleSize === "10 in" || consoleSize === "Console-10 in") {
-      consolePrice = getFormulaValue(formulas, "console_10_inch", 12000);
+      baseConsolePrice = getFormulaValue(formulas, "console_10_inch", 12000);
     }
 
-    // Price is per console, multiplied by quantity
-    // Placement doesn't affect price, only quantity
-    breakdown.consolePrice = consolePrice * quantity;
+    // Calculate total console price: base price * quantity + sum of all accessory prices
+    let consoleAccessoriesTotal = 0;
+    if (configuration.console?.placements && Array.isArray(configuration.console.placements)) {
+      const accessoryIds = configuration.console.placements
+        .map((p: any) => p?.accessoryId)
+        .filter((id: any) => id && id !== null && id !== "none");
+      
+      if (accessoryIds.length > 0) {
+        const { data: accessories } = await supabase
+          .from("accessories_prices")
+          .select("id, sale_price")
+          .in("id", accessoryIds)
+          .eq("is_active", true);
+        
+        if (accessories && accessories.length > 0) {
+          // Sum all accessory prices (each console placement can have one accessory)
+          consoleAccessoriesTotal = accessories.reduce((sum: number, acc: any) => {
+            return sum + (Number(acc.sale_price) || 0);
+          }, 0);
+        }
+      }
+    }
+
+    // Total console price = (base console price * quantity) + (sum of all accessories)
+    breakdown.consolePrice = (baseConsolePrice * quantity) + consoleAccessoriesTotal;
     totalPrice += breakdown.consolePrice;
   }
 
@@ -737,9 +766,10 @@ async function calculateSofaPricing(
   breakdown.dimensionUpgrade = totalPrice * ((depthUpgradePercent + widthUpgradePercent) / 100);
   totalPrice += breakdown.dimensionUpgrade;
 
-  // Accessories (legs)
-  if (configuration.legType || configuration.legsCode) {
-    const legCode = configuration.legsCode || configuration.legType;
+  // Accessories (legs only - armrest is separate)
+  let accessoriesTotal = 0;
+  if (configuration.legType || configuration.legsCode || configuration.legs?.type) {
+    const legCode = configuration.legsCode || configuration.legType || configuration.legs?.type;
     const { data: leg } = await supabase
       .from("legs_prices")
       .select("price_per_unit")
@@ -748,8 +778,104 @@ async function calculateSofaPricing(
       .single();
 
     if (leg && leg.price_per_unit) {
-      breakdown.accessoriesPrice = leg.price_per_unit || 0;
-      totalPrice += breakdown.accessoriesPrice;
+      accessoriesTotal += leg.price_per_unit || 0;
+    }
+  }
+  breakdown.accessoriesPrice = accessoriesTotal;
+  totalPrice += accessoriesTotal;
+
+  // Armrest pricing (separate from accessories)
+  if (configuration.armrest?.type) {
+    const armrestType = configuration.armrest.type;
+    try {
+      const { data: armrestOption, error: armrestError } = await supabase
+        .from("dropdown_options")
+        .select("metadata, option_value, display_label")
+        .eq("category", "sofa")
+        .eq("field_name", "armrest_type")
+        .eq("option_value", armrestType)
+        .eq("is_active", true)
+        .single();
+
+      if (armrestError) {
+        console.warn("Error fetching armrest option:", armrestError);
+        console.warn("Armrest type searched:", armrestType);
+      }
+
+      if (armrestOption && armrestOption.metadata) {
+        // Handle both JSONB object and parsed object
+        let metadata = armrestOption.metadata;
+        if (typeof metadata === 'string') {
+          try {
+            metadata = JSON.parse(metadata);
+          } catch (e) {
+            console.warn("Failed to parse armrest metadata as JSON:", e);
+          }
+        }
+        
+        // Try multiple possible field names for price
+        const armrestPrice = Number(
+          metadata?.price_rs || 
+          metadata?.price || 
+          metadata?.priceRs || 
+          0
+        );
+        
+        breakdown.armrestUpgrade = armrestPrice;
+        totalPrice += armrestPrice;
+        
+        if (armrestPrice > 0) {
+          console.log(`✅ Armrest "${armrestType}" price: ₹${armrestPrice}`);
+        } else {
+          console.log(`ℹ️ Armrest "${armrestType}" has no price (free/default)`);
+        }
+      } else if (armrestOption) {
+        console.warn(`⚠️ Armrest option found but no metadata:`, armrestOption);
+      }
+    } catch (error) {
+      console.error("Error processing armrest pricing:", error);
+    }
+  }
+
+  // Stitch Type pricing
+  if (configuration.stitch?.type) {
+    const stitchType = configuration.stitch.type;
+    try {
+      const { data: stitchOption, error: stitchError } = await supabase
+        .from("dropdown_options")
+        .select("metadata")
+        .eq("category", "sofa")
+        .eq("field_name", "stitch_type")
+        .eq("option_value", stitchType)
+        .eq("is_active", true)
+        .single();
+
+      if (stitchError) {
+        console.warn("Error fetching stitch type option:", stitchError);
+      }
+
+      if (stitchOption && stitchOption.metadata) {
+        let metadata = stitchOption.metadata;
+        if (typeof metadata === 'string') {
+          try {
+            metadata = JSON.parse(metadata);
+          } catch (e) {
+            console.warn("Failed to parse stitch metadata as JSON:", e);
+          }
+        }
+        
+        const stitchPrice = Number(
+          metadata?.price_rs || 
+          metadata?.price || 
+          metadata?.priceRs || 
+          0
+        );
+        
+        breakdown.stitchTypePrice = stitchPrice;
+        totalPrice += stitchPrice;
+      }
+    } catch (error) {
+      console.error("Error processing stitch type pricing:", error);
     }
   }
 
@@ -796,6 +922,8 @@ async function calculateBedPricing(
     accessoriesPrice: 0,
     mechanismUpgrade: 0,
     storagePrice: 0,
+    armrestUpgrade: 0,
+    stitchTypePrice: 0,
     discountAmount: 0,
     subtotal: 0,
     total: 0,
@@ -903,6 +1031,8 @@ async function calculateReclinerPricing(
     accessoriesPrice: 0,
     mechanismUpgrade: 0,
     storagePrice: 0,
+    armrestUpgrade: 0,
+    stitchTypePrice: 0,
     discountAmount: 0,
     subtotal: 0,
     total: 0,
@@ -1149,6 +1279,8 @@ async function calculateCinemaChairPricing(
     accessoriesPrice: 0,
     mechanismUpgrade: 0,
     storagePrice: 0,
+    armrestUpgrade: 0,
+    stitchTypePrice: 0,
     discountAmount: 0,
     subtotal: 0,
     total: 0,
@@ -1340,6 +1472,8 @@ async function calculateChairPricing(
     accessoriesPrice: 0,
     mechanismUpgrade: 0,
     storagePrice: 0,
+    armrestUpgrade: 0,
+    stitchTypePrice: 0,
     discountAmount: 0,
     subtotal: 0,
     total: 0,
@@ -1446,6 +1580,8 @@ async function calculateBenchPricing(
     accessoriesPrice: 0,
     mechanismUpgrade: 0,
     storagePrice: 0,
+    armrestUpgrade: 0,
+    stitchTypePrice: 0,
     discountAmount: 0,
     subtotal: 0,
     total: 0,
@@ -1550,6 +1686,8 @@ async function calculateSofabedPricing(
     accessoriesPrice: 0,
     mechanismUpgrade: 0,
     storagePrice: 0,
+    armrestUpgrade: 0,
+    stitchTypePrice: 0,
     discountAmount: 0,
     subtotal: 0,
     total: 0,
@@ -1811,6 +1949,8 @@ async function calculateGenericPricing(
     accessoriesPrice: 0,
     mechanismUpgrade: 0,
     storagePrice: 0,
+    armrestUpgrade: 0,
+    stitchTypePrice: 0,
     discountAmount: 0,
     subtotal: 0,
     total: 0,

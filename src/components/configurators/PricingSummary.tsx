@@ -65,21 +65,18 @@ const PricingSummary = ({
         ) : pricing ? (
           <>
             <div className="space-y-3 text-sm">
-              {/* Base Price */}
-              {pricing.breakdown.basePrice > 0 && pricing.breakdown.basePrice !== pricing.breakdown.baseSeatPrice && (
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Base Price</span>
-                  <span className="font-semibold">₹{Math.round(pricing.breakdown.basePrice).toLocaleString()}</span>
-                </div>
-              )}
-              
-              {/* Base Seat Price */}
-              {pricing.breakdown.baseSeatPrice > 0 && (
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Base Seat</span>
-                  <span className="font-semibold">₹{Math.round(pricing.breakdown.baseSeatPrice).toLocaleString()}</span>
-                </div>
-              )}
+              {/* Base Product Cost - Combine basePrice and baseSeatPrice */}
+              {(() => {
+                const baseProductCost = pricing.breakdown.baseSeatPrice > 0 
+                  ? pricing.breakdown.baseSeatPrice 
+                  : pricing.breakdown.basePrice;
+                return baseProductCost > 0 ? (
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Base Product Cost</span>
+                    <span className="font-semibold">₹{Math.round(baseProductCost).toLocaleString()}</span>
+                  </div>
+                ) : null;
+              })()}
               
               {/* Additional Seats */}
               {pricing.breakdown.additionalSeatsPrice > 0 && (
@@ -111,19 +108,27 @@ const PricingSummary = ({
                 </div>
               )}
               
-              {/* Lounger */}
+              {/* Consoles */}
+              {pricing.breakdown.consolePrice > 0 && (
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Consoles</span>
+                  <span className="font-semibold">₹{Math.round(pricing.breakdown.consolePrice).toLocaleString()}</span>
+                </div>
+              )}
+              
+              {/* Loungers */}
               {pricing.breakdown.loungerPrice > 0 && (
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">Lounger</span>
+                  <span className="text-muted-foreground">Loungers</span>
                   <span className="font-semibold">₹{Math.round(pricing.breakdown.loungerPrice).toLocaleString()}</span>
                 </div>
               )}
               
-              {/* Console */}
-              {pricing.breakdown.consolePrice > 0 && (
+              {/* Recliners (Mechanism Upgrade for recliner category) */}
+              {pricing.breakdown.mechanismUpgrade > 0 && (
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">Console</span>
-                  <span className="font-semibold">₹{Math.round(pricing.breakdown.consolePrice).toLocaleString()}</span>
+                  <span className="text-muted-foreground">Recliners</span>
+                  <span className="font-semibold">₹{Math.round(pricing.breakdown.mechanismUpgrade).toLocaleString()}</span>
                 </div>
               )}
               
@@ -135,35 +140,11 @@ const PricingSummary = ({
                 </div>
               )}
               
-              {/* Mechanism Upgrade */}
-              {pricing.breakdown.mechanismUpgrade > 0 && (
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Mechanism Upgrade</span>
-                  <span className="font-semibold">₹{Math.round(pricing.breakdown.mechanismUpgrade).toLocaleString()}</span>
-                </div>
-              )}
-              
-              {/* Storage */}
-              {pricing.breakdown.storagePrice > 0 && (
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Storage</span>
-                  <span className="font-semibold">₹{Math.round(pricing.breakdown.storagePrice).toLocaleString()}</span>
-                </div>
-              )}
-              
-              {/* Fabric Charges */}
+              {/* Fabric Upgrade */}
               {pricing.breakdown.fabricCharges > 0 && (
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">Fabric Charges</span>
+                  <span className="text-muted-foreground">Fabric Upgrade</span>
                   <span className="font-semibold">₹{Math.round(pricing.breakdown.fabricCharges).toLocaleString()}</span>
-                </div>
-              )}
-              
-              {/* Foam Upgrade */}
-              {pricing.breakdown.foamUpgrade > 0 && (
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Foam Upgrade</span>
-                  <span className="font-semibold">₹{Math.round(pricing.breakdown.foamUpgrade).toLocaleString()}</span>
                 </div>
               )}
               
@@ -177,7 +158,46 @@ const PricingSummary = ({
                 </div>
               )}
               
-              {/* Accessories */}
+              {/* Foam Upgrade */}
+              {pricing.breakdown.foamUpgrade > 0 && (
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Foam Upgrade</span>
+                  <span className="font-semibold">₹{Math.round(pricing.breakdown.foamUpgrade).toLocaleString()}</span>
+                </div>
+              )}
+              
+              {/* Armrest Upgrade */}
+              {pricing.breakdown.armrestUpgrade > 0 && (
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Armrest Upgrade</span>
+                  <span className="font-semibold">
+                    ₹{Math.round(pricing.breakdown.armrestUpgrade).toLocaleString()}
+                  </span>
+                </div>
+              )}
+              
+              {/* Stitch Type - Selection */}
+              {configuration.stitch?.type && (
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Stitch Type - {configuration.stitch.type}</span>
+                  <span className="font-semibold">
+                    {pricing.breakdown.stitchTypePrice > 0 
+                      ? `₹${Math.round(pricing.breakdown.stitchTypePrice).toLocaleString()}`
+                      : "Included"
+                    }
+                  </span>
+                </div>
+              )}
+              
+              {/* Storage */}
+              {pricing.breakdown.storagePrice > 0 && (
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Storage</span>
+                  <span className="font-semibold">₹{Math.round(pricing.breakdown.storagePrice).toLocaleString()}</span>
+                </div>
+              )}
+              
+              {/* Accessories (legs only) */}
               {pricing.breakdown.accessoriesPrice > 0 && (
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Accessories</span>

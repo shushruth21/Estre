@@ -133,10 +133,11 @@ const Checkout = () => {
     onSuccess: (order) => {
       toast({
         title: "Order Placed Successfully!",
-        description: `Order ${order.order_number} has been created. You will be contacted for payment details.`,
+        description: `Order ${order.order_number} has been created. Generating sale order...`,
       });
       queryClient.invalidateQueries({ queryKey: ["cart"] });
-      navigate(`/orders`);
+      // Navigate to sale order page
+      navigate(`/sale-order/${order.id}`);
     },
     onError: (error: any) => {
       toast({

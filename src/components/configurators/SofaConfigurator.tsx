@@ -51,6 +51,7 @@ const SofaConfigurator = ({
   const pillowTypesResult = useDropdownOptions("sofa", "pillow_type");
   const pillowSizesResult = useDropdownOptions("sofa", "pillow_size");
   const pillowFabricPlanResult = useDropdownOptions("sofa", "pillow_fabric_plan");
+  const armrestTypesResult = useDropdownOptions("sofa", "armrest_type");
   
   // Shape-specific dropdown options
   const l1OptionsResult = useDropdownOptions("sofa", "l1_option");
@@ -82,6 +83,7 @@ const SofaConfigurator = ({
   const pillowTypes = Array.isArray(pillowTypesResult.data) ? pillowTypesResult.data : [];
   const pillowSizes = Array.isArray(pillowSizesResult.data) ? pillowSizesResult.data : [];
   const pillowFabricPlans = Array.isArray(pillowFabricPlanResult.data) ? pillowFabricPlanResult.data : [];
+  const armrestTypes = Array.isArray(armrestTypesResult.data) ? armrestTypesResult.data : [];
   
   const l1Options = Array.isArray(l1OptionsResult.data) ? l1OptionsResult.data : [];
   const r1Options = Array.isArray(r1OptionsResult.data) ? r1OptionsResult.data : [];
@@ -137,6 +139,7 @@ const SofaConfigurator = ({
   });
 
   // Load accessories for console dropdowns from accessories_prices table
+  // Filter to get unique accessories (no duplicates)
   const { data: consoleAccessories, isLoading: loadingAccessories } = useQuery({
     queryKey: ["console-accessories-prices"],
     queryFn: async () => {
@@ -146,7 +149,17 @@ const SofaConfigurator = ({
         .eq("is_active", true)
         .order("description");
       if (error) throw error;
-      return data || [];
+      
+      // Remove duplicates based on description (in case there are any)
+      const uniqueAccessories = (data || []).reduce((acc: any[], current: any) => {
+        const existing = acc.find((item: any) => item.description === current.description);
+        if (!existing) {
+          acc.push(current);
+        }
+        return acc;
+      }, []);
+      
+      return uniqueAccessories;
     },
   });
 
@@ -253,52 +266,58 @@ const SofaConfigurator = ({
     return positions;
   };
 
+  // Helper for ordinal suffix
+  const getOrdinalSuffix = (num: number) => {
+    const j = num % 10;
+    const k = num % 100;
+    if (j === 1 && k !== 11) return "st";
+    if (j === 2 && k !== 12) return "nd";
+    if (j === 3 && k !== 13) return "rd";
+    return "th";
+  };
+
   // Generate all possible console placements based on sections
-  // Returns array of placement objects with section, position, and label
+  // Returns array of placement objects with section, position, and label (cleaner labels without console numbering)
   const generateAllConsolePlacements = () => {
     const placements: Array<{ section: string; position: string; label: string; value: string }> = [];
     const sectionCounts = getSectionSeatCounts();
-    let consoleIndex = 1;
 
     // Front section consoles (between seats only)
     if (sectionCounts.front > 1) {
       for (let i = 1; i < sectionCounts.front; i++) {
-        const ordinal = i === 1 ? 'st' : i === 2 ? 'nd' : i === 3 ? 'rd' : 'th';
+        const ordinal = getOrdinalSuffix(i);
         placements.push({
           section: 'front',
           position: `after_${i}`,
-          label: `Front Console ${consoleIndex}: After ${i}${ordinal} Seat from Left`,
+          label: `Front: After ${i}${ordinal} Seat from Left`,
           value: `front_${i}`
         });
-        consoleIndex++;
       }
     }
 
     // Left section consoles (L2 - between seats only)
     if (sectionCounts.left > 1) {
       for (let i = 1; i < sectionCounts.left; i++) {
-        const ordinal = i === 1 ? 'st' : i === 2 ? 'nd' : i === 3 ? 'rd' : 'th';
+        const ordinal = getOrdinalSuffix(i);
         placements.push({
           section: 'left',
           position: `after_${i}`,
-          label: `Left Console ${consoleIndex}: After ${i}${ordinal} Seat from Left (Left Section)`,
+          label: `Left: After ${i}${ordinal} Seat from Left`,
           value: `left_${i}`
         });
-        consoleIndex++;
       }
     }
 
     // Right section consoles (R2 - between seats only)
     if (sectionCounts.right > 1) {
       for (let i = 1; i < sectionCounts.right; i++) {
-        const ordinal = i === 1 ? 'st' : i === 2 ? 'nd' : i === 3 ? 'rd' : 'th';
+        const ordinal = getOrdinalSuffix(i);
         placements.push({
           section: 'right',
           position: `after_${i}`,
-          label: `Right Console ${consoleIndex}: After ${i}${ordinal} Seat from Left (Right Section)`,
+          label: `Right: After ${i}${ordinal} Seat from Left`,
           value: `right_${i}`
         });
-        consoleIndex++;
       }
     }
 
@@ -928,6 +947,7 @@ const SofaConfigurator = ({
                   const allPlacements = generateAllConsolePlacements();
                   
                   // Filter out consoles with "none" placement (hidden consoles)
+                  // Only show consoles that have valid positions
                   const validPlacements = (configuration.console?.placements || []).filter(
                     (p: any) => p && p.position && p.position !== null && p.section !== null
                   );
@@ -947,27 +967,32 @@ const SofaConfigurator = ({
                       ? availablePlacements.find(p => p.value === currentPlacementValue)
                       : null;
                     
-                    // Use stable value - never use "none" as the displayed value, only as selectable option
-                    // If we have a valid placement, use it; otherwise use first available placement
-                    const selectValue = selectedPlacement?.value || (availablePlacements.length > 0 ? availablePlacements[0].value : "none");
+                    // Determine the current value - if placement exists, use it; otherwise show "none"
+                    // Since this console is in validPlacements, it should have a valid placement
+                    const selectValue = selectedPlacement?.value || "none";
                     
                     return (
-                      <div key={`console-${currentPlacement.section}-${currentPlacement.position}-${index}`} className="space-y-3 p-4 bg-muted/30 rounded-lg border">
-                        <Label className="text-sm font-semibold">Console {index + 1} Configuration</Label>
+                      <div key={`console-${currentPlacement.section}-${currentPlacement.position}-${index}-${selectValue}`} className="space-y-3 p-4 bg-muted/30 rounded-lg border">
+                        <div className="flex items-center justify-between">
+                          <Label className="text-sm font-semibold">Console Slot {index + 1}</Label>
+                          {selectedPlacement && (
+                            <Badge variant="secondary" className="text-xs">
+                              Active
+                            </Badge>
+                          )}
+                        </div>
                         <div className="space-y-2">
                           <Label className="text-xs text-muted-foreground">Placement</Label>
                           <Select
+                            key={`console-select-${currentPlacement.section}-${currentPlacement.position}-${index}`}
                             value={selectValue}
                             onValueChange={(value) => {
-                              const placements = [...(configuration.console?.placements || [])];
                               if (value === "none") {
                                 // Remove this console from the placements array
-                                const filteredPlacements = placements.filter((_, i) => {
-                                  // Find the original index of this placement
-                                  const originalIndex = (configuration.console?.placements || []).findIndex(
-                                    (p: any) => p && p.position === currentPlacement.position && p.section === currentPlacement.section
-                                  );
-                                  return i !== originalIndex;
+                                const currentPlacements = configuration.console?.placements || [];
+                                const filteredPlacements = currentPlacements.filter((p: any) => {
+                                  // Remove the placement that matches this console's position and section
+                                  return !(p && p.position === currentPlacement.position && p.section === currentPlacement.section);
                                 });
                                 
                                 updateConfiguration({
@@ -978,6 +1003,7 @@ const SofaConfigurator = ({
                                   },
                                 });
                               } else {
+                                const placements = [...(configuration.console?.placements || [])];
                                 const placement = availablePlacements.find(p => p.value === value);
                                 if (placement) {
                                   const afterSeat = parseInt(placement.position.split('_')[1] || "1", 10);
@@ -1052,11 +1078,16 @@ const SofaConfigurator = ({
                               {loadingAccessories ? (
                                 <SelectItem value="loading" disabled>Loading...</SelectItem>
                               ) : consoleAccessories && consoleAccessories.length > 0 ? (
-                                consoleAccessories.map((acc: any) => (
-                                  <SelectItem key={acc.id} value={acc.id}>
-                                    {acc.description} - ₹{acc.sale_price?.toLocaleString() || 0}
-                                  </SelectItem>
-                                ))
+                                // Filter to ensure unique IDs and descriptions
+                                consoleAccessories
+                                  .filter((acc: any, index: number, self: any[]) => 
+                                    index === self.findIndex((a: any) => a.id === acc.id && a.description === acc.description)
+                                  )
+                                  .map((acc: any) => (
+                                    <SelectItem key={`${acc.id}-${acc.description}`} value={acc.id}>
+                                      {acc.description} - ₹{Number(acc.sale_price || 0).toLocaleString()}
+                                    </SelectItem>
+                                  ))
                               ) : (
                                 <SelectItem value="no-data" disabled>No accessories available</SelectItem>
                               )}
@@ -1066,6 +1097,85 @@ const SofaConfigurator = ({
                       </div>
                     );
                   });
+                })()}
+
+                {/* Active Consoles Summary */}
+                {(() => {
+                  const activePlacements = (configuration.console?.placements || []).filter(
+                    (p: any) => p && p.position && p.position !== null && p.section !== null && p.position !== "none"
+                  );
+                  
+                  if (activePlacements.length === 0) return null;
+
+                  // Get console size for base price calculation
+                  const consoleSize = configuration.console?.size || "";
+                  const is6Inch = consoleSize.includes("6") || consoleSize === "6 in" || consoleSize === "Console-6 in";
+                  const baseConsolePrice = is6Inch ? 8000 : 12000; // Default prices, will be overridden by pricing calculation
+
+                  return (
+                    <Card className="p-4 bg-gradient-to-r from-green-50 to-blue-50 border-green-300 dark:from-green-950/20 dark:to-blue-950/20 dark:border-green-800">
+                      <CardHeader className="p-0 pb-3">
+                        <CardTitle className="text-base font-semibold flex items-center gap-2">
+                          <span>✓</span> Active Consoles Summary
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent className="p-0 space-y-2">
+                        {activePlacements.map((placement: any, index: number) => {
+                          const placementLabel = generateAllConsolePlacements().find(
+                            p => p.value === `${placement.section}_${placement.afterSeat || 1}`
+                          )?.label || `${placement.section}: After ${placement.afterSeat || 1}${getOrdinalSuffix(placement.afterSeat || 1)} Seat`;
+                          
+                          const accessory = consoleAccessories?.find((acc: any) => acc.id === placement.accessoryId);
+                          const accessoryPrice = accessory ? (Number(accessory.sale_price) || 0) : 0;
+                          const consolePrice = baseConsolePrice + accessoryPrice;
+
+                          return (
+                            <div
+                              key={`summary-${placement.section}-${placement.position}-${index}`}
+                              className="p-3 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm"
+                            >
+                              <div className="flex items-start justify-between">
+                                <div className="flex-1">
+                                  <div className="font-semibold text-sm mb-1">
+                                    Console {index + 1}
+                                  </div>
+                                  <div className="text-sm text-muted-foreground">
+                                    📍 {placementLabel}
+                                  </div>
+                                  {accessory && (
+                                    <div className="text-sm text-blue-600 dark:text-blue-400 mt-1">
+                                      + {accessory.description} (₹{accessoryPrice.toLocaleString()})
+                                    </div>
+                                  )}
+                                </div>
+                                <div className="text-right">
+                                  <div className="font-bold text-green-600 dark:text-green-400">
+                                    ₹{consolePrice.toLocaleString()}
+                                  </div>
+                                  <div className="text-xs text-muted-foreground">
+                                    {consoleSize || "10 in"}
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                        
+                        {/* Total Console Cost Note */}
+                        <div className="pt-3 border-t border-gray-300 dark:border-gray-700">
+                          <div className="flex items-center justify-between">
+                            <span className="font-semibold text-sm">Total Console Cost:</span>
+                            <span className="text-sm text-muted-foreground">
+                              (Calculated in price summary)
+                            </span>
+                          </div>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            {activePlacements.length} active console{activePlacements.length !== 1 ? 's' : ''} configured
+                          </p>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  );
                 })()}
               </div>
             )}
@@ -1804,6 +1914,78 @@ const SofaConfigurator = ({
                       High-quality wood for frame construction
                     </p>
                   )}
+          </div>
+
+                {/* Armrest Type */}
+                <div className="space-y-3">
+                  <Label className="text-base font-semibold">Armrest</Label>
+            <Select
+                    value={configuration.armrest?.type || ""}
+              onValueChange={(value) =>
+                updateConfiguration({
+                        armrest: { ...configuration.armrest, type: value },
+                })
+              }
+            >
+              <SelectTrigger>
+                      <SelectValue placeholder="Select Armrest Type" />
+              </SelectTrigger>
+              <SelectContent>
+                      {armrestTypesResult.isLoading ? (
+                        <SelectItem value="loading" disabled>Loading...</SelectItem>
+                      ) : armrestTypes && armrestTypes.length > 0 ? (
+                        armrestTypes
+                          .filter((armrest: any) => armrest && armrest.option_value)
+                          .map((armrest: any) => {
+                            const price = armrest.metadata?.price_rs || 0;
+                            const width = armrest.metadata?.width_in;
+                            return (
+                              <SelectItem key={armrest.id} value={armrest.option_value}>
+                                <div className="flex items-center justify-between w-full">
+                                  <div className="flex flex-col">
+                                    <span>{armrest.display_label || armrest.option_value}</span>
+                                    {width && (
+                                      <span className="text-xs text-muted-foreground">
+                                        Width: {width}" 
+                                      </span>
+                                    )}
+                                  </div>
+                                  {price > 0 && (
+                                    <Badge variant="secondary" className="ml-2">
+                                      +₹{price.toLocaleString()}
+                                    </Badge>
+                                  )}
+                                </div>
+                              </SelectItem>
+                            );
+                          })
+                      ) : (
+                        <SelectItem value="no-data" disabled>No options available</SelectItem>
+                )}
+              </SelectContent>
+            </Select>
+                  {configuration.armrest?.type && (() => {
+                    const selectedArmrest = armrestTypes.find((a: any) => a?.option_value === configuration.armrest?.type);
+                    const price = selectedArmrest?.metadata?.price_rs || 0;
+                    const width = selectedArmrest?.metadata?.width_in;
+                    return (
+                      <Alert>
+                        <AlertDescription>
+                          <strong>Selected: {selectedArmrest?.display_label || configuration.armrest.type}</strong>
+                          {width && (
+                            <>
+                              <br />
+                              Width: {width} inches
+                            </>
+                          )}
+                          <br />
+                          {price === 0
+                            ? "Standard armrest - No extra cost"
+                            : `Additional charge: ₹${price.toLocaleString()}`}
+                        </AlertDescription>
+                      </Alert>
+                    );
+                  })()}
           </div>
 
                 {/* Stitch Type */}

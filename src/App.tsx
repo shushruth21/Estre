@@ -23,6 +23,7 @@ import AdminUsers from "./pages/admin/AdminUsers";
 import StaffDashboard from "./pages/staff/StaffDashboard";
 import StaffJobCards from "./pages/staff/StaffJobCards";
 import StaffJobCardDetail from "./pages/staff/StaffJobCardDetail";
+import SaleOrder from "./pages/SaleOrder";
 import NotFound from "./pages/NotFound";
 
 // Configure QueryClient with better error handling
@@ -56,6 +57,8 @@ const App = () => (
           <Route path="/cart" element={<Cart />} />
           <Route path="/checkout" element={<Checkout />} />
           <Route path="/orders" element={<Orders />} />
+          <Route path="/sale-order/:orderId" element={<SaleOrder />} />
+          <Route path="/sale-order/:orderId/:itemId" element={<SaleOrder />} />
           <Route path="/login" element={<Login />} />
           <Route path="/signup" element={<Signup />} />
           <Route path="/dashboard" element={<Dashboard />} />

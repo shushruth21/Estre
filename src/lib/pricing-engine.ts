@@ -1,6 +1,7 @@
 import { supabase } from "@/integrations/supabase/client";
 
 export interface PricingBreakdown {
+  basePrice: number;
   baseSeatPrice: number;
   additionalSeatsPrice: number;
   cornerSeatsPrice: number;
@@ -12,6 +13,10 @@ export interface PricingBreakdown {
   foamUpgrade: number;
   dimensionUpgrade: number;
   accessoriesPrice: number;
+  mechanismUpgrade: number;
+  storagePrice: number;
+  armrestUpgrade: number;
+  stitchTypePrice: number;
   discountAmount: number;
   subtotal: number;
   total: number;
