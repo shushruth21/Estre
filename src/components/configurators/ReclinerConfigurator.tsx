@@ -48,6 +48,39 @@ const ReclinerConfigurator = ({ product, configuration, onConfigurationChange }:
     return total;
   };
 
+  // Calculate physical width per section based on seater type and seat width
+  const calculateSectionWidth = (seaterType: string, seatWidth: number): number => {
+    const seatCount = getSeatCount(seaterType);
+    if (seaterType === "Backrest") {
+      // Backrest: 14 inches for 22" width, not applicable for other widths
+      return seatWidth === 22 ? 14 : 0;
+    }
+    if (seaterType === "Corner") {
+      // Corner: same as seat width
+      return seatWidth;
+    }
+    // Regular seats: seat count × seat width
+    return seatCount * seatWidth;
+  };
+
+  // Calculate total physical width
+  const calculateTotalWidth = (): number => {
+    const seatWidth = configuration.dimensions?.seatWidth || 22;
+    let totalWidth = 0;
+    
+    if (configuration.sections?.F) {
+      totalWidth += calculateSectionWidth(configuration.sections.F.type, seatWidth);
+    }
+    if (configuration.sections?.L1) {
+      totalWidth += calculateSectionWidth(configuration.sections.L1.type, seatWidth);
+    }
+    if (configuration.sections?.L2) {
+      totalWidth += calculateSectionWidth(configuration.sections.L2.type, seatWidth);
+    }
+    
+    return totalWidth;
+  };
+
   // Initialize configuration
   useEffect(() => {
     if (!configuration.productId && product?.id) {
@@ -318,9 +351,14 @@ const ReclinerConfigurator = ({ product, configuration, onConfigurationChange }:
                 </>
               )}
 
-              {/* Total Seats Display */}
-              <div className="p-4 bg-muted rounded-lg">
-                <Label className="text-sm font-semibold">Total Seats: {totalSeats}</Label>
+              {/* Total Seats & Width Display */}
+              <div className="grid md:grid-cols-2 gap-4">
+                <div className="p-4 bg-muted rounded-lg">
+                  <Label className="text-sm font-semibold">Total Seats: {totalSeats}</Label>
+                </div>
+                <div className="p-4 bg-muted rounded-lg">
+                  <Label className="text-sm font-semibold">Total Width: {calculateTotalWidth()}" ({Math.round(calculateTotalWidth() * 2.54)} cm)</Label>
+                </div>
               </div>
             </CardContent>
           </Card>
@@ -489,11 +527,17 @@ const ReclinerConfigurator = ({ product, configuration, onConfigurationChange }:
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      {seatDepths?.map((depth: any) => (
-                        <SelectItem key={depth.id} value={depth.option_value}>
-                          {depth.display_label || depth.option_value}
-                        </SelectItem>
-                      ))}
+                      {seatDepths?.map((depth: any) => {
+                        const depthValue = Number(depth.option_value);
+                        const upgradePercent = depthValue === 22 || depthValue === 24 ? 0 : depthValue === 26 ? 3 : depthValue === 28 ? 6 : 0;
+                        const label = depth.display_label || depth.option_value;
+                        const upgradeLabel = upgradePercent > 0 ? ` (+${upgradePercent}% upgrade)` : " (Standard)";
+                        return (
+                          <SelectItem key={depth.id} value={depth.option_value}>
+                            {label}{upgradeLabel}
+                          </SelectItem>
+                        );
+                      })}
                     </SelectContent>
                   </Select>
                 </div>
@@ -510,11 +554,17 @@ const ReclinerConfigurator = ({ product, configuration, onConfigurationChange }:
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      {seatWidths?.map((width: any) => (
-                        <SelectItem key={width.id} value={width.option_value}>
-                          {width.display_label || width.option_value}
-                        </SelectItem>
-                      ))}
+                      {seatWidths?.map((width: any) => {
+                        const widthValue = Number(width.option_value);
+                        const upgradePercent = widthValue === 22 || widthValue === 24 ? 0 : widthValue === 26 ? 6.5 : widthValue === 28 ? 13 : 0;
+                        const label = width.display_label || width.option_value;
+                        const upgradeLabel = upgradePercent > 0 ? ` (+${upgradePercent}% upgrade)` : " (Standard)";
+                        return (
+                          <SelectItem key={width.id} value={width.option_value}>
+                            {label}{upgradeLabel}
+                          </SelectItem>
+                        );
+                      })}
                     </SelectContent>
                   </Select>
                 </div>
@@ -538,6 +588,7 @@ const ReclinerConfigurator = ({ product, configuration, onConfigurationChange }:
                       ))}
                     </SelectContent>
                   </Select>
+                  <p className="text-xs text-muted-foreground">No pricing impact</p>
                 </div>
               </div>
             </CardContent>

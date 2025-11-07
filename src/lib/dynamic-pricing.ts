@@ -970,6 +970,30 @@ async function calculateReclinerPricing(
     totalPrice += breakdown.consolePrice;
   }
 
+  // Foam upgrade (applied to base total)
+  const foamType = configuration.foam?.type || "";
+  if (foamType) {
+    const foamKey = `foam_${foamType.toLowerCase().replace(/\s+/g, "_")}`;
+    breakdown.foamUpgrade = getFormulaValue(formulas, foamKey, 0);
+    totalPrice += breakdown.foamUpgrade;
+  }
+
+  // Calculate base total (before dimension upgrades and fabric)
+  const baseTotal = totalPrice;
+
+  // Seat Depth Upgrade
+  // 22" = 0%, 24" = 0%, 26" = 3%, 28" = 6%
+  const seatDepth = configuration.dimensions?.seatDepth || 22;
+  const depthUpgradePercent: Record<number, number> = {
+    22: 0,
+    24: 0,
+    26: 0.03, // 3%
+    28: 0.06, // 6%
+  };
+  
+  const depthUpgradePercentValue = depthUpgradePercent[seatDepth] || 0;
+  const depthUpgrade = baseTotal * depthUpgradePercentValue;
+
   // Seat Width Upgrade
   // 22" = 0%, 24" = 0%, 26" = 6.5%, 28" = 13%
   const seatWidth = configuration.dimensions?.seatWidth || 22;
@@ -981,12 +1005,13 @@ async function calculateReclinerPricing(
   };
   
   const widthUpgradePercentValue = widthUpgradePercent[seatWidth] || 0;
-  if (widthUpgradePercentValue > 0) {
-    breakdown.dimensionUpgrade = totalPrice * widthUpgradePercentValue;
-    totalPrice += breakdown.dimensionUpgrade;
-  }
+  const widthUpgrade = baseTotal * widthUpgradePercentValue;
 
-  // Fabric charges
+  // Total dimension upgrade (applied to base total, before fabric)
+  breakdown.dimensionUpgrade = depthUpgrade + widthUpgrade;
+  totalPrice += breakdown.dimensionUpgrade;
+
+  // Fabric charges (applied after dimension upgrades)
   const fabricMeters = calculateFabricMeters("recliner", configuration, settings);
   const fabricCode = configuration.fabric?.structureCode || configuration.fabric?.claddingPlan;
   
@@ -994,14 +1019,6 @@ async function calculateReclinerPricing(
     const fabricPricePerMeter = await getFabricPrice(fabricCode);
     breakdown.fabricCharges = fabricMeters * fabricPricePerMeter;
     totalPrice += breakdown.fabricCharges;
-  }
-
-  // Foam upgrade
-  const foamType = configuration.foam?.type || "";
-  if (foamType) {
-    const foamKey = `foam_${foamType.toLowerCase().replace(/\s+/g, "_")}`;
-    breakdown.foamUpgrade = getFormulaValue(formulas, foamKey, 0);
-    totalPrice += breakdown.foamUpgrade;
   }
 
   breakdown.subtotal = totalPrice;
