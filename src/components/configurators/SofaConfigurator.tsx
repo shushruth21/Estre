@@ -1229,7 +1229,7 @@ const SofaConfigurator = ({
                     <SelectContent>
                       {Array.from({ length: 4 }, (_, i) => i + 1).map((num) => (
                         <SelectItem key={num} value={num.toString()}>
-                          {num} No.
+                          {num} {num === 1 ? 'No.' : 'Nos.'}
                         </SelectItem>
                       ))}
                     </SelectContent>
