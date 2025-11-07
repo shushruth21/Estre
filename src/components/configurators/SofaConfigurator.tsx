@@ -954,28 +954,39 @@ const SofaConfigurator = ({
                         <div className="space-y-2">
                           <Label className="text-xs text-muted-foreground">Placement</Label>
                           <Select
-                            value={selectedPlacement?.value || currentPlacementValue}
+                            value={selectedPlacement?.value || currentPlacementValue || "none"}
                             onValueChange={(value) => {
                               const placements = [...(configuration.console?.placements || [])];
-                              const placement = availablePlacements.find(p => p.value === value);
-                              if (placement) {
-                                const afterSeat = parseInt(placement.position.split('_')[1] || "1", 10);
+                              if (value === "none") {
+                                // Set placement to null/empty when "None" is selected
                                 placements[index] = {
-                                  section: placement.section,
-                                  position: placement.position,
-                                  afterSeat: afterSeat,
+                                  section: null,
+                                  position: null,
+                                  afterSeat: null,
                                   accessoryId: placements[index]?.accessoryId || null
                                 };
-                                updateConfiguration({
-                                  console: { ...configuration.console, placements },
-                                });
+                              } else {
+                                const placement = availablePlacements.find(p => p.value === value);
+                                if (placement) {
+                                  const afterSeat = parseInt(placement.position.split('_')[1] || "1", 10);
+                                  placements[index] = {
+                                    section: placement.section,
+                                    position: placement.position,
+                                    afterSeat: afterSeat,
+                                    accessoryId: placements[index]?.accessoryId || null
+                                  };
+                                }
                               }
+                              updateConfiguration({
+                                console: { ...configuration.console, placements },
+                              });
                             }}
                           >
                             <SelectTrigger>
                               <SelectValue placeholder="Select console placement" />
                             </SelectTrigger>
                             <SelectContent>
+                              <SelectItem value="none">None</SelectItem>
                               {availablePlacements.map((placement) => (
                                 <SelectItem key={placement.value} value={placement.value}>
                                   {placement.label}
