@@ -616,7 +616,7 @@ async function calculateSofaPricing(
     totalPrice += breakdown.additionalSeatsPrice;
   }
 
-  // Lounger pricing - Formula: 5ft = 100% base, 5'6" = 110%, 6ft = 110%, 6'6" = 120%, 7ft = 130%
+  // Lounger pricing - Formula: 5ft = 100% base, 5'6" = 100%, 6ft = 110%, 6'6" = 120%, 7ft = 130%
   if (configuration.lounger?.required) {
     const loungerSize = configuration.lounger?.size || "";
     const quantity = configuration.lounger?.quantity || 1;
@@ -1614,7 +1614,7 @@ async function calculateSofabedPricing(
     totalPrice += sectionPrice;
   }
 
-  // Lounger pricing - Formula: 5ft = 100% base, each additional 6" = +10% base
+  // Lounger pricing - Formula: 5ft = 100% base, 5'6" = 100%, 6ft = 110%, 6'6" = 120%, 7ft = 130%
   if (configuration.lounger?.required === "Yes") {
     const numLoungers = configuration.lounger?.numberOfLoungers === "2 Nos." ? 2 : 1;
     const loungerSize = configuration.lounger?.size || "";
