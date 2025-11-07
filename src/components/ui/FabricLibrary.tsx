@@ -187,41 +187,38 @@ export const FabricLibrary = ({
   const getFabricImageUrl = (fabric: Fabric): string | null => {
     // Try colour column first (may contain image URL)
     if (fabric.colour) {
+      const colourValue = String(fabric.colour).trim();
+      
       // Use getFirstImageUrl to handle various formats (string, array, comma-separated, JSON)
-      const imageUrl = getFirstImageUrl(fabric.colour);
-      if (imageUrl) {
-        if (import.meta.env.DEV) {
-          console.log('✅ Found image in colour column:', {
-            estre_code: fabric.estre_code,
-            colour: fabric.colour,
-            normalized: imageUrl
-          });
-        }
+      const imageUrl = getFirstImageUrl(colourValue);
+      if (imageUrl && imageUrl !== '/placeholder.svg') {
         return imageUrl;
+      }
+      
+      // If getFirstImageUrl didn't work, try direct normalization (more lenient)
+      if (colourValue && colourValue.length > 3) {
+        const normalized = normalizeImageUrl(colourValue);
+        if (normalized && normalized !== '/placeholder.svg') {
+          return normalized;
+        }
       }
     }
     
     // Fallback to colour_link column
     if (fabric.colour_link) {
-      const imageUrl = getFirstImageUrl(fabric.colour_link);
-      if (imageUrl) {
-        if (import.meta.env.DEV) {
-          console.log('✅ Found image in colour_link column:', {
-            estre_code: fabric.estre_code,
-            colour_link: fabric.colour_link,
-            normalized: imageUrl
-          });
-        }
+      const colourLinkValue = String(fabric.colour_link).trim();
+      const imageUrl = getFirstImageUrl(colourLinkValue);
+      if (imageUrl && imageUrl !== '/placeholder.svg') {
         return imageUrl;
       }
-    }
-    
-    if (import.meta.env.DEV && fabric.colour) {
-      console.log('⚠️ No valid image URL found for fabric:', {
-        estre_code: fabric.estre_code,
-        colour: fabric.colour,
-        colour_link: fabric.colour_link
-      });
+      
+      // If getFirstImageUrl didn't work, try direct normalization
+      if (colourLinkValue && colourLinkValue.length > 3) {
+        const normalized = normalizeImageUrl(colourLinkValue);
+        if (normalized && normalized !== '/placeholder.svg') {
+          return normalized;
+        }
+      }
     }
     
     return null;
