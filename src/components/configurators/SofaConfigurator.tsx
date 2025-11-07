@@ -926,16 +926,13 @@ const SofaConfigurator = ({
                 {/* Console Placements & Accessories */}
                 {configuration.console?.quantity > 0 && (() => {
                   const allPlacements = generateAllConsolePlacements();
-                  const maxPlacements = allPlacements.length;
                   
-                  return Array.from({ length: configuration.console.quantity }, (_, index) => {
-                    const currentPlacement = configuration.console?.placements?.[index] || { 
-                      section: "front", 
-                      position: "after_1",
-                      afterSeat: 1, 
-                      accessoryId: null 
-                    };
-                    
+                  // Filter out consoles with "none" placement (hidden consoles)
+                  const validPlacements = (configuration.console?.placements || []).filter(
+                    (p: any) => p && p.position && p.position !== null && p.section !== null
+                  );
+                  
+                  return validPlacements.map((currentPlacement: any, index: number) => {
                     // Get available placement options (only valid positions)
                     const availablePlacements = allPlacements.length > 0 
                       ? allPlacements 
@@ -958,28 +955,43 @@ const SofaConfigurator = ({
                             onValueChange={(value) => {
                               const placements = [...(configuration.console?.placements || [])];
                               if (value === "none") {
-                                // Set placement to null/empty when "None" is selected
-                                placements[index] = {
-                                  section: null,
-                                  position: null,
-                                  afterSeat: null,
-                                  accessoryId: placements[index]?.accessoryId || null
-                                };
+                                // Remove this console from the placements array
+                                const filteredPlacements = placements.filter((_, i) => {
+                                  // Find the original index of this placement
+                                  const originalIndex = (configuration.console?.placements || []).findIndex(
+                                    (p: any) => p && p.position === currentPlacement.position && p.section === currentPlacement.section
+                                  );
+                                  return i !== originalIndex;
+                                });
+                                
+                                updateConfiguration({
+                                  console: { 
+                                    ...configuration.console, 
+                                    placements: filteredPlacements,
+                                    quantity: filteredPlacements.length
+                                  },
+                                });
                               } else {
                                 const placement = availablePlacements.find(p => p.value === value);
                                 if (placement) {
                                   const afterSeat = parseInt(placement.position.split('_')[1] || "1", 10);
-                                  placements[index] = {
-                                    section: placement.section,
-                                    position: placement.position,
-                                    afterSeat: afterSeat,
-                                    accessoryId: placements[index]?.accessoryId || null
-                                  };
+                                  // Find and update the existing placement
+                                  const placementIndex = placements.findIndex(
+                                    (p: any) => p && p.position === currentPlacement.position && p.section === currentPlacement.section
+                                  );
+                                  if (placementIndex >= 0) {
+                                    placements[placementIndex] = {
+                                      section: placement.section,
+                                      position: placement.position,
+                                      afterSeat: afterSeat,
+                                      accessoryId: placements[placementIndex]?.accessoryId || null
+                                    };
+                                  }
                                 }
+                                updateConfiguration({
+                                  console: { ...configuration.console, placements },
+                                });
                               }
-                              updateConfiguration({
-                                console: { ...configuration.console, placements },
-                              });
                             }}
                           >
                             <SelectTrigger>
@@ -1011,13 +1023,19 @@ const SofaConfigurator = ({
                             value={currentPlacement.accessoryId || "none"}
                             onValueChange={(value) => {
                               const placements = [...(configuration.console?.placements || [])];
-                              placements[index] = {
-                                ...placements[index],
-                                accessoryId: value === "none" ? null : value
-                              };
-                              updateConfiguration({
-                                console: { ...configuration.console, placements },
-                              });
+                              // Find the placement by matching position and section
+                              const placementIndex = placements.findIndex(
+                                (p: any) => p && p.position === currentPlacement.position && p.section === currentPlacement.section
+                              );
+                              if (placementIndex >= 0) {
+                                placements[placementIndex] = {
+                                  ...placements[placementIndex],
+                                  accessoryId: value === "none" ? null : value
+                                };
+                                updateConfiguration({
+                                  console: { ...configuration.console, placements },
+                                });
+                              }
                             }}
                           >
                             <SelectTrigger>
