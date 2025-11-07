@@ -20,7 +20,7 @@ import {
   ExternalLink,
   Palette,
 } from "lucide-react";
-import { normalizeImageUrl, isValidImageUrl } from "@/lib/image-utils";
+import { normalizeImageUrl, isValidImageUrl, getFirstImageUrl } from "@/lib/image-utils";
 
 interface FabricLibraryProps {
   open: boolean;
@@ -62,7 +62,7 @@ export const FabricLibrary = ({
     queryKey: ["fabric-library-stats"],
     queryFn: async () => {
       // Fetch all rows without limit - Supabase default limit is 1000, so we need to handle pagination
-      let allData: Fabric[] = [];
+      let allData: Array<{ bom_price: number | null; price: number | null; upgrade: number | null }> = [];
       let from = 0;
       const batchSize = 1000;
       let hasMore = true;
@@ -88,7 +88,7 @@ export const FabricLibrary = ({
         }
       }
 
-      return allData as Fabric[];
+      return allData;
     },
   });
 
@@ -151,17 +151,17 @@ export const FabricLibrary = ({
     // Min Price: from bom_price column
     const bomPrices = fabricsForStats
       .map((f) => f.bom_price)
-      .filter((p) => p !== null && p !== undefined && p > 0);
+      .filter((p): p is number => p !== null && p !== undefined && p > 0);
 
-    // Max Price: from upgrade column
-    const upgradePrices = fabricsForStats
-      .map((f) => f.upgrade)
-      .filter((p) => p !== null && p !== undefined && p > 0);
+    // Max Price: from bom_price column (as per user's requirement)
+    const maxBomPrices = fabricsForStats
+      .map((f) => f.bom_price)
+      .filter((p): p is number => p !== null && p !== undefined && p > 0);
 
     const total = fabricsForStats.length;
     const avgPrice = bomPrices.length > 0 ? bomPrices.reduce((a, b) => a + b, 0) / bomPrices.length : 0;
     const minPrice = bomPrices.length > 0 ? Math.min(...bomPrices) : 0;
-    const maxPrice = upgradePrices.length > 0 ? Math.max(...upgradePrices) : 0;
+    const maxPrice = maxBomPrices.length > 0 ? Math.max(...maxBomPrices) : 0;
 
     return {
       total,
@@ -185,12 +185,45 @@ export const FabricLibrary = ({
 
   // Get fabric image URL from colour column
   const getFabricImageUrl = (fabric: Fabric): string | null => {
+    // Try colour column first (may contain image URL)
     if (fabric.colour) {
-      const normalized = normalizeImageUrl(fabric.colour);
-      if (normalized && isValidImageUrl(normalized)) {
-        return normalized;
+      // Use getFirstImageUrl to handle various formats (string, array, comma-separated, JSON)
+      const imageUrl = getFirstImageUrl(fabric.colour);
+      if (imageUrl) {
+        if (import.meta.env.DEV) {
+          console.log('✅ Found image in colour column:', {
+            estre_code: fabric.estre_code,
+            colour: fabric.colour,
+            normalized: imageUrl
+          });
+        }
+        return imageUrl;
       }
     }
+    
+    // Fallback to colour_link column
+    if (fabric.colour_link) {
+      const imageUrl = getFirstImageUrl(fabric.colour_link);
+      if (imageUrl) {
+        if (import.meta.env.DEV) {
+          console.log('✅ Found image in colour_link column:', {
+            estre_code: fabric.estre_code,
+            colour_link: fabric.colour_link,
+            normalized: imageUrl
+          });
+        }
+        return imageUrl;
+      }
+    }
+    
+    if (import.meta.env.DEV && fabric.colour) {
+      console.log('⚠️ No valid image URL found for fabric:', {
+        estre_code: fabric.estre_code,
+        colour: fabric.colour,
+        colour_link: fabric.colour_link
+      });
+    }
+    
     return null;
   };
 
