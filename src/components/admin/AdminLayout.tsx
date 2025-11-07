@@ -1,4 +1,4 @@
-import { ReactNode } from "react";
+import { ReactNode, useEffect } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
@@ -83,6 +83,7 @@ const navigationGroups: { title: string; items: NavItem[] }[] = [
   {
     title: "Team & Analytics",
     items: [
+      { name: "Users", href: "/admin/users", icon: Users },
       { name: "Staff", href: "/admin/staff", icon: Users },
       { name: "Reports", href: "/admin/reports", icon: BarChart3 },
     ],
@@ -114,11 +115,50 @@ export function AdminLayout({ children }: AdminLayoutProps) {
       const { count } = await supabase
         .from("job_cards")
         .select("*", { count: "exact", head: true })
-        .in("status", ["pending", "in_progress"]);
+        .in("status", ["pending", "fabric_cutting", "upholstery", "finishing", "quality_check", "frame_assembly"]);
       return count || 0;
     },
     refetchInterval: 30000,
   });
+
+  // Try direct query as fallback if roles are empty (MUST be before any conditional returns)
+  useEffect(() => {
+    if (userRoles.length === 0 && !loading && user?.id) {
+      const checkRoleDirectly = async () => {
+        try {
+          const { data: rolesData, error } = await supabase
+            .from("user_roles")
+            .select("role")
+            .eq("user_id", user.id);
+          
+          if (error) {
+            console.error("❌ AdminLayout: Error fetching roles:", error);
+            // Try security definer function
+            const { data: adminCheck } = await supabase
+              .rpc('is_admin_or_manager', { _user_id: user.id });
+            
+            if (adminCheck) {
+              console.log("✅ AdminLayout: Admin role confirmed via function");
+              // Force reload to update state
+              window.location.reload();
+            }
+          } else if (rolesData && rolesData.length > 0) {
+            const roles = rolesData.map((r: any) => r.role);
+            if (roles.includes('admin') || roles.includes('store_manager') || roles.includes('production_manager')) {
+              console.log("✅ AdminLayout: Admin role confirmed via direct query");
+              // Force reload to update state
+              window.location.reload();
+            }
+          }
+        } catch (err) {
+          console.error("❌ AdminLayout: Error in checkRoleDirectly:", err);
+        }
+      };
+      
+      const timer = setTimeout(checkRoleDirectly, 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [userRoles.length, loading, user?.id]);
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -172,6 +212,18 @@ export function AdminLayout({ children }: AdminLayoutProps) {
     userRoles.includes('store_manager') || 
     userRoles.includes('production_manager');
 
+  // If roles are still loading, show loading state instead of denying access
+  if (userRoles.length === 0 && !loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="text-center space-y-4">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
+          <p className="text-muted-foreground">Verifying access...</p>
+        </div>
+      </div>
+    );
+  }
+
   if (!hasAdminRole && userRoles.length > 0) {
     // Only deny access if roles have been loaded and user doesn't have admin role
     if (import.meta.env.DEV) {
@@ -209,19 +261,6 @@ export function AdminLayout({ children }: AdminLayoutProps) {
               Login
             </Button>
           </div>
-        </div>
-      </div>
-    );
-  }
-
-  // If roles are still loading, show loading state instead of denying access
-  if (userRoles.length === 0 && !loading) {
-    // Give it a moment for roles to load
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="text-center space-y-4">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
-          <p className="text-muted-foreground">Verifying access...</p>
         </div>
       </div>
     );

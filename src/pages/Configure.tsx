@@ -154,16 +154,16 @@ const Configure = () => {
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
-      <header className="border-b bg-card sticky top-0 z-50">
-        <div className="container mx-auto px-4 py-4">
+      <header className="border-b bg-background/95 backdrop-blur-sm glass-panel sticky top-0 z-50 shadow-sm">
+        <div className="container mx-auto container-spacing py-4">
           <div className="flex items-center justify-between">
             <Link to={`/products?category=${category}`}>
-              <Button variant="ghost" size="sm">
+              <Button variant="ghost" size="sm" className="luxury-button">
                 <ArrowLeft className="mr-2 h-4 w-4" />
                 Back to Products
               </Button>
             </Link>
-            <h1 className="text-xl font-bold">Configure: {product.title}</h1>
+            <h1 className="text-xl lg:text-2xl font-serif font-bold">Configure: {product.title}</h1>
             <div className="flex items-center gap-4">
               {pricing && (
                 <div className="text-right">
@@ -178,23 +178,23 @@ const Configure = () => {
         </div>
       </header>
 
-      <div className="container mx-auto px-4 py-8">
-        <div className="grid lg:grid-cols-5 gap-8">
+      <div className="container mx-auto container-spacing py-8 lg:py-12">
+        <div className="grid lg:grid-cols-5 gap-6 lg:gap-8">
           {/* Product Gallery */}
           <div className="lg:col-span-2">
-            <div className="sticky top-24">
+            <div className="sticky top-24 space-y-6">
               <ProductImageGallery 
                 images={product?.images || null}
                 productTitle={product.title}
               />
               
-              <Card className="mt-4 luxury-card border-muted/50">
-                <CardContent className="p-6">
-                  <h2 className="font-serif text-3xl font-bold mb-2">
+              <Card className="luxury-card-glass border-muted/50">
+                <CardContent className="p-6 lg:p-8">
+                  <h2 className="font-serif text-3xl lg:text-4xl font-bold mb-3">
                     {product.title}
                   </h2>
-                  <p className="text-muted-foreground">
-                    Customize every detail to match your vision
+                  <p className="text-muted-foreground text-base lg:text-lg leading-relaxed">
+                    Customize every detail to match your vision and create timeless elegance
                   </p>
                 </CardContent>
               </Card>
@@ -203,11 +203,11 @@ const Configure = () => {
 
           {/* Configuration Panel */}
           <div className="lg:col-span-2">
-            <Card className="luxury-card border-muted/50">
-              <CardHeader>
-                <CardTitle className="font-serif text-2xl">Product Configuration</CardTitle>
+            <Card className="luxury-card-glass border-muted/50">
+              <CardHeader className="pb-4">
+                <CardTitle className="font-serif text-2xl lg:text-3xl">Product Configuration</CardTitle>
               </CardHeader>
-              <CardContent>
+              <CardContent className="space-y-6">
                 {category === "sofa" && (
                   <SofaConfigurator
                     product={product}
@@ -279,7 +279,7 @@ const Configure = () => {
           {/* Pricing Summary Sidebar */}
           <div className="lg:col-span-1">
             <div className="sticky top-24">
-              <div className="luxury-card border-muted/50">
+              <div className="luxury-card-glass border-muted/50">
                 <PricingSummary
                   pricing={pricing}
                   isCalculating={isCalculating}

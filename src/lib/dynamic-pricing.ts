@@ -742,13 +742,13 @@ async function calculateSofaPricing(
     const legCode = configuration.legsCode || configuration.legType;
     const { data: leg } = await supabase
       .from("legs_prices")
-      .select("price_rs")
-      .eq("code", legCode)
+      .select("price_per_unit")
+      .eq("description", legCode)
       .eq("is_active", true)
       .single();
 
-    if (leg) {
-      breakdown.accessoriesPrice = leg.price_rs || 0;
+    if (leg && leg.price_per_unit) {
+      breakdown.accessoriesPrice = leg.price_per_unit || 0;
       totalPrice += breakdown.accessoriesPrice;
     }
   }
@@ -843,13 +843,13 @@ async function calculateBedPricing(
     const legCode = configuration.legsCode || configuration.legType;
     const { data: leg } = await supabase
       .from("legs_prices")
-      .select("price_rs")
-      .eq("code", legCode)
+      .select("price_per_unit")
+      .eq("description", legCode)
       .eq("is_active", true)
       .single();
 
-    if (leg) {
-      breakdown.accessoriesPrice = leg.price_rs || 0;
+    if (leg && leg.price_per_unit) {
+      breakdown.accessoriesPrice = leg.price_per_unit || 0;
       totalPrice += breakdown.accessoriesPrice;
     }
   }
@@ -1391,13 +1391,13 @@ async function calculateChairPricing(
     const legCode = configuration.legsCode || configuration.legType;
     const { data: leg } = await supabase
       .from("legs_prices")
-      .select("price_rs")
-      .eq("code", legCode)
+      .select("price_per_unit")
+      .eq("description", legCode)
       .eq("is_active", true)
       .single();
 
-    if (leg) {
-      breakdown.accessoriesPrice = leg.price_rs * quantity;
+    if (leg && leg.price_per_unit) {
+      breakdown.accessoriesPrice = leg.price_per_unit * quantity;
       totalPrice += breakdown.accessoriesPrice;
     }
   }
@@ -1486,13 +1486,13 @@ async function calculateBenchPricing(
     const legCode = configuration.legsCode || configuration.legType;
     const { data: leg } = await supabase
       .from("legs_prices")
-      .select("price_rs")
-      .eq("code", legCode)
+      .select("price_per_unit")
+      .eq("description", legCode)
       .eq("is_active", true)
       .single();
 
-    if (leg) {
-      breakdown.accessoriesPrice = leg.price_rs;
+    if (leg && leg.price_per_unit) {
+      breakdown.accessoriesPrice = leg.price_per_unit;
       totalPrice += breakdown.accessoriesPrice;
     }
   }

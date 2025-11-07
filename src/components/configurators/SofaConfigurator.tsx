@@ -525,7 +525,7 @@ const SofaConfigurator = ({
   return (
     <div className="space-y-6">
       {/* Configuration Section */}
-      <Card className="border-2">
+      <Card className="luxury-card-glass border-2">
         <CardHeader>
           <CardTitle className="text-2xl font-serif">Configuration</CardTitle>
           <CardDescription>Customize your perfect sofa piece</CardDescription>
@@ -1908,7 +1908,7 @@ const SofaConfigurator = ({
       </Card>
 
       {/* Customer Information */}
-      <Card className="border-2">
+      <Card className="luxury-card-glass border-2">
         <CardHeader>
           <CardTitle className="text-2xl font-serif">Your Information</CardTitle>
         </CardHeader>
@@ -1988,7 +1988,7 @@ const SofaConfigurator = ({
               </Card>
 
       {/* Configuration Preview */}
-      <Card className="border-2">
+      <Card className="luxury-card-glass border-2">
         <CardHeader>
           <CardTitle className="text-2xl font-serif">Configuration Preview & Export</CardTitle>
         </CardHeader>

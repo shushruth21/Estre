@@ -8,49 +8,49 @@ All colors MUST be HSL.
 
 @layer base {
   :root {
-    /* Brand Colors - Professional furniture company */
-    --background: 0 0% 100%;
-    --foreground: 220 15% 15%;
+    /* Emerald Essence Color Palette - Luxury Furniture Brand */
+    --background: 90 40% 98%;
+    --foreground: 150 60% 8%;
     
     --card: 0 0% 100%;
-    --card-foreground: 220 15% 15%;
+    --card-foreground: 150 60% 8%;
     
     --popover: 0 0% 100%;
-    --popover-foreground: 220 15% 15%;
+    --popover-foreground: 150 60% 8%;
     
-    /* Primary - Deep Navy for trust and professionalism */
-    --primary: 220 40% 25%;
-    --primary-foreground: 0 0% 100%;
+    /* Primary - Deep Emerald Green (#0D2B1D) */
+    --primary: 150 60% 8%;
+    --primary-foreground: 90 40% 95%;
     
-    /* Secondary - Warm Wood Tone */
-    --secondary: 25 30% 45%;
-    --secondary-foreground: 0 0% 100%;
+    /* Secondary - Medium Green (#345635) */
+    --secondary: 140 25% 25%;
+    --secondary-foreground: 90 40% 95%;
     
-    /* Accent - Rich Gold for premium feel */
-    --accent: 40 85% 50%;
-    --accent-foreground: 220 40% 15%;
+    /* Accent - Light Green (#E3EFD3) */
+    --accent: 90 40% 90%;
+    --accent-foreground: 150 60% 8%;
     
-    --muted: 220 15% 96%;
-    --muted-foreground: 220 10% 45%;
+    --muted: 90 30% 96%;
+    --muted-foreground: 140 15% 40%;
     
     --destructive: 0 85% 50%;
     --destructive-foreground: 0 0% 100%;
     
-    --border: 220 15% 90%;
-    --input: 220 15% 90%;
-    --ring: 220 40% 25%;
+    --border: 90 20% 88%;
+    --input: 90 20% 88%;
+    --ring: 150 60% 8%;
     
     --radius: 0.75rem;
     
-    /* Sidebar */
-    --sidebar-background: 220 40% 25%;
-    --sidebar-foreground: 0 0% 95%;
-    --sidebar-primary: 40 85% 50%;
-    --sidebar-primary-foreground: 220 40% 15%;
-    --sidebar-accent: 220 35% 30%;
-    --sidebar-accent-foreground: 0 0% 95%;
-    --sidebar-border: 220 35% 20%;
-    --sidebar-ring: 40 85% 50%;
+    /* Sidebar - Deep Emerald */
+    --sidebar-background: 150 60% 8%;
+    --sidebar-foreground: 90 40% 95%;
+    --sidebar-primary: 90 40% 90%;
+    --sidebar-primary-foreground: 150 60% 8%;
+    --sidebar-accent: 140 25% 25%;
+    --sidebar-accent-foreground: 90 40% 95%;
+    --sidebar-border: 140 30% 20%;
+    --sidebar-ring: 90 40% 90%;
     
     /* Custom Semantic Tokens */
     --success: 140 70% 45%;
@@ -60,60 +60,63 @@ All colors MUST be HSL.
     --info: 200 85% 50%;
     --info-foreground: 0 0% 100%;
     
-    /* Gradients */
-    --gradient-primary: linear-gradient(135deg, hsl(220 40% 25%) 0%, hsl(220 35% 35%) 100%);
-    --gradient-accent: linear-gradient(135deg, hsl(40 85% 50%) 0%, hsl(35 90% 55%) 100%);
-    --gradient-hero: linear-gradient(135deg, hsl(220 40% 25%) 0%, hsl(220 35% 30%) 50%, hsl(25 30% 45%) 100%);
+    /* Gradients - Emerald Essence */
+    --gradient-primary: linear-gradient(135deg, hsl(150 60% 8%) 0%, hsl(140 25% 25%) 100%);
+    --gradient-accent: linear-gradient(135deg, hsl(90 40% 90%) 0%, hsl(140 25% 25%) 100%);
+    --gradient-hero: linear-gradient(135deg, hsl(150 60% 8%) 0%, hsl(140 25% 25%) 50%, hsl(90 40% 90%) 100%);
     
-    /* Shadows */
-    --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
-    --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1);
-    --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1);
-    --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.1);
-    --shadow-premium: 0 25px 50px -12px rgb(0 0 0 / 0.25);
+    /* Shadows - Premium Luxury */
+    --shadow-sm: 0 1px 2px 0 rgb(13 43 29 / 0.05);
+    --shadow-md: 0 4px 6px -1px rgb(13 43 29 / 0.1);
+    --shadow-lg: 0 10px 15px -3px rgb(13 43 29 / 0.1);
+    --shadow-xl: 0 20px 25px -5px rgb(13 43 29 / 0.15);
+    --shadow-premium: 0 25px 50px -12px rgb(13 43 29 / 0.25);
+    --shadow-glass: 0 8px 32px 0 rgb(13 43 29 / 0.15);
     
     /* Transitions */
     --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     --transition-fast: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+    --transition-premium: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
   }
 
   .dark {
-    --background: 220 25% 10%;
-    --foreground: 0 0% 95%;
+    /* Dark Mode - Emerald Essence */
+    --background: 150 60% 5%;
+    --foreground: 90 40% 95%;
     
-    --card: 220 25% 12%;
-    --card-foreground: 0 0% 95%;
+    --card: 150 50% 10%;
+    --card-foreground: 90 40% 95%;
     
-    --popover: 220 25% 12%;
-    --popover-foreground: 0 0% 95%;
+    --popover: 150 50% 10%;
+    --popover-foreground: 90 40% 95%;
     
-    --primary: 40 85% 50%;
-    --primary-foreground: 220 40% 15%;
+    --primary: 90 40% 90%;
+    --primary-foreground: 150 60% 8%;
     
-    --secondary: 220 20% 20%;
-    --secondary-foreground: 0 0% 95%;
+    --secondary: 140 25% 30%;
+    --secondary-foreground: 90 40% 95%;
     
-    --muted: 220 20% 18%;
-    --muted-foreground: 220 10% 60%;
+    --muted: 150 30% 15%;
+    --muted-foreground: 90 20% 70%;
     
-    --accent: 220 20% 20%;
-    --accent-foreground: 40 85% 50%;
+    --accent: 140 25% 30%;
+    --accent-foreground: 90 40% 90%;
     
     --destructive: 0 70% 50%;
     --destructive-foreground: 0 0% 100%;
     
-    --border: 220 20% 20%;
-    --input: 220 20% 20%;
-    --ring: 40 85% 50%;
+    --border: 150 30% 18%;
+    --input: 150 30% 18%;
+    --ring: 90 40% 90%;
     
-    --sidebar-background: 220 25% 10%;
-    --sidebar-foreground: 0 0% 95%;
-    --sidebar-primary: 40 85% 50%;
-    --sidebar-primary-foreground: 220 40% 15%;
-    --sidebar-accent: 220 20% 18%;
-    --sidebar-accent-foreground: 0 0% 95%;
-    --sidebar-border: 220 20% 15%;
-    --sidebar-ring: 40 85% 50%;
+    --sidebar-background: 150 60% 5%;
+    --sidebar-foreground: 90 40% 95%;
+    --sidebar-primary: 90 40% 90%;
+    --sidebar-primary-foreground: 150 60% 8%;
+    --sidebar-accent: 140 25% 25%;
+    --sidebar-accent-foreground: 90 40% 95%;
+    --sidebar-border: 150 40% 12%;
+    --sidebar-ring: 90 40% 90%;
   }
 }
 
@@ -162,6 +165,10 @@ All colors MUST be HSL.
     box-shadow: var(--shadow-premium);
   }
   
+  .shadow-glass {
+    box-shadow: var(--shadow-glass);
+  }
+  
   .transition-smooth {
     transition: var(--transition-smooth);
   }
@@ -170,12 +177,61 @@ All colors MUST be HSL.
     transition: var(--transition-fast);
   }
   
+  .transition-premium {
+    transition: var(--transition-premium);
+  }
+  
+  /* Glassmorphism Effects */
+  .glass-card {
+    @apply rounded-xl border border-white/20;
+    background: rgba(255, 255, 255, 0.7);
+    backdrop-filter: blur(12px) saturate(180%);
+    -webkit-backdrop-filter: blur(12px) saturate(180%);
+    box-shadow: var(--shadow-glass);
+  }
+  
+  .dark .glass-card {
+    background: rgba(13, 43, 29, 0.6);
+    border-color: rgba(255, 255, 255, 0.1);
+  }
+  
+  .glass-panel {
+    @apply rounded-lg border border-white/30;
+    background: rgba(255, 255, 255, 0.8);
+    backdrop-filter: blur(16px) saturate(180%);
+    -webkit-backdrop-filter: blur(16px) saturate(180%);
+    box-shadow: var(--shadow-glass);
+  }
+  
+  .dark .glass-panel {
+    background: rgba(13, 43, 29, 0.7);
+    border-color: rgba(255, 255, 255, 0.15);
+  }
+  
+  .glass-modal {
+    @apply rounded-2xl border border-white/20;
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    box-shadow: var(--shadow-premium);
+  }
+  
+  .dark .glass-modal {
+    background: rgba(13, 43, 29, 0.85);
+    border-color: rgba(255, 255, 255, 0.1);
+  }
+  
+  /* Luxury Card Styles */
   .luxury-card {
-    @apply rounded-xl border bg-card shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1;
+    @apply rounded-xl border bg-card shadow-lg hover:shadow-xl transition-premium hover:-translate-y-1;
+  }
+  
+  .luxury-card-glass {
+    @apply luxury-card glass-card;
   }
   
   .luxury-button {
-    @apply rounded-lg font-medium transition-all duration-300 hover:scale-105 active:scale-95;
+    @apply rounded-lg font-medium transition-premium hover:scale-105 active:scale-95 shadow-md hover:shadow-lg;
   }
   
   .image-zoom {
@@ -189,5 +245,14 @@ All colors MUST be HSL.
   .bg-grid-pattern {
     background-image: radial-gradient(circle, hsl(var(--muted-foreground) / 0.1) 1px, transparent 1px);
     background-size: 32px 32px;
+  }
+  
+  /* Premium Spacing */
+  .section-spacing {
+    @apply py-16 md:py-24 lg:py-32;
+  }
+  
+  .container-spacing {
+    @apply px-4 sm:px-6 lg:px-8;
   }
 }

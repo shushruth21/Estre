@@ -48,15 +48,54 @@ export function useAuth() {
         .eq("user_id", userId);
 
       if (error) {
-        console.error("Error fetching user roles:", error);
+        console.error("❌ Error fetching user roles:", error);
+        console.error("Error details:", {
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
+          code: error.code
+        });
+        
+        // Try fallback using security definer function
+        try {
+          const { data: adminCheck } = await supabase
+            .rpc('is_admin_or_manager', { _user_id: userId });
+          
+          if (adminCheck) {
+            console.log("✅ Admin role confirmed via security definer function");
+            setUserRoles(['admin']);
+            setLoading(false);
+            return;
+          }
+          
+          const { data: staffCheck } = await supabase
+            .rpc('has_role', { 
+              _user_id: userId,
+              _role: 'factory_staff'
+            });
+          
+          if (staffCheck) {
+            console.log("✅ Staff role confirmed via security definer function");
+            setUserRoles(['factory_staff']);
+            setLoading(false);
+            return;
+          }
+        } catch (functionError) {
+          console.error("❌ Security definer function also failed:", functionError);
+        }
+        
         return;
       }
 
       if (data) {
-        setUserRoles(data.map((r: any) => r.role));
+        const roles = data.map((r: any) => r.role);
+        setUserRoles(roles);
+        console.log("✅ User roles loaded:", roles);
+      } else {
+        console.warn("⚠️ No roles data returned for user:", userId);
       }
     } catch (error) {
-      console.error("Error in fetchUserRoles:", error);
+      console.error("❌ Error in fetchUserRoles:", error);
     } finally {
       setLoading(false);
     }

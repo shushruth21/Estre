@@ -5,15 +5,17 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
-import { ArrowLeft, Loader2, Eye, EyeOff } from "lucide-react";
+import { ArrowLeft, Loader2, Eye, EyeOff, Shield } from "lucide-react";
 
 const Login = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [adminMode, setAdminMode] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
   const { user, loading: authLoading, isAdmin } = useAuth();
@@ -26,10 +28,13 @@ const Login = () => {
         .from("user_roles")
         .select("role")
         .eq("user_id", user.id)
-        .then(({ data: roles }) => {
+        .then(({ data: roles, error }) => {
+          if (error) {
+            console.error("❌ Error fetching roles in useEffect:", error);
+          }
           if (roles && roles.length > 0) {
             const userRole = roles[0].role;
-            if (isAdmin()) {
+            if (isAdmin() || userRole === 'admin' || userRole === 'store_manager' || userRole === 'production_manager') {
               navigate("/admin/dashboard", { replace: true });
             } else if (userRole === 'factory_staff') {
               navigate("/staff/job-cards", { replace: true });
@@ -90,41 +95,115 @@ const Login = () => {
         description: "Logged in successfully",
       });
 
-      // Wait a bit longer to ensure session and auth state are fully updated
-      await new Promise(resolve => setTimeout(resolve, 300));
+      // Wait for session to be fully established
+      await new Promise(resolve => setTimeout(resolve, 500));
+
+      // Re-fetch roles to ensure they're loaded
+      let rolesData = null;
+      let rolesFetchError = null;
+
+      // Try direct query first
+      const directQuery = await supabase
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", data.user.id);
+
+      rolesData = directQuery.data;
+      rolesFetchError = directQuery.error;
+
+      // Log for debugging
+      console.log("🔍 User ID:", data.user.id);
+      console.log("🔍 Roles fetched:", rolesData);
+      console.log("🔍 Roles fetch error:", rolesFetchError);
+
+      // If direct query fails or returns empty, try alternative methods
+      if (rolesFetchError || !rolesData || rolesData.length === 0) {
+        console.log("⚠️ Direct query failed or empty, trying alternative methods...");
+        
+        // Method 1: Try using the security definer function
+        try {
+          const { data: adminCheck, error: adminError } = await supabase
+            .rpc('is_admin_or_manager', { _user_id: data.user.id });
+          
+          if (!adminError && adminCheck) {
+            console.log("✅ Admin role confirmed via security definer function");
+            rolesData = [{ role: 'admin' }];
+            rolesFetchError = null;
+          } else {
+            // Method 2: Try checking for staff role
+            const { data: staffCheck, error: staffError } = await supabase
+              .rpc('has_role', { 
+                _user_id: data.user.id,
+                _role: 'factory_staff'
+              });
+            
+            if (!staffError && staffCheck) {
+              console.log("✅ Staff role confirmed via security definer function");
+              rolesData = [{ role: 'factory_staff' }];
+              rolesFetchError = null;
+            }
+          }
+        } catch (functionError) {
+          console.error("❌ Security definer function error:", functionError);
+        }
+
+        // If still no roles, show detailed error
+        if (rolesFetchError) {
+          console.error("❌ RLS Policy Error Details:", {
+            message: rolesFetchError.message,
+            details: rolesFetchError.details,
+            hint: rolesFetchError.hint,
+            code: rolesFetchError.code
+          });
+          
+          toast({
+            title: "Role Query Error",
+            description: `Error: ${rolesFetchError.message}. Please check RLS policies or contact administrator.`,
+            variant: "destructive",
+          });
+        }
+      }
 
       // Determine redirect path based on roles
       let redirectPath = "/"; // Default to home
       
-      if (roles && roles.length > 0) {
-        const userRole = roles[0].role;
+      if (rolesData && rolesData.length > 0) {
+        const userRole = rolesData[0].role;
         
-        if (import.meta.env.DEV) {
-          console.log("🎯 Redirecting based on role:", userRole);
-        }
+        console.log("🎯 User role found:", userRole);
+        console.log("🎯 All roles:", rolesData.map(r => r.role));
         
         if (userRole === 'admin' || userRole === 'store_manager' || userRole === 'production_manager') {
           redirectPath = "/admin/dashboard";
+          console.log("✅ Admin role detected, redirecting to:", redirectPath);
         } else if (userRole === 'factory_staff') {
           redirectPath = "/staff/job-cards";
+          console.log("✅ Staff role detected, redirecting to:", redirectPath);
+        } else {
+          console.log("ℹ️ Customer role, staying on homepage");
         }
+      } else if (!rolesFetchError) {
+        // Only show "no role" message if there's no error (error already shown above)
+        console.warn("⚠️ No roles found for user:", data.user.email);
+        toast({
+          title: "No Role Assigned",
+          description: "Your account doesn't have a role assigned. Please contact an administrator.",
+          variant: "destructive",
+        });
       }
 
       // Force navigation with replace to prevent back button issues
-      if (import.meta.env.DEV) {
-        console.log("🚀 Navigating to:", redirectPath);
+      console.log("🚀 Final redirect path:", redirectPath);
+      
+      // If admin mode is enabled, bypass role checks and go directly to admin
+      if (adminMode) {
+        console.log("🔓 Admin Mode: Bypassing role checks, redirecting to admin dashboard");
+        window.location.href = "/admin/dashboard";
+        return;
       }
       
-      // Use navigate first (React Router)
-      navigate(redirectPath, { replace: true });
-      
-      // Also use window.location as immediate fallback for admin pages
-      // This ensures the redirect happens even if React Router is slow
-      if (redirectPath.startsWith("/admin") || redirectPath.startsWith("/staff")) {
-        setTimeout(() => {
-          window.location.href = redirectPath;
-        }, 200);
-      }
+      // Always redirect immediately (use window.location for reliability)
+      window.location.href = redirectPath;
     } catch (error: any) {
       console.error("Login error:", error);
       
@@ -219,6 +298,20 @@ const Login = () => {
                       )}
                     </Button>
                   </div>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="admin-mode"
+                    checked={adminMode}
+                    onCheckedChange={(checked) => setAdminMode(checked as boolean)}
+                  />
+                  <Label
+                    htmlFor="admin-mode"
+                    className="text-sm font-normal cursor-pointer flex items-center gap-2"
+                  >
+                    <Shield className="h-4 w-4" />
+                    Admin Mode (Bypass Role Check)
+                  </Label>
                 </div>
                 <Button type="submit" className="w-full" disabled={isLoading || authLoading}>
                   {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}

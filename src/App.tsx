@@ -1,6 +1,7 @@
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { ThemeProvider } from "next-themes";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import ErrorBoundary from "@/components/ErrorBoundary";
@@ -18,6 +19,7 @@ import AdminProducts from "./pages/admin/AdminProducts";
 import AdminDropdowns from "./pages/admin/AdminDropdowns";
 import AdminJobCards from "./pages/admin/AdminJobCards";
 import AdminOrders from "./pages/admin/AdminOrders";
+import AdminUsers from "./pages/admin/AdminUsers";
 import StaffDashboard from "./pages/staff/StaffDashboard";
 import StaffJobCards from "./pages/staff/StaffJobCards";
 import StaffJobCardDetail from "./pages/staff/StaffJobCardDetail";
@@ -40,13 +42,14 @@ const queryClient = new QueryClient({
 
 const App = () => (
   <ErrorBoundary>
-  <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <Toaster />
-      <Sonner />
-      <BrowserRouter>
-          <ErrorBoundary>
-        <Routes>
+  <ThemeProvider attribute="class" defaultTheme="light" enableSystem>
+    <QueryClientProvider client={queryClient}>
+      <TooltipProvider>
+        <Toaster />
+        <Sonner />
+        <BrowserRouter>
+            <ErrorBoundary>
+          <Routes>
           <Route path="/" element={<Index />} />
           <Route path="/products" element={<Products />} />
           <Route path="/configure/:category/:productId" element={<Configure />} />
@@ -63,6 +66,7 @@ const App = () => (
           <Route path="/admin/dropdowns" element={<AdminDropdowns />} />
           <Route path="/admin/job-cards" element={<AdminJobCards />} />
           <Route path="/admin/orders" element={<AdminOrders />} />
+          <Route path="/admin/users" element={<AdminUsers />} />
           
           {/* Staff Routes */}
           <Route path="/staff/dashboard" element={<StaffDashboard />} />
@@ -76,6 +80,7 @@ const App = () => (
       </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>
+  </ThemeProvider>
   </ErrorBoundary>
 );
 
