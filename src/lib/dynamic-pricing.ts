@@ -477,56 +477,72 @@ async function calculateSofaPricing(
   const l2Seats = parseSeatCount(configuration.l2SeatCount || configuration.l2 || 0);
   const r2Seats = parseSeatCount(configuration.r2SeatCount || configuration.r2 || 0);
 
-  // Calculate total seats
-  let totalSeats = frontSeats;
-  let cornerSeats = 0;
-  let backrestSeats = 0;
+  // Get formula values
+  const firstSeatPercent = getFormulaValue(formulas, "first_seat_percent", 100);
+  const additionalSeatPercent = getFormulaValue(formulas, "additional_seat_percent", 70);
+  const cornerPercent = getFormulaValue(formulas, "corner_seat_percent", 100); // For L1/R1 corner pieces
+  const backrestPercent = getFormulaValue(formulas, "backrest_seat_percent", 20); // For L1/R1 backrest pieces
 
+  let totalPrice = 0;
+
+  // ===== F SECTION (Front) - Always contains the first seat =====
+  if (frontSeats > 0) {
+    // First seat: 100%
+    breakdown.baseSeatPrice = (basePrice * firstSeatPercent) / 100;
+    totalPrice += breakdown.baseSeatPrice;
+
+    // Additional seats in F: 70% each
+    if (frontSeats > 1) {
+      const additionalSeatPrice = (basePrice * additionalSeatPercent) / 100;
+      breakdown.additionalSeatsPrice = additionalSeatPrice * (frontSeats - 1);
+      totalPrice += breakdown.additionalSeatsPrice;
+    }
+  }
+
+  // ===== L1 SECTION (Corner/Backrest) - Structural piece, NOT seats =====
   if (shape === "l-shape" || shape === "u-shape" || shape === "combo") {
     if (l1Option === "Corner" || l1Option?.toLowerCase().includes("corner")) {
-      cornerSeats += l2Seats; // Count all seats in corner section
+      // Corner piece: 100% of base price (structural, not a seat)
+      const cornerPrice = (basePrice * cornerPercent) / 100;
+      breakdown.cornerSeatsPrice += cornerPrice;
+      totalPrice += cornerPrice;
     } else if (l1Option === "Backrest" || l1Option?.toLowerCase().includes("backrest")) {
-      backrestSeats += l2Seats; // Count all seats in backrest section
+      // Backrest piece: 20% of base price (structural, not a seat)
+      const backrestPrice = (basePrice * backrestPercent) / 100;
+      breakdown.backrestSeatsPrice += backrestPrice;
+      totalPrice += backrestPrice;
     }
-    totalSeats += l2Seats;
   }
 
-  if (shape === "u-shape" || shape === "combo") {
-    if (r1Option === "Corner" || r1Option?.toLowerCase().includes("corner")) {
-      cornerSeats += r2Seats; // Count all seats in corner section
-    } else if (r1Option === "Backrest" || r1Option?.toLowerCase().includes("backrest")) {
-      backrestSeats += r2Seats; // Count all seats in backrest section
-    }
-    totalSeats += r2Seats;
-  }
-
-  // Base seat price (first seat)
-  const firstSeatPercent = getFormulaValue(formulas, "first_seat_percent", 100);
-  breakdown.baseSeatPrice = (basePrice * firstSeatPercent) / 100;
-  let totalPrice = breakdown.baseSeatPrice;
-
-  // Additional front seats (beyond first)
-  if (frontSeats > 1) {
-    const additionalSeatPercent = getFormulaValue(formulas, "additional_seat_percent", 70);
+  // ===== L2 SECTION - All seats are additional (70% each) =====
+  // L2 seats come AFTER the first seat (which is in F), so they are all additional
+  if (l2Seats > 0 && (shape === "l-shape" || shape === "u-shape" || shape === "combo")) {
     const additionalSeatPrice = (basePrice * additionalSeatPercent) / 100;
-    breakdown.additionalSeatsPrice = additionalSeatPrice * (frontSeats - 1);
+    breakdown.additionalSeatsPrice += additionalSeatPrice * l2Seats;
     totalPrice += breakdown.additionalSeatsPrice;
   }
 
-  // Corner seats
-  if (cornerSeats > 0) {
-    const cornerSeatPercent = getFormulaValue(formulas, "corner_seat_percent", 100);
-    const cornerSeatPrice = (basePrice * cornerSeatPercent) / 100;
-    breakdown.cornerSeatsPrice = cornerSeatPrice * cornerSeats;
-    totalPrice += breakdown.cornerSeatsPrice;
+  // ===== R1 SECTION (Corner/Backrest) - Structural piece, NOT seats =====
+  if (shape === "u-shape" || shape === "combo") {
+    if (r1Option === "Corner" || r1Option?.toLowerCase().includes("corner")) {
+      // Corner piece: 100% of base price (structural, not a seat)
+      const cornerPrice = (basePrice * cornerPercent) / 100;
+      breakdown.cornerSeatsPrice += cornerPrice;
+      totalPrice += cornerPrice;
+    } else if (r1Option === "Backrest" || r1Option?.toLowerCase().includes("backrest")) {
+      // Backrest piece: 20% of base price (structural, not a seat)
+      const backrestPrice = (basePrice * backrestPercent) / 100;
+      breakdown.backrestSeatsPrice += backrestPrice;
+      totalPrice += backrestPrice;
+    }
   }
 
-  // Backrest seats (already counted in backrestSeats variable)
-  if (backrestSeats > 0) {
-    const backrestSeatPercent = getFormulaValue(formulas, "backrest_seat_percent", 20);
-    const backrestSeatPrice = (basePrice * backrestSeatPercent) / 100;
-    breakdown.backrestSeatsPrice = backrestSeatPrice * backrestSeats; // Use the correctly counted backrestSeats
-    totalPrice += breakdown.backrestSeatsPrice;
+  // ===== R2 SECTION - All seats are additional (70% each) =====
+  // R2 seats come AFTER the first seat (which is in F), so they are all additional
+  if (r2Seats > 0 && (shape === "u-shape" || shape === "combo")) {
+    const additionalSeatPrice = (basePrice * additionalSeatPercent) / 100;
+    breakdown.additionalSeatsPrice += additionalSeatPrice * r2Seats;
+    totalPrice += breakdown.additionalSeatsPrice;
   }
 
   // Lounger pricing - Formula: 100% base + 10% per additional 6"
