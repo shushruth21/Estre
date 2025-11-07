@@ -41,6 +41,7 @@ const SofaConfigurator = ({
   const foamTypesResult = useDropdownOptions("sofa", "foam_type");
   const seatDepthsResult = useDropdownOptions("sofa", "seat_depth");
   const seatWidthsResult = useDropdownOptions("sofa", "seat_width");
+  const seatHeightsResult = useDropdownOptions("sofa", "seat_height");
   const legTypesResult = useDropdownOptions("sofa", "leg_type");
   const woodTypesResult = useDropdownOptions("sofa", "wood_type");
   const stitchTypesResult = useDropdownOptions("sofa", "stitch_type");
@@ -73,6 +74,7 @@ const SofaConfigurator = ({
   const foamTypes = Array.isArray(foamTypesResult.data) ? foamTypesResult.data : [];
   const seatDepths = Array.isArray(seatDepthsResult.data) ? seatDepthsResult.data : [];
   const seatWidths = Array.isArray(seatWidthsResult.data) ? seatWidthsResult.data : [];
+  const seatHeights = Array.isArray(seatHeightsResult.data) ? seatHeightsResult.data : [];
   const legTypes = Array.isArray(legTypesResult.data) ? legTypesResult.data : [];
   const woodTypes = Array.isArray(woodTypesResult.data) ? woodTypesResult.data : [];
   const stitchTypes = Array.isArray(stitchTypesResult.data) ? stitchTypesResult.data : [];
@@ -121,7 +123,7 @@ const SofaConfigurator = ({
   const isCombo = normalizedShape === 'combo';
 
   const isLoadingDropdowns = shapesResult.isLoading || frontSeatCountsResult.isLoading || foamTypesResult.isLoading || 
-                              seatDepthsResult.isLoading || seatWidthsResult.isLoading || legTypesResult.isLoading || 
+                              seatDepthsResult.isLoading || seatWidthsResult.isLoading || seatHeightsResult.isLoading || legTypesResult.isLoading || 
                               woodTypesResult.isLoading || stitchTypesResult.isLoading || loungerSizesResult.isLoading || 
                               consoleSizesResult.isLoading;
 
@@ -444,6 +446,9 @@ const SofaConfigurator = ({
           seatWidth: (seatWidths && seatWidths.length > 0)
             ? (seatWidths.find((w: any) => w.metadata?.default || w.option_value?.includes("22"))?.option_value?.replace(/["\s]/g, '')?.replace('in', '') || seatWidths[0].option_value?.replace(/["\s]/g, '')?.replace('in', ''))
             : "22",
+          seatHeight: (seatHeights && seatHeights.length > 0)
+            ? (seatHeights.find((h: any) => h.metadata?.default || h.option_value?.includes("18"))?.option_value?.replace(/["\s]/g, '')?.replace('in', '') || seatHeights[0].option_value?.replace(/["\s]/g, '')?.replace('in', ''))
+            : "18",
         },
         legs: {
           type: (legTypes && legTypes.length > 0) ? legTypes[0].option_value : "",
@@ -466,7 +471,7 @@ const SofaConfigurator = ({
       };
       onConfigurationChange(defaultConfig);
     }
-  }, [product?.id, product?.comes_with_headrest, shapes, frontSeatCounts, foamTypes, seatDepths, seatWidths, woodTypes, stitchTypes]);
+  }, [product?.id, product?.comes_with_headrest, shapes, frontSeatCounts, foamTypes, seatDepths, seatWidths, seatHeights, woodTypes, stitchTypes]);
 
   const updateConfiguration = (updates: any) => {
     const newConfig = { ...configuration, ...updates };
@@ -953,22 +958,39 @@ const SofaConfigurator = ({
                   );
                   
                   return validPlacements.map((currentPlacement: any, index: number) => {
-                    // Get available placement options (only valid positions)
-                    const availablePlacements = allPlacements.length > 0 
-                      ? allPlacements 
-                      : [{ section: "front", position: "after_1", label: "After 1st Seat from Left (Front)", value: "front_1" }];
-                    
-                    // Find current placement in available options - use stable calculation
+                    // Get current placement value
                     const currentPlacementValue = currentPlacement.position && currentPlacement.section
                       ? `${currentPlacement.section}_${currentPlacement.afterSeat || 1}`
                       : null;
                     
+                    // Filter out placements that are already selected by OTHER console slots
+                    // This ensures each console slot can only select unique placements
+                    const otherSelectedPlacements = validPlacements
+                      .filter((p: any, i: number) => i !== index) // Exclude current slot
+                      .map((p: any) => {
+                        if (p.position && p.section) {
+                          return `${p.section}_${p.afterSeat || 1}`;
+                        }
+                        return null;
+                      })
+                      .filter(Boolean);
+                    
+                    // Get available placement options - exclude already selected ones (except current)
+                    const availablePlacements = allPlacements.length > 0 
+                      ? allPlacements.filter((placement) => {
+                          // Always include the current placement (so user can see what's selected)
+                          if (placement.value === currentPlacementValue) return true;
+                          // Exclude placements already selected by other console slots
+                          return !otherSelectedPlacements.includes(placement.value);
+                        })
+                      : [{ section: "front", position: "after_1", label: "After 1st Seat from Left (Front)", value: "front_1" }];
+                    
+                    // Find current placement in available options
                     const selectedPlacement = currentPlacementValue 
                       ? availablePlacements.find(p => p.value === currentPlacementValue)
                       : null;
                     
                     // Determine the current value - if placement exists, use it; otherwise show "none"
-                    // Since this console is in validPlacements, it should have a valid placement
                     const selectValue = selectedPlacement?.value || "none";
                     
                     return (
@@ -1007,17 +1029,30 @@ const SofaConfigurator = ({
                                 const placement = availablePlacements.find(p => p.value === value);
                                 if (placement) {
                                   const afterSeat = parseInt(placement.position.split('_')[1] || "1", 10);
-                                  // Find and update the existing placement
-                                  const placementIndex = placements.findIndex(
-                                    (p: any) => p && p.position === currentPlacement.position && p.section === currentPlacement.section
-                                  );
-                                  if (placementIndex >= 0) {
-                                    placements[placementIndex] = {
+                                  
+                                  // Find the current console slot by index (more reliable than matching position)
+                                  // Since we're mapping over validPlacements, the index corresponds to the slot
+                                  if (placements[index] !== undefined) {
+                                    // Update the placement for this specific slot
+                                    placements[index] = {
                                       section: placement.section,
                                       position: placement.position,
                                       afterSeat: afterSeat,
-                                      accessoryId: placements[placementIndex]?.accessoryId || null
+                                      accessoryId: placements[index]?.accessoryId || null
                                     };
+                                  } else {
+                                    // Fallback: find by matching current position/section
+                                    const placementIndex = placements.findIndex(
+                                      (p: any) => p && p.position === currentPlacement.position && p.section === currentPlacement.section
+                                    );
+                                    if (placementIndex >= 0) {
+                                      placements[placementIndex] = {
+                                        section: placement.section,
+                                        position: placement.position,
+                                        afterSeat: afterSeat,
+                                        accessoryId: placements[placementIndex]?.accessoryId || null
+                                      };
+                                    }
                                   }
                                 }
                                 updateConfiguration({
@@ -1043,11 +1078,6 @@ const SofaConfigurator = ({
                               )}
                             </SelectContent>
                           </Select>
-                          {selectedPlacement && (
-                            <p className="text-xs text-muted-foreground">
-                              {selectedPlacement.label}
-                            </p>
-                          )}
                         </div>
                         <div className="space-y-2">
                           <Label className="text-xs text-muted-foreground">Accessory</Label>
@@ -1837,6 +1867,55 @@ const SofaConfigurator = ({
                         {getDimensionPercentage("width", configuration.dimensions.seatWidth) === 0
                           ? "Standard width - No extra cost"
                           : `Upgrade charge: ${getDimensionPercentage("width", configuration.dimensions.seatWidth)}%`}
+                      </AlertDescription>
+                    </Alert>
+                  )}
+          </div>
+
+                {/* Seat Height */}
+                <div className="space-y-3">
+                  <Label className="text-base font-semibold">Seat Height</Label>
+                  <Select
+                    value={configuration.dimensions?.seatHeight?.toString() || (seatHeights && seatHeights.length > 0 && seatHeights[0]?.option_value ? normalizeDimensionValue(seatHeights[0].option_value) : "")}
+                    onValueChange={(value) =>
+                      updateConfiguration({
+                        dimensions: {
+                          ...configuration.dimensions,
+                          seatHeight: value,
+                        },
+                      })
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select Seat Height" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {seatHeightsResult.isLoading ? (
+                        <SelectItem value="loading" disabled>Loading...</SelectItem>
+                      ) : seatHeights && seatHeights.length > 0 ? (
+                        seatHeights.map((height: any) => {
+                          const heightValue = normalizeDimensionValue(height.option_value);
+                          return (
+                            <SelectItem key={height.id} value={heightValue}>
+                              {height.display_label || height.option_value || `${heightValue} in`}
+                            </SelectItem>
+                          );
+                        })
+                      ) : (
+                        <>
+                          <SelectItem value="16">16 in</SelectItem>
+                          <SelectItem value="18">18 in</SelectItem>
+                          <SelectItem value="20">20 in</SelectItem>
+                        </>
+                      )}
+                    </SelectContent>
+                  </Select>
+                  {configuration.dimensions?.seatHeight && (
+                    <Alert>
+                      <AlertDescription>
+                        <strong>Selected: {configuration.dimensions.seatHeight} in height</strong>
+                        <br />
+                        Standard seat height option
                       </AlertDescription>
                     </Alert>
                   )}
