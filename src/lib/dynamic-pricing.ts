@@ -797,6 +797,12 @@ async function calculateBedPricing(
 
 /**
  * Calculate recliner-specific pricing
+ * Pricing Rules:
+ * - First Seat: 100% of base price
+ * - Additional Seat: 70% of base price
+ * - Corner Seat: 50% of base price
+ * - Dummy Seat: 55% of base price (replaces regular seat)
+ * - Backrest: 20% of base price
  */
 async function calculateReclinerPricing(
   configuration: any,
@@ -825,27 +831,128 @@ async function calculateReclinerPricing(
     total: 0,
   };
 
-  const seatCount = configuration.seats?.length || configuration.numberOfSeats || 1;
-  
-  // Base price for first seat
-  breakdown.baseSeatPrice = basePrice;
-  let totalPrice = basePrice;
+  // Helper: Get seat count from type string
+  const getSeatCount = (type: string): number => {
+    if (type === "Corner" || type === "Backrest") return 0;
+    const match = type.match(/(\d+)-Seater/);
+    return match ? parseInt(match[1], 10) : 0;
+  };
 
-  // Additional seats
-  if (seatCount > 1) {
-    const additionalSeatPercent = getFormulaValue(formulas, "additional_seat_percent", 70);
-    const additionalSeatPrice = (basePrice * additionalSeatPercent) / 100;
-    breakdown.additionalSeatsPrice = additionalSeatPrice * (seatCount - 1);
-    totalPrice += breakdown.additionalSeatsPrice;
+  // Helper: Calculate section price
+  const calculateSectionPrice = (
+    section: { type: string; qty: number } | null,
+    basePricePerSeat: number,
+    isFirstSeatCounted: boolean
+  ): { price: number; isFirstSeatCounted: boolean } => {
+    if (!section) return { price: 0, isFirstSeatCounted };
+
+    const seatCount = getSeatCount(section.type);
+    const qty = section.qty || 1;
+    let sectionPrice = 0;
+
+    if (section.type === "Corner") {
+      // Corner: 50% of base price
+      sectionPrice = (basePricePerSeat * 0.50) * qty;
+      breakdown.cornerSeatsPrice += sectionPrice;
+    } else if (section.type === "Backrest") {
+      // Backrest: 20% of base price
+      sectionPrice = (basePricePerSeat * 0.20) * qty;
+      breakdown.backrestSeatsPrice += sectionPrice;
+    } else if (seatCount > 0) {
+      // Regular seats
+      for (let module = 0; module < qty; module++) {
+        if (!isFirstSeatCounted) {
+          // First seat: 100%
+          sectionPrice += basePricePerSeat;
+          breakdown.baseSeatPrice += basePricePerSeat;
+          isFirstSeatCounted = true;
+          // Additional seats: 70%
+          if (seatCount > 1) {
+            const additionalPrice = (basePricePerSeat * 0.70) * (seatCount - 1);
+            sectionPrice += additionalPrice;
+            breakdown.additionalSeatsPrice += additionalPrice;
+          }
+        } else {
+          // All seats are additional: 70% each
+          const additionalPrice = (basePricePerSeat * 0.70) * seatCount;
+          sectionPrice += additionalPrice;
+          breakdown.additionalSeatsPrice += additionalPrice;
+        }
+      }
+    }
+
+    return { price: sectionPrice, isFirstSeatCounted };
+  };
+
+  let totalPrice = 0;
+  let isFirstSeatCounted = false;
+
+  // Calculate section prices
+  // F Section (Front)
+  if (configuration.sections?.F) {
+    const fResult = calculateSectionPrice(
+      configuration.sections.F,
+      basePrice,
+      isFirstSeatCounted
+    );
+    totalPrice += fResult.price;
+    isFirstSeatCounted = fResult.isFirstSeatCounted;
+  }
+
+  // L1 Section (Corner) - Only for L SHAPE
+  if (configuration.sections?.L1) {
+    const l1Result = calculateSectionPrice(
+      configuration.sections.L1,
+      basePrice,
+      true // Corner doesn't count as first seat
+    );
+    totalPrice += l1Result.price;
+  }
+
+  // L2 Section (Left Seats) - Only for L SHAPE
+  // Note: Based on user's logic, L2 restarts first seat pricing
+  if (configuration.sections?.L2) {
+    const l2Result = calculateSectionPrice(
+      configuration.sections.L2,
+      basePrice,
+      false // L2 restarts first seat pricing
+    );
+    totalPrice += l2Result.price;
+  }
+
+  // Dummy Seat Adjustment
+  // Dummy seats replace regular seats and are priced at 55% instead of 70%
+  const dummySeatsF = configuration.dummySeats?.F || 0;
+  const dummySeatsL = configuration.dummySeats?.L || 0;
+  const totalDummySeats = dummySeatsF + dummySeatsL;
+  
+  if (totalDummySeats > 0) {
+    // Each dummy seat: (55% - 70%) = -15% adjustment
+    const dummyAdjustment = (basePrice * -0.15) * totalDummySeats;
+    breakdown.additionalSeatsPrice += dummyAdjustment; // Negative adjustment
+    totalPrice += dummyAdjustment;
   }
 
   // Mechanism pricing
-  const mechanism = configuration.mechanism?.front || configuration.mechanism || "Manual";
-  if (mechanism === "electric" || mechanism === "Electric" || mechanism === "Electric-RRR") {
-    const electricCost = getFormulaValue(formulas, "electric_mechanism_cost", 5000);
-    breakdown.mechanismUpgrade = electricCost * seatCount;
-    totalPrice += breakdown.mechanismUpgrade;
-  }
+  // Manual = 0, Manual-RRR = 6800, Electric = 29000, Electric-RRR = 16500, Only Sofa = 0
+  const mechanismPrices: Record<string, number> = {
+    "Manual": 0,
+    "Manual-RRR": 6800,
+    "Electric": 29000,
+    "Electrical": 29000, // Alternative spelling
+    "Electric-RRR": 16500,
+    "Only Sofa": 0,
+  };
+
+  const frontMechanism = configuration.mechanism?.front || "Manual";
+  const leftMechanism = configuration.mechanism?.left || "Manual";
+  const isLShape = configuration.baseShape === "L SHAPE";
+  
+  const frontMechanismPrice = mechanismPrices[frontMechanism] || 0;
+  const leftMechanismPrice = isLShape ? (mechanismPrices[leftMechanism] || 0) : 0;
+  
+  breakdown.mechanismUpgrade = frontMechanismPrice + leftMechanismPrice;
+  totalPrice += breakdown.mechanismUpgrade;
 
   // Console pricing
   if (configuration.console?.required === "Yes" || configuration.console?.required === true) {
@@ -853,14 +960,30 @@ async function calculateReclinerPricing(
     const quantity = configuration.console?.quantity || 1;
 
     let consolePrice = 0;
-    if (consoleSize.includes("6") || consoleSize === "6 in") {
+    if (consoleSize.includes("6") || consoleSize === "6 in" || consoleSize === "Console-6 in") {
       consolePrice = getFormulaValue(formulas, "console_6_inch", 8000);
-    } else if (consoleSize.includes("10") || consoleSize === "10 in") {
+    } else if (consoleSize.includes("10") || consoleSize === "10 in" || consoleSize === "Console-10 In") {
       consolePrice = getFormulaValue(formulas, "console_10_inch", 12000);
     }
 
     breakdown.consolePrice = consolePrice * quantity;
     totalPrice += breakdown.consolePrice;
+  }
+
+  // Seat Width Upgrade
+  // 22" = 0%, 24" = 0%, 26" = 6.5%, 28" = 13%
+  const seatWidth = configuration.dimensions?.seatWidth || 22;
+  const widthUpgradePercent: Record<number, number> = {
+    22: 0,
+    24: 0,
+    26: 0.065, // 6.5%
+    28: 0.13,  // 13%
+  };
+  
+  const widthUpgradePercentValue = widthUpgradePercent[seatWidth] || 0;
+  if (widthUpgradePercentValue > 0) {
+    breakdown.dimensionUpgrade = totalPrice * widthUpgradePercentValue;
+    totalPrice += breakdown.dimensionUpgrade;
   }
 
   // Fabric charges
