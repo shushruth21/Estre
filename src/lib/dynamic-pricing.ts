@@ -293,15 +293,79 @@ export const calculateFabricMeters = (
     }
 
     case "sofabed": {
-      // Similar to sofa but with bed mechanism
-      const seatCount = configuration.seatCount || configuration.seatType || 1;
-      const firstSeatMeters = getSettingValue(settings, "fabric_first_seat_mtrs", 5.0);
+      // Section-based fabric calculation (similar to sofa)
+      const sections = configuration.sections || {};
+      
+      // Helper to parse seat count
+      const parseSeatCount = (seaterType: string): number => {
+        if (!seaterType) return 0;
+        const lower = seaterType.toLowerCase();
+        if (lower.includes("4-seater")) return 4;
+        if (lower.includes("3-seater")) return 3;
+        if (lower.includes("2-seater")) return 2;
+        if (lower.includes("1-seater")) return 1;
+        return 0;
+      };
+
+      // Calculate total seats from sections
+      let totalSeats = 0;
+      ["F", "L2", "R2", "C2"].forEach((sectionId) => {
+        const section = sections[sectionId];
+        if (section?.seater && section.seater !== "none") {
+          const seatCount = parseSeatCount(section.seater);
+          const qty = section.qty || 1;
+          totalSeats += seatCount * qty;
+        }
+      });
+
+      // Base fabric: 6m for first seat (standard sofa bed)
+      const firstSeatMeters = getSettingValue(settings, "fabric_first_seat_mtrs", 6.0);
       totalMeters += firstSeatMeters;
 
-      if (seatCount > 1) {
+      // Additional seats: +3m per seat
+      if (totalSeats > 1) {
         const additionalSeatMeters = getSettingValue(settings, "fabric_additional_seat_mtrs", 3.0);
-        totalMeters += (seatCount - 1) * additionalSeatMeters;
+        totalMeters += (totalSeats - 1) * additionalSeatMeters;
       }
+
+      // Lounger fabric (by size)
+      if (configuration.lounger?.required === "Yes" && configuration.lounger?.size) {
+        const loungerSize = configuration.lounger.size;
+        const quantity = configuration.lounger?.numberOfLoungers === "2 Nos." ? 2 : 1;
+        let loungerMeters = 0;
+
+        // Map lounger sizes to meters
+        if (loungerSize.includes("5 ft") && !loungerSize.includes("6 in")) {
+          loungerMeters = 5.5; // 5 ft
+        } else if (loungerSize.includes("5 ft 6") || loungerSize.includes("5'6")) {
+          loungerMeters = 6.5; // 5'6"
+        } else if (loungerSize.includes("6 ft") && !loungerSize.includes("6 in") && !loungerSize.includes("6'6")) {
+          loungerMeters = 7.2; // 6 ft
+        } else if (loungerSize.includes("6 ft 6") || loungerSize.includes("6'6")) {
+          loungerMeters = 7.8; // 6'6"
+        } else if (loungerSize.includes("7 ft") || loungerSize.includes("7'")) {
+          loungerMeters = 8.4; // 7 ft
+        }
+
+        totalMeters += loungerMeters * quantity;
+      }
+
+      // Console fabric (by size and quantity)
+      if (configuration.console?.required === "Yes" && configuration.console?.size) {
+        const consoleSize = configuration.console.size;
+        const quantity = configuration.console?.quantity || 1;
+        let consoleMeters = 0;
+
+        // 6-inch console: 1.5 meters, 10-inch console: 2 meters
+        if (consoleSize.includes("6") || consoleSize === "6 in" || consoleSize === "Console-6 in") {
+          consoleMeters = 1.5;
+        } else if (consoleSize.includes("10") || consoleSize === "10 in" || consoleSize === "Console-10 In") {
+          consoleMeters = 2.0;
+        }
+
+        totalMeters += consoleMeters * quantity;
+      }
+
       break;
     }
   }
@@ -372,11 +436,18 @@ export const calculateDynamicPrice = async (
 
     // Get base price from product
     // For sofa category, prioritize net_markup_1seater
+    // For sofabed, use 2-seater base price (strike_price_2seater_rs or net_price_rs)
     let basePrice = 0;
     if (category === "sofa") {
       basePrice = productData.net_markup_1seater || 
                   productData.net_price_rs || 
                   productData.strike_price_1seater_rs || 
+                  productData.bom_rs || 
+                  productData.adjusted_bom_rs || 0;
+    } else if (category === "sofabed") {
+      // Sofa bed uses 2-seater base price
+      basePrice = productData.strike_price_2seater_rs ||
+                  productData.net_price_rs || 
                   productData.bom_rs || 
                   productData.adjusted_bom_rs || 0;
     } else {
@@ -1041,6 +1112,14 @@ async function calculateReclinerPricing(
 
 /**
  * Calculate cinema chair pricing
+ * Pricing Rules:
+ * - First Seat: 100% of base price
+ * - Additional Seats: 55% of base price each
+ * - Mechanism: Single Motor (0), Dual Motor (28,000 per seat)
+ * - Console: 6" (₹8,000) or 10" (₹12,000) per console
+ * - Foam: Per seat pricing (Super Soft: ₹2,000, Latex: ₹4,000, Memory: ₹3,000)
+ * - Dimension Upgrades: Width (22/24 = 0%, 28 = 13%, 30 = 19.5%), Depth (22/24 = 0%)
+ * - Accessories: From accessories_prices table
  */
 async function calculateCinemaChairPricing(
   configuration: any,
@@ -1069,36 +1148,45 @@ async function calculateCinemaChairPricing(
     total: 0,
   };
 
-  const seatCount = configuration.numberOfSeats || configuration.seatCount || 1;
+  // Parse seat count from seater type or numberOfSeats
+  const parseSeaterType = (seaterType: string | number | undefined): number => {
+    if (typeof seaterType === "number") return seaterType;
+    if (!seaterType) return 1;
+    const match = seaterType.toString().match(/(\d+)/);
+    return match ? parseInt(match[1], 10) : 1;
+  };
+
+  const seatCount = parseSeaterType(configuration.seaterType || configuration.numberOfSeats || configuration.seatCount || 1);
   
-  breakdown.baseSeatPrice = basePrice;
+  // Base pricing: First seat 100%, additional seats 55%
+  breakdown.baseSeatPrice = basePrice; // First seat: 100%
   let totalPrice = basePrice;
 
-  // Additional seats
+  // Additional seats: 55% each
   if (seatCount > 1) {
-    const additionalSeatPercent = getFormulaValue(formulas, "additional_seat_percent", 70);
+    const additionalSeatPercent = getFormulaValue(formulas, "additional_seat_percent", 55); // Cinema chairs use 55%
     const additionalSeatPrice = (basePrice * additionalSeatPercent) / 100;
     breakdown.additionalSeatsPrice = additionalSeatPrice * (seatCount - 1);
     totalPrice += breakdown.additionalSeatsPrice;
   }
 
-  // Mechanism pricing
-  const mechanism = configuration.mechanism || "Manual";
-  if (mechanism === "electric" || mechanism === "Electric") {
-    const electricCost = getFormulaValue(formulas, "electric_mechanism_cost", 5000);
-    breakdown.mechanismUpgrade = electricCost * seatCount;
+  // Mechanism pricing: Single Motor (0), Dual Motor (28,000 per seat)
+  const mechanism = configuration.mechanism || "Single Motor";
+  if (mechanism === "Dual Motor" || mechanism === "dual_motor") {
+    const dualMotorCost = getFormulaValue(formulas, "dual_motor_cost", 28000);
+    breakdown.mechanismUpgrade = dualMotorCost * seatCount;
     totalPrice += breakdown.mechanismUpgrade;
   }
 
   // Console pricing
   if (configuration.console?.required === "Yes" || configuration.console?.required === true) {
     const consoleSize = configuration.console?.size || "";
-    const quantity = configuration.console?.quantity || 1;
+    const quantity = configuration.console?.quantity || 0;
 
     let consolePrice = 0;
-    if (consoleSize.includes("6") || consoleSize === "6 in") {
+    if (consoleSize.includes("6") || consoleSize === "6 in" || consoleSize === "Console-6 in") {
       consolePrice = getFormulaValue(formulas, "console_6_inch", 8000);
-    } else if (consoleSize.includes("10") || consoleSize === "10 in") {
+    } else if (consoleSize.includes("10") || consoleSize === "10 in" || consoleSize === "Console-10 In") {
       consolePrice = getFormulaValue(formulas, "console_10_inch", 12000);
     }
 
@@ -1106,7 +1194,44 @@ async function calculateCinemaChairPricing(
     totalPrice += breakdown.consolePrice;
   }
 
-  // Fabric charges
+  // Foam upgrade (per seat)
+  const foamType = configuration.foam?.type || "Firm";
+  const foamPrices: Record<string, number> = {
+    "Firm": 0,
+    "Soft": 0,
+    "Super Soft": 2000,
+    "Latex": 4000,
+    "Memory": 3000,
+    "Memory Foam": 3000,
+  };
+  const foamPricePerSeat = foamPrices[foamType] || 0;
+  breakdown.foamUpgrade = foamPricePerSeat * seatCount;
+  totalPrice += breakdown.foamUpgrade;
+
+  // Subtotal before dimension upgrades and fabric
+  const baseTotal = totalPrice;
+
+  // Dimension upgrades (applied to base total, before fabric)
+  const seatWidth = configuration.dimensions?.seatWidth || 24;
+  const seatDepth = configuration.dimensions?.seatDepth || 22;
+
+  // Width upgrade: 22/24 = 0%, 28 = 13%, 30 = 19.5%
+  const widthUpgradePercent: Record<number, number> = {
+    22: 0.00,
+    24: 0.00,
+    28: 0.13,  // 13%
+    30: 0.195, // 19.5%
+  };
+  const widthUpgradePercentValue = widthUpgradePercent[Number(seatWidth)] || 0;
+  const widthUpgrade = baseTotal * widthUpgradePercentValue;
+
+  // Depth upgrade: 22/24 = 0% (no upgrade for cinema chairs)
+  const depthUpgrade = 0;
+
+  breakdown.dimensionUpgrade = widthUpgrade + depthUpgrade;
+  totalPrice += breakdown.dimensionUpgrade;
+
+  // Fabric charges (applied after dimension upgrades)
   const fabricMeters = calculateFabricMeters("cinema_chairs", configuration, settings);
   const fabricCode = configuration.fabric?.structureCode || configuration.fabric?.claddingPlan;
   
@@ -1115,6 +1240,55 @@ async function calculateCinemaChairPricing(
     breakdown.fabricCharges = fabricMeters * fabricPricePerMeter;
     totalPrice += breakdown.fabricCharges;
   }
+
+  // Accessories pricing
+  let accessoriesTotal = 0;
+
+  // Left armrest accessory
+  if (configuration.accessories?.leftArmRest) {
+    const { data: leftAcc } = await supabase
+      .from("accessories_prices")
+      .select("sale_price")
+      .eq("id", configuration.accessories.leftArmRest)
+      .eq("is_active", true)
+      .single();
+    if (leftAcc) {
+      accessoriesTotal += leftAcc.sale_price || 0;
+    }
+  }
+
+  // Right armrest accessory
+  if (configuration.accessories?.rightArmRest) {
+    const { data: rightAcc } = await supabase
+      .from("accessories_prices")
+      .select("sale_price")
+      .eq("id", configuration.accessories.rightArmRest)
+      .eq("is_active", true)
+      .single();
+    if (rightAcc) {
+      accessoriesTotal += rightAcc.sale_price || 0;
+    }
+  }
+
+  // Console accessories
+  if (configuration.accessories?.consoleAccessories && Array.isArray(configuration.accessories.consoleAccessories)) {
+    const consoleAccessoryIds = configuration.accessories.consoleAccessories.filter((id: any) => id !== null && id !== "none");
+    if (consoleAccessoryIds.length > 0) {
+      const { data: consoleAccessories } = await supabase
+        .from("accessories_prices")
+        .select("sale_price")
+        .in("id", consoleAccessoryIds)
+        .eq("is_active", true);
+      if (consoleAccessories) {
+        consoleAccessories.forEach((acc) => {
+          accessoriesTotal += acc.sale_price || 0;
+        });
+      }
+    }
+  }
+
+  breakdown.accessoriesPrice = accessoriesTotal;
+  totalPrice += breakdown.accessoriesPrice;
 
   breakdown.subtotal = totalPrice;
 
@@ -1337,6 +1511,16 @@ async function calculateBenchPricing(
 
 /**
  * Calculate sofabed pricing
+ * Pricing Rules:
+ * - First Seat: 100% of 2-Seater base price
+ * - Additional Seats: 35% (KEY DIFFERENCE from sofa's 70%)
+ * - Corner: 65%
+ * - Backrest: 14%
+ * - Lounger: 40% base (5'6") + 4% per additional 6"
+ * - Recliner: ₹14,000 per electric recliner
+ * - Console: ₹8,000 (6") or ₹12,000 (10") per console
+ * - Foam: Per seat (Latex: ₹4,000, Memory: ₹3,000)
+ * - Dimension Upgrades: Width (22/24=0%, 26=6.5%, 30=19.5%), Depth (22/24=0%, 26/27=3%, 28/29=6%)
  */
 async function calculateSofabedPricing(
   configuration: any,
@@ -1365,37 +1549,117 @@ async function calculateSofabedPricing(
     total: 0,
   };
 
-  const seatCount = configuration.seatType || configuration.seatCount || 1;
-  const seatNumber = parseSeatCount(seatCount);
+  // Helper: Parse seat count from seater type
+  const parseSeatCount = (seaterType: string): number => {
+    if (!seaterType) return 0;
+    const lower = seaterType.toLowerCase();
+    if (lower.includes("4-seater")) return 4;
+    if (lower.includes("3-seater")) return 3;
+    if (lower.includes("2-seater")) return 2;
+    if (lower.includes("1-seater")) return 1;
+    return 0;
+  };
+
+  // Get base price for 2-seater (this should be the basePrice parameter)
+  const basePriceFor2Seater = basePrice;
+  let totalPrice = 0;
+  let firstSeatAdded = false;
+
+  const sections = configuration.sections || {};
+  const sectionOrder = ["F", "L1", "L2", "R1", "R2", "C1", "C2"];
+
+  // Calculate section-based pricing
+  for (const sectionId of sectionOrder) {
+    const section = sections[sectionId];
+    if (!section || !section.seater || section.seater === "none") continue;
+
+    const seaterType = section.seater.toLowerCase();
+    const qty = section.qty || 1;
+    let sectionPrice = 0;
+
+    if (seaterType === "corner") {
+      // Corner: 65% per unit
+      sectionPrice = (basePriceFor2Seater * 0.65) * qty;
+      breakdown.cornerSeatsPrice += sectionPrice;
+    } else if (seaterType === "backrest") {
+      // Backrest: 14% per unit
+      sectionPrice = (basePriceFor2Seater * 0.14) * qty;
+      breakdown.backrestSeatsPrice += sectionPrice;
+    } else {
+      // Regular seater (2/3/4-seater, with or without mech)
+      const seatCount = parseSeatCount(section.seater);
+      
+      for (let module = 0; module < qty; module++) {
+        for (let seat = 0; seat < seatCount; seat++) {
+          if (!firstSeatAdded) {
+            // First seat: 100%
+            sectionPrice += basePriceFor2Seater * 1.00;
+            breakdown.baseSeatPrice += basePriceFor2Seater * 1.00;
+            firstSeatAdded = true;
+          } else {
+            // Additional seats: 35%
+            sectionPrice += basePriceFor2Seater * 0.35;
+            breakdown.additionalSeatsPrice += basePriceFor2Seater * 0.35;
+          }
+        }
+      }
+    }
+
+    totalPrice += sectionPrice;
+  }
+
+  // Lounger pricing
+  if (configuration.lounger?.required === "Yes") {
+    const numLoungers = configuration.lounger?.numberOfLoungers === "2 Nos." ? 2 : 1;
+    const loungerSize = configuration.lounger?.size || "Lounger-5 ft 6 in";
+    
+    // Base: 40% for 5'6"
+    let loungerMultiplier = 0.40;
+    
+    // Add 4% for each additional 6 inches beyond 5'6"
+    if (loungerSize.includes("6 ft") && !loungerSize.includes("6 in") && !loungerSize.includes("6'6")) {
+      loungerMultiplier += 0.04; // 6'0" = 44%
+    }
+    if (loungerSize.includes("6 ft 6") || loungerSize.includes("6'6")) {
+      loungerMultiplier += 0.08; // 6'6" = 48%
+    }
+    if (loungerSize.includes("7 ft") || loungerSize.includes("7'")) {
+      loungerMultiplier += 0.12; // 7'0" = 52%
+    }
+    // 5 ft (less than 5'6") = 36% (40% - 4%)
+    if (loungerSize.includes("5 ft") && !loungerSize.includes("6 in")) {
+      loungerMultiplier = 0.36;
+    }
+    
+    breakdown.loungerPrice = loungerMultiplier * basePriceFor2Seater * numLoungers;
+    totalPrice += breakdown.loungerPrice;
+  }
+
+  // Recliner mechanism pricing (₹14,000 per recliner)
+  const recliner = configuration.recliner || {};
+  let reclinerTotal = 0;
+  const reclinerPricePerSeat = getFormulaValue(formulas, "recliner_electric_cost", 14000);
   
-  breakdown.baseSeatPrice = basePrice;
-  let totalPrice = basePrice;
-
-  // Additional seats
-  if (seatNumber > 1) {
-    const additionalSeatPercent = getFormulaValue(formulas, "additional_seat_percent", 70);
-    const additionalSeatPrice = (basePrice * additionalSeatPercent) / 100;
-    breakdown.additionalSeatsPrice = additionalSeatPrice * (seatNumber - 1);
-    totalPrice += breakdown.additionalSeatsPrice;
-  }
-
-  // Mechanism pricing
-  const mechanism = configuration.mechanismType || configuration.mechanism || "Manual";
-  if (mechanism === "electric" || mechanism === "Electric" || mechanism === "Electric-RRR") {
-    const electricCost = getFormulaValue(formulas, "electric_mechanism_cost", 5000);
-    breakdown.mechanismUpgrade = electricCost;
-    totalPrice += breakdown.mechanismUpgrade;
-  }
+  ["F", "L", "R", "C"].forEach((section) => {
+    const reclinerData = recliner[section];
+    if (reclinerData?.required === "Yes") {
+      const numRecliners = reclinerData.numberOfRecliners || 0;
+      reclinerTotal += reclinerPricePerSeat * numRecliners;
+    }
+  });
+  
+  breakdown.mechanismUpgrade = reclinerTotal;
+  totalPrice += breakdown.mechanismUpgrade;
 
   // Console pricing
-  if (configuration.console?.required === "Yes" || configuration.console?.required === true) {
+  if (configuration.console?.required === "Yes") {
     const consoleSize = configuration.console?.size || "";
-    const quantity = configuration.console?.quantity || 1;
+    const quantity = configuration.console?.quantity || 0;
 
     let consolePrice = 0;
-    if (consoleSize.includes("6") || consoleSize === "6 in") {
+    if (consoleSize.includes("6") || consoleSize === "6 in" || consoleSize === "Console-6 in") {
       consolePrice = getFormulaValue(formulas, "console_6_inch", 8000);
-    } else if (consoleSize.includes("10") || consoleSize === "10 in") {
+    } else if (consoleSize.includes("10") || consoleSize === "10 in" || consoleSize === "Console-10 In") {
       consolePrice = getFormulaValue(formulas, "console_10_inch", 12000);
     }
 
@@ -1403,7 +1667,70 @@ async function calculateSofabedPricing(
     totalPrice += breakdown.consolePrice;
   }
 
-  // Fabric charges
+  // Foam upgrade (per seat)
+  const foamType = configuration.foam?.type || "Firm";
+  const foamPrices: Record<string, number> = {
+    "Firm": 0,
+    "Soft": 0,
+    "Super Soft": 0,
+    "Latex": 4000,
+    "Latex Foam": 4000,
+    "Memory": 3000,
+    "Memory Foam": 3000,
+  };
+  
+  // Calculate total seats for foam pricing
+  let totalSeats = 0;
+  ["F", "L2", "R2", "C2"].forEach((sectionId) => {
+    const section = sections[sectionId];
+    if (section?.seater && section.seater !== "none") {
+      const seatCount = parseSeatCount(section.seater);
+      const qty = section.qty || 1;
+      totalSeats += seatCount * qty;
+    }
+  });
+  
+  const foamPricePerSeat = foamPrices[foamType] || 0;
+  breakdown.foamUpgrade = foamPricePerSeat * totalSeats;
+  totalPrice += breakdown.foamUpgrade;
+
+  // Subtotal before dimension upgrades
+  const baseTotal = totalPrice;
+
+  // Dimension upgrades (applied to base total, before fabric)
+  const seatWidth = configuration.dimensions?.seatWidth || 24;
+  const seatDepth = configuration.dimensions?.seatDepth || 22;
+
+  // Width upgrade: 22/24 = 0%, 26/27 = 6.5%, 30/31 = 19.5%
+  const widthUpgradePercent: Record<number, number> = {
+    22: 0.00,
+    23: 0.00,
+    24: 0.00,
+    25: 0.00,
+    26: 0.065,  // 6.5%
+    27: 0.065,
+    30: 0.195, // 19.5%
+    31: 0.195,
+  };
+  const widthUpgrade = baseTotal * (widthUpgradePercent[Number(seatWidth)] || 0);
+
+  // Depth upgrade: 22/24 = 0%, 26/27 = 3%, 28/29 = 6%
+  const depthUpgradePercent: Record<number, number> = {
+    22: 0.00,
+    23: 0.00,
+    24: 0.00,
+    25: 0.00,
+    26: 0.03,  // 3%
+    27: 0.03,
+    28: 0.06,  // 6%
+    29: 0.06,
+  };
+  const depthUpgrade = baseTotal * (depthUpgradePercent[Number(seatDepth)] || 0);
+
+  breakdown.dimensionUpgrade = widthUpgrade + depthUpgrade;
+  totalPrice += breakdown.dimensionUpgrade;
+
+  // Fabric charges (applied after dimension upgrades)
   const fabricMeters = calculateFabricMeters("sofabed", configuration, settings);
   const fabricCode = configuration.fabric?.structureCode || configuration.fabric?.claddingPlan;
   
@@ -1411,6 +1738,23 @@ async function calculateSofabedPricing(
     const fabricPricePerMeter = await getFabricPrice(fabricCode);
     breakdown.fabricCharges = fabricMeters * fabricPricePerMeter;
     totalPrice += breakdown.fabricCharges;
+  }
+
+  // Console accessories
+  if (configuration.console?.accessories && Array.isArray(configuration.console.accessories)) {
+    const consoleAccessoryIds = configuration.console.accessories.filter((id: any) => id !== null && id !== "none");
+    if (consoleAccessoryIds.length > 0) {
+      const { data: consoleAccessories } = await supabase
+        .from("accessories_prices")
+        .select("sale_price")
+        .in("id", consoleAccessoryIds)
+        .eq("is_active", true);
+      if (consoleAccessories) {
+        consoleAccessories.forEach((acc) => {
+          breakdown.accessoriesPrice += acc.sale_price || 0;
+        });
+      }
+    }
   }
 
   breakdown.subtotal = totalPrice;

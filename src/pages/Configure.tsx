@@ -17,6 +17,7 @@ import DiningChairConfigurator from "@/components/configurators/DiningChairConfi
 import ArmChairConfigurator from "@/components/configurators/ArmChairConfigurator";
 import BenchConfigurator from "@/components/configurators/BenchConfigurator";
 import PlaceholderConfigurator from "@/components/configurators/PlaceholderConfigurator";
+import SofaBedConfigurator from "@/components/configurators/SofaBedConfigurator";
 import PricingSummary from "@/components/configurators/PricingSummary";
 
 const Configure = () => {
@@ -256,7 +257,14 @@ const Configure = () => {
                     onConfigurationChange={setConfiguration}
                   />
                 )}
-                {(category === "kids_bed" || category === "sofabed" || category === "database_pouffes") && (
+                {category === "sofabed" && (
+                  <SofaBedConfigurator
+                    product={product}
+                    configuration={configuration}
+                    onConfigurationChange={setConfiguration}
+                  />
+                )}
+                {(category === "kids_bed" || category === "database_pouffes") && (
                   <PlaceholderConfigurator
                     product={product}
                     configuration={configuration}
