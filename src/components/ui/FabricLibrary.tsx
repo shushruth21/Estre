@@ -20,6 +20,7 @@ import {
   ExternalLink,
   Palette,
 } from "lucide-react";
+import { normalizeImageUrl, isValidImageUrl } from "@/lib/image-utils";
 
 interface FabricLibraryProps {
   open: boolean;
@@ -182,7 +183,18 @@ export const FabricLibrary = ({
     onOpenChange(false);
   };
 
-  // Generate color from fabric code or use default
+  // Get fabric image URL from colour column
+  const getFabricImageUrl = (fabric: Fabric): string | null => {
+    if (fabric.colour) {
+      const normalized = normalizeImageUrl(fabric.colour);
+      if (normalized && isValidImageUrl(normalized)) {
+        return normalized;
+      }
+    }
+    return null;
+  };
+
+  // Generate color from fabric code or use default (fallback when no image)
   const getFabricColor = (fabric: Fabric): string => {
     // Try to extract color from code or use a hash-based color
     if (fabric.colour_link) return fabric.colour_link;
@@ -345,12 +357,34 @@ export const FabricLibrary = ({
                   onClick={() => handleSelect(fabric.estre_code)}
                 >
                   <CardContent className="p-4 space-y-3">
-                    {/* Color Swatch */}
+                    {/* Color Swatch / Image Preview */}
                     <div className="flex justify-center">
-                      <div
-                        className="w-20 h-20 rounded-full border-2 border-gray-200 shadow-sm"
-                        style={{ backgroundColor: getFabricColor(fabric) }}
-                      />
+                      {(() => {
+                        const imageUrl = getFabricImageUrl(fabric);
+                        const fallbackColor = getFabricColor(fabric);
+                        return imageUrl ? (
+                          <div 
+                            className="w-20 h-20 rounded-full border-2 border-gray-200 shadow-sm overflow-hidden relative"
+                            style={{ backgroundColor: fallbackColor }}
+                          >
+                            <img
+                              src={imageUrl}
+                              alt={fabric.description || fabric.colour || fabric.estre_code}
+                              className="w-full h-full object-cover"
+                              onError={(e) => {
+                                // Hide image and show color background on error
+                                const target = e.target as HTMLImageElement;
+                                target.style.display = 'none';
+                              }}
+                            />
+                          </div>
+                        ) : (
+                          <div
+                            className="w-20 h-20 rounded-full border-2 border-gray-200 shadow-sm"
+                            style={{ backgroundColor: fallbackColor }}
+                          />
+                        );
+                      })()}
                     </div>
 
                     {/* Fabric Code */}
@@ -410,10 +444,32 @@ export const FabricLibrary = ({
                 >
                   <CardContent className="p-4">
                     <div className="flex items-center gap-4">
-                      <div
-                        className="w-16 h-16 rounded border-2 border-gray-200 flex-shrink-0"
-                        style={{ backgroundColor: getFabricColor(fabric) }}
-                      />
+                      {(() => {
+                        const imageUrl = getFabricImageUrl(fabric);
+                        const fallbackColor = getFabricColor(fabric);
+                        return imageUrl ? (
+                          <div 
+                            className="w-16 h-16 rounded border-2 border-gray-200 flex-shrink-0 overflow-hidden relative"
+                            style={{ backgroundColor: fallbackColor }}
+                          >
+                            <img
+                              src={imageUrl}
+                              alt={fabric.description || fabric.colour || fabric.estre_code}
+                              className="w-full h-full object-cover"
+                              onError={(e) => {
+                                // Hide image and show color background on error
+                                const target = e.target as HTMLImageElement;
+                                target.style.display = 'none';
+                              }}
+                            />
+                          </div>
+                        ) : (
+                          <div
+                            className="w-16 h-16 rounded border-2 border-gray-200 flex-shrink-0"
+                            style={{ backgroundColor: fallbackColor }}
+                          />
+                        );
+                      })()}
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-1">
                           <Badge variant="outline" className="text-xs font-mono">
