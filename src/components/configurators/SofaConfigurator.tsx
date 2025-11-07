@@ -938,20 +938,26 @@ const SofaConfigurator = ({
                       ? allPlacements 
                       : [{ section: "front", position: "after_1", label: "After 1st Seat from Left (Front)", value: "front_1" }];
                     
-                    // Find current placement in available options
-                    const currentPlacementValue = currentPlacement.position 
-                      ? `${currentPlacement.section || "front"}_${currentPlacement.afterSeat || 1}`
-                      : availablePlacements[Math.min(index, availablePlacements.length - 1)]?.value || "front_1";
+                    // Find current placement in available options - use stable calculation
+                    const currentPlacementValue = currentPlacement.position && currentPlacement.section
+                      ? `${currentPlacement.section}_${currentPlacement.afterSeat || 1}`
+                      : null;
                     
-                    const selectedPlacement = availablePlacements.find(p => p.value === currentPlacementValue) || availablePlacements[0];
+                    const selectedPlacement = currentPlacementValue 
+                      ? availablePlacements.find(p => p.value === currentPlacementValue)
+                      : null;
+                    
+                    // Use stable value - never use "none" as the displayed value, only as selectable option
+                    // If we have a valid placement, use it; otherwise use first available placement
+                    const selectValue = selectedPlacement?.value || (availablePlacements.length > 0 ? availablePlacements[0].value : "none");
                     
                     return (
-                      <div key={index} className="space-y-3 p-4 bg-muted/30 rounded-lg border">
+                      <div key={`console-${currentPlacement.section}-${currentPlacement.position}-${index}`} className="space-y-3 p-4 bg-muted/30 rounded-lg border">
                         <Label className="text-sm font-semibold">Console {index + 1} Configuration</Label>
                         <div className="space-y-2">
                           <Label className="text-xs text-muted-foreground">Placement</Label>
                           <Select
-                            value={selectedPlacement?.value || currentPlacementValue || "none"}
+                            value={selectValue}
                             onValueChange={(value) => {
                               const placements = [...(configuration.console?.placements || [])];
                               if (value === "none") {
