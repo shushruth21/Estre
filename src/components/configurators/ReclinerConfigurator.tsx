@@ -518,26 +518,38 @@ const ReclinerConfigurator = ({ product, configuration, onConfigurationChange }:
                 <div className="space-y-2">
                   <Label>Seat Depth (inches)</Label>
                   <Select
-                    value={String(configuration.dimensions?.seatDepth || 24)}
+                    value={
+                      seatDepths && seatDepths.length > 0
+                        ? seatDepths.find((d: any) => {
+                            const storedValue = configuration.dimensions?.seatDepth || 24;
+                            const optionValue = Number(d.option_value);
+                            return optionValue === storedValue;
+                          })?.option_value || String(configuration.dimensions?.seatDepth || 24)
+                        : String(configuration.dimensions?.seatDepth || 24)
+                    }
                     onValueChange={(value) => updateConfiguration({
                       dimensions: { ...configuration.dimensions, seatDepth: Number(value) }
                     })}
                   >
                     <SelectTrigger>
-                      <SelectValue />
+                      <SelectValue placeholder="Select seat depth" />
                     </SelectTrigger>
                     <SelectContent>
-                      {seatDepths?.map((depth: any) => {
-                        const depthValue = Number(depth.option_value);
-                        const upgradePercent = depthValue === 22 || depthValue === 24 ? 0 : depthValue === 26 ? 3 : depthValue === 28 ? 6 : 0;
-                        const label = depth.display_label || depth.option_value;
-                        const upgradeLabel = upgradePercent > 0 ? ` (+${upgradePercent}% upgrade)` : " (Standard)";
-                        return (
-                          <SelectItem key={depth.id} value={depth.option_value}>
-                            {label}{upgradeLabel}
-                          </SelectItem>
-                        );
-                      })}
+                      {seatDepths && seatDepths.length > 0 ? (
+                        seatDepths.map((depth: any) => {
+                          const depthValue = Number(depth.option_value);
+                          const upgradePercent = depthValue === 22 || depthValue === 24 ? 0 : depthValue === 26 ? 3 : depthValue === 28 ? 6 : 0;
+                          const label = depth.display_label || depth.option_value;
+                          const upgradeLabel = upgradePercent > 0 ? ` (+${upgradePercent}% upgrade)` : " (Standard)";
+                          return (
+                            <SelectItem key={depth.id} value={depth.option_value}>
+                              {label}{upgradeLabel}
+                            </SelectItem>
+                          );
+                        })
+                      ) : (
+                        <SelectItem value="24" disabled>Loading...</SelectItem>
+                      )}
                     </SelectContent>
                   </Select>
                 </div>
@@ -545,26 +557,38 @@ const ReclinerConfigurator = ({ product, configuration, onConfigurationChange }:
                 <div className="space-y-2">
                   <Label>Seat Width (inches)</Label>
                   <Select
-                    value={String(configuration.dimensions?.seatWidth || 22)}
+                    value={
+                      seatWidths && seatWidths.length > 0
+                        ? seatWidths.find((w: any) => {
+                            const storedValue = configuration.dimensions?.seatWidth || 22;
+                            const optionValue = Number(w.option_value);
+                            return optionValue === storedValue;
+                          })?.option_value || String(configuration.dimensions?.seatWidth || 22)
+                        : String(configuration.dimensions?.seatWidth || 22)
+                    }
                     onValueChange={(value) => updateConfiguration({
                       dimensions: { ...configuration.dimensions, seatWidth: Number(value) }
                     })}
                   >
                     <SelectTrigger>
-                      <SelectValue />
+                      <SelectValue placeholder="Select seat width" />
                     </SelectTrigger>
                     <SelectContent>
-                      {seatWidths?.map((width: any) => {
-                        const widthValue = Number(width.option_value);
-                        const upgradePercent = widthValue === 22 || widthValue === 24 ? 0 : widthValue === 26 ? 6.5 : widthValue === 28 ? 13 : 0;
-                        const label = width.display_label || width.option_value;
-                        const upgradeLabel = upgradePercent > 0 ? ` (+${upgradePercent}% upgrade)` : " (Standard)";
-                        return (
-                          <SelectItem key={width.id} value={width.option_value}>
-                            {label}{upgradeLabel}
-                          </SelectItem>
-                        );
-                      })}
+                      {seatWidths && seatWidths.length > 0 ? (
+                        seatWidths.map((width: any) => {
+                          const widthValue = Number(width.option_value);
+                          const upgradePercent = widthValue === 22 || widthValue === 24 ? 0 : widthValue === 26 ? 6.5 : widthValue === 28 ? 13 : 0;
+                          const label = width.display_label || width.option_value;
+                          const upgradeLabel = upgradePercent > 0 ? ` (+${upgradePercent}% upgrade)` : " (Standard)";
+                          return (
+                            <SelectItem key={width.id} value={width.option_value}>
+                              {label}{upgradeLabel}
+                            </SelectItem>
+                          );
+                        })
+                      ) : (
+                        <SelectItem value="22" disabled>Loading...</SelectItem>
+                      )}
                     </SelectContent>
                   </Select>
                 </div>
@@ -572,20 +596,32 @@ const ReclinerConfigurator = ({ product, configuration, onConfigurationChange }:
                 <div className="space-y-2">
                   <Label>Seat Height (inches)</Label>
                   <Select
-                    value={String(configuration.dimensions?.seatHeight || 18)}
+                    value={
+                      seatHeights && seatHeights.length > 0
+                        ? seatHeights.find((h: any) => {
+                            const storedValue = configuration.dimensions?.seatHeight || 18;
+                            const optionValue = Number(h.option_value);
+                            return optionValue === storedValue;
+                          })?.option_value || String(configuration.dimensions?.seatHeight || 18)
+                        : String(configuration.dimensions?.seatHeight || 18)
+                    }
                     onValueChange={(value) => updateConfiguration({
                       dimensions: { ...configuration.dimensions, seatHeight: Number(value) }
                     })}
                   >
                     <SelectTrigger>
-                      <SelectValue />
+                      <SelectValue placeholder="Select seat height" />
                     </SelectTrigger>
                     <SelectContent>
-                      {seatHeights?.map((height: any) => (
-                        <SelectItem key={height.id} value={height.option_value}>
-                          {height.display_label || height.option_value}
-                        </SelectItem>
-                      ))}
+                      {seatHeights && seatHeights.length > 0 ? (
+                        seatHeights.map((height: any) => (
+                          <SelectItem key={height.id} value={height.option_value}>
+                            {height.display_label || height.option_value}
+                          </SelectItem>
+                        ))
+                      ) : (
+                        <SelectItem value="18" disabled>Loading...</SelectItem>
+                      )}
                     </SelectContent>
                   </Select>
                   <p className="text-xs text-muted-foreground">No pricing impact</p>
