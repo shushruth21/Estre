@@ -237,12 +237,72 @@ const SofaConfigurator = ({
   };
 
   // Generate console placement options for a specific section
-  const generateConsolePlacementOptions = (section: 'front' | 'left' | 'right', seatCount: number) => {
+  // Consoles are placed ONLY between seats within each section (no corner junctions)
+  const generateConsolePlacementOptions = (section: 'front' | 'left' | 'right', seatCount: number, module?: number) => {
     if (seatCount <= 1) return [];
-    return Array.from({ length: seatCount - 1 }, (_, i) => ({
-      value: (i + 1).toString(),
-      label: `After ${i + 1}${i === 0 ? 'st' : i === 1 ? 'nd' : i === 2 ? 'rd' : 'th'} Seat from Left (${section.charAt(0).toUpperCase() + section.slice(1)})`
-    }));
+    const positions = [];
+    for (let i = 1; i < seatCount; i++) {
+      const ordinal = i === 1 ? 'st' : i === 2 ? 'nd' : i === 3 ? 'rd' : 'th';
+      const sectionLabel = section.charAt(0).toUpperCase() + section.slice(1);
+      const moduleLabel = module && module > 1 ? ` (Module ${module})` : '';
+      positions.push({
+        value: i.toString(),
+        label: `After ${i}${ordinal} Seat from Left (${sectionLabel}${moduleLabel})`
+      });
+    }
+    return positions;
+  };
+
+  // Generate all possible console placements based on sections
+  // Returns array of placement objects with section, position, and label
+  const generateAllConsolePlacements = () => {
+    const placements: Array<{ section: string; position: string; label: string; value: string }> = [];
+    const sectionCounts = getSectionSeatCounts();
+    let consoleIndex = 1;
+
+    // Front section consoles (between seats only)
+    if (sectionCounts.front > 1) {
+      for (let i = 1; i < sectionCounts.front; i++) {
+        const ordinal = i === 1 ? 'st' : i === 2 ? 'nd' : i === 3 ? 'rd' : 'th';
+        placements.push({
+          section: 'front',
+          position: `after_${i}`,
+          label: `Front Console ${consoleIndex}: After ${i}${ordinal} Seat from Left`,
+          value: `front_${i}`
+        });
+        consoleIndex++;
+      }
+    }
+
+    // Left section consoles (L2 - between seats only)
+    if (sectionCounts.left > 1) {
+      for (let i = 1; i < sectionCounts.left; i++) {
+        const ordinal = i === 1 ? 'st' : i === 2 ? 'nd' : i === 3 ? 'rd' : 'th';
+        placements.push({
+          section: 'left',
+          position: `after_${i}`,
+          label: `Left Console ${consoleIndex}: After ${i}${ordinal} Seat from Left (Left Section)`,
+          value: `left_${i}`
+        });
+        consoleIndex++;
+      }
+    }
+
+    // Right section consoles (R2 - between seats only)
+    if (sectionCounts.right > 1) {
+      for (let i = 1; i < sectionCounts.right; i++) {
+        const ordinal = i === 1 ? 'st' : i === 2 ? 'nd' : i === 3 ? 'rd' : 'th';
+        placements.push({
+          section: 'right',
+          position: `after_${i}`,
+          label: `Right Console ${consoleIndex}: After ${i}${ordinal} Seat from Left (Right Section)`,
+          value: `right_${i}`
+        });
+        consoleIndex++;
+      }
+    }
+
+    return placements;
   };
 
   // Auto-update console quantity when total seats change (if console is required)
@@ -254,13 +314,31 @@ const SofaConfigurator = ({
       
       // Only update if quantity needs to change
       if (currentQuantity !== maxConsoles) {
-        const placements = Array(maxConsoles).fill(null).map((_, i) => 
-          configuration.console?.placements?.[i] || { 
-            position: "front", 
-            afterSeat: i + 1,
-            accessoryId: null
+        // Generate all available placements
+        const allPlacements = generateAllConsolePlacements();
+        
+        // Initialize placements with valid positions
+        const placements = Array(maxConsoles).fill(null).map((_, i) => {
+          const existingPlacement = configuration.console?.placements?.[i];
+          if (existingPlacement && existingPlacement.section && existingPlacement.position) {
+            return existingPlacement;
           }
-        );
+          
+          // Default to first available placement or front section
+          const defaultPlacement = allPlacements[i] || allPlacements[0] || {
+            section: "front",
+            position: "after_1",
+            label: "After 1st Seat from Left (Front)",
+            value: "front_1"
+          };
+          
+          return {
+            section: defaultPlacement.section,
+            position: defaultPlacement.position,
+            afterSeat: parseInt(defaultPlacement.position.split('_')[1] || "1", 10),
+            accessoryId: null
+          };
+        });
         
         updateConfiguration({
           console: {
@@ -847,113 +925,73 @@ const SofaConfigurator = ({
 
                 {/* Console Placements & Accessories */}
                 {configuration.console?.quantity > 0 && (() => {
-                  const sectionCounts = getSectionSeatCounts();
+                  const allPlacements = generateAllConsolePlacements();
+                  const maxPlacements = allPlacements.length;
+                  
                   return Array.from({ length: configuration.console.quantity }, (_, index) => {
-                    const currentPlacement = configuration.console?.placements?.[index] || { position: "front", afterSeat: 1, accessoryId: null };
-                    const currentSection = currentPlacement.position || "front";
+                    const currentPlacement = configuration.console?.placements?.[index] || { 
+                      section: "front", 
+                      position: "after_1",
+                      afterSeat: 1, 
+                      accessoryId: null 
+                    };
                     
-                    // Get valid placement options based on shape
-                    const validSections: Array<{ value: string; label: string }> = [];
-                    if (sectionCounts.front > 0) {
-                      validSections.push({ value: "front", label: "Front" });
-                    }
-                    if (sectionCounts.left > 0) {
-                      validSections.push({ value: "left", label: "Left" });
-                    }
-                    if (sectionCounts.right > 0) {
-                      validSections.push({ value: "right", label: "Right" });
-                    }
-                    if (sectionCounts.hasCorner) {
-                      validSections.push({ value: "corner", label: "Corner Junction" });
-                    }
+                    // Get available placement options (only valid positions)
+                    const availablePlacements = allPlacements.length > 0 
+                      ? allPlacements 
+                      : [{ section: "front", position: "after_1", label: "After 1st Seat from Left (Front)", value: "front_1" }];
                     
-                    // Get placement options for current section
-                    let placementOptions: Array<{ value: string; label: string }> = [];
-                    if (currentSection === "corner") {
-                      // Corner console - no "after seat" needed
-                      placementOptions = [{ value: "corner", label: "At corner junction" }];
-                    } else if (currentSection === "front" && sectionCounts.front > 1) {
-                      placementOptions = generateConsolePlacementOptions("front", sectionCounts.front);
-                    } else if (currentSection === "left" && sectionCounts.left > 1) {
-                      placementOptions = generateConsolePlacementOptions("left", sectionCounts.left);
-                    } else if (currentSection === "right" && sectionCounts.right > 1) {
-                      placementOptions = generateConsolePlacementOptions("right", sectionCounts.right);
-                    }
+                    // Find current placement in available options
+                    const currentPlacementValue = currentPlacement.position 
+                      ? `${currentPlacement.section || "front"}_${currentPlacement.afterSeat || 1}`
+                      : availablePlacements[Math.min(index, availablePlacements.length - 1)]?.value || "front_1";
+                    
+                    const selectedPlacement = availablePlacements.find(p => p.value === currentPlacementValue) || availablePlacements[0];
                     
                     return (
                       <div key={index} className="space-y-3 p-4 bg-muted/30 rounded-lg border">
                         <Label className="text-sm font-semibold">Console {index + 1} Configuration</Label>
-                        <div className="grid grid-cols-2 gap-3">
-                          <div className="space-y-2">
-                            <Label className="text-xs text-muted-foreground">Placement Position</Label>
-                            <Select
-                              value={currentSection}
-                              onValueChange={(value) => {
-                                const placements = [...(configuration.console?.placements || [])];
+                        <div className="space-y-2">
+                          <Label className="text-xs text-muted-foreground">Placement</Label>
+                          <Select
+                            value={selectedPlacement?.value || currentPlacementValue}
+                            onValueChange={(value) => {
+                              const placements = [...(configuration.console?.placements || [])];
+                              const placement = availablePlacements.find(p => p.value === value);
+                              if (placement) {
+                                const afterSeat = parseInt(placement.position.split('_')[1] || "1", 10);
                                 placements[index] = {
-                                  position: value,
-                                  afterSeat: value === "corner" ? null : (placements[index]?.afterSeat || 1),
+                                  section: placement.section,
+                                  position: placement.position,
+                                  afterSeat: afterSeat,
                                   accessoryId: placements[index]?.accessoryId || null
                                 };
                                 updateConfiguration({
                                   console: { ...configuration.console, placements },
                                 });
-                              }}
-                            >
-                              <SelectTrigger>
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {validSections.map((section) => (
-                                  <SelectItem key={section.value} value={section.value}>
-                                    {section.label}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </div>
-                          {currentSection !== "corner" && (
-                            <div className="space-y-2">
-                              <Label className="text-xs text-muted-foreground">After Seat</Label>
-                              <Select
-                                value={(currentPlacement.afterSeat || 1).toString()}
-                                onValueChange={(value) => {
-                                  const placements = [...(configuration.console?.placements || [])];
-                                  const afterSeat = value === "none" ? null : parseInt(value, 10);
-                                  placements[index] = {
-                                    ...placements[index],
-                                    afterSeat: afterSeat || 1
-                                  };
-                                  updateConfiguration({
-                                    console: { ...configuration.console, placements },
-                                  });
-                                }}
-                              >
-                                <SelectTrigger>
-                                  <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="none">None (Unassigned)</SelectItem>
-                                  {placementOptions.map((option) => (
-                                    <SelectItem key={option.value} value={option.value}>
-                                      {option.label}
-                                    </SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
-                            </div>
-                          )}
-                          {currentSection === "corner" && (
-                            <div className="space-y-2">
-                              <Label className="text-xs text-muted-foreground">Corner Type</Label>
-                              <div className="p-2 bg-muted rounded text-xs text-muted-foreground">
-                                {sectionCounts.left > 0 && sectionCounts.right > 0 
-                                  ? "Front-Left or Front-Right junction"
-                                  : sectionCounts.left > 0 
-                                    ? "Front-Left junction"
-                                    : "Front-Right junction"}
-                              </div>
-                            </div>
+                              }
+                            }}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select console placement" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {availablePlacements.map((placement) => (
+                                <SelectItem key={placement.value} value={placement.value}>
+                                  {placement.label}
+                                </SelectItem>
+                              ))}
+                              {availablePlacements.length === 0 && (
+                                <SelectItem value="no-options" disabled>
+                                  No console positions available (need at least 2 seats)
+                                </SelectItem>
+                              )}
+                            </SelectContent>
+                          </Select>
+                          {selectedPlacement && (
+                            <p className="text-xs text-muted-foreground">
+                              {selectedPlacement.label}
+                            </p>
                           )}
                         </div>
                         <div className="space-y-2">
