@@ -331,36 +331,32 @@ const SofaConfigurator = ({
   useEffect(() => {
     if (configuration.console?.required) {
       const maxConsoles = Math.max(0, totalSeats - 1);
-      const currentQuantity = configuration.console?.quantity || 0;
+      const currentPlacements = configuration.console?.placements || [];
       
-      // Only update if quantity needs to change
-      if (currentQuantity !== maxConsoles) {
-        // Generate all available placements
-        const allPlacements = generateAllConsolePlacements();
-        
-        // Initialize placements with valid positions
-        const placements = Array(maxConsoles).fill(null).map((_, i) => {
-          const existingPlacement = configuration.console?.placements?.[i];
-          if (existingPlacement && existingPlacement.section && existingPlacement.position) {
-            return existingPlacement;
-          }
-          
-          // Default to first available placement or front section
-          const defaultPlacement = allPlacements[i] || allPlacements[0] || {
-            section: "front",
-            position: "after_1",
-            label: "After 1st Seat from Left (Front)",
-            value: "front_1"
-          };
-          
-          return {
-            section: defaultPlacement.section,
-            position: defaultPlacement.position,
-            afterSeat: parseInt(defaultPlacement.position.split('_')[1] || "1", 10),
+      // Always maintain maxConsoles slots in the array
+      // This ensures slots maintain their positions even when set to "none"
+      let placements = [...currentPlacements];
+      
+      // Ensure we have exactly maxConsoles slots
+      if (placements.length < maxConsoles) {
+        // Fill missing slots with "none" placeholder
+        while (placements.length < maxConsoles) {
+          placements.push({
+            section: null,
+            position: "none",
+            afterSeat: null,
             accessoryId: null
-          };
-        });
-        
+          });
+        }
+      } else if (placements.length > maxConsoles) {
+        // Trim excess slots
+        placements = placements.slice(0, maxConsoles);
+      }
+      
+      // Only update if placements array changed or quantity is different
+      const placementsChanged = JSON.stringify(placements) !== JSON.stringify(currentPlacements);
+      
+      if (placementsChanged || configuration.console?.quantity !== maxConsoles) {
         updateConfiguration({
           console: {
             ...configuration.console,
@@ -370,7 +366,7 @@ const SofaConfigurator = ({
         });
       }
     }
-  }, [totalSeats, configuration.console?.required, configuration.console?.quantity]);
+  }, [totalSeats, configuration.console?.required]);
 
   // Initialize configuration
   useEffect(() => {
@@ -869,15 +865,23 @@ const SofaConfigurator = ({
                   const maxConsoles = Math.max(0, totalSeats - 1);
                   const autoQuantity = isRequired ? maxConsoles : 0;
                   
-                  // Initialize placements array
+                  // Initialize placements array - always maintain maxConsoles slots
+                  // Use "none" placeholder to maintain slot positions
                   const placements = isRequired 
-                    ? Array(autoQuantity).fill(null).map((_, i) => 
-                        configuration.console?.placements?.[i] || { 
-                          position: "front", 
-                          afterSeat: i + 1,
-                          accessoryId: null
+                    ? Array(autoQuantity).fill(null).map((_, i) => {
+                        const existing = configuration.console?.placements?.[i];
+                        // If existing placement is valid, keep it; otherwise set to "none"
+                        if (existing && existing.position && existing.position !== "none" && existing.section) {
+                          return existing;
                         }
-                      )
+                        // Return "none" placeholder to maintain slot position
+                        return {
+                          section: null,
+                          position: "none",
+                          afterSeat: null,
+                          accessoryId: null
+                        };
+                      })
                     : [];
                   
                   updateConfiguration({
@@ -950,25 +954,54 @@ const SofaConfigurator = ({
                 {/* Console Placements & Accessories */}
                 {configuration.console?.quantity > 0 && (() => {
                   const allPlacements = generateAllConsolePlacements();
+                  const maxConsoles = Math.max(0, getTotalSeats() - 1);
                   
-                  // Filter out consoles with "none" placement (hidden consoles)
-                  // Only show consoles that have valid positions
-                  const validPlacements = (configuration.console?.placements || []).filter(
-                    (p: any) => p && p.position && p.position !== null && p.section !== null
-                  );
+                  // Always maintain maxConsoles slots in the array
+                  // This ensures slots maintain their positions even when set to "none"
+                  let currentPlacements = configuration.console?.placements || [];
                   
-                  return validPlacements.map((currentPlacement: any, index: number) => {
-                    // Get current placement value
-                    const currentPlacementValue = currentPlacement.position && currentPlacement.section
+                  // Ensure we have exactly maxConsoles slots
+                  if (currentPlacements.length < maxConsoles) {
+                    currentPlacements = [...currentPlacements];
+                    // Fill missing slots with "none" placeholder
+                    while (currentPlacements.length < maxConsoles) {
+                      currentPlacements.push({
+                        section: null,
+                        position: "none",
+                        afterSeat: null,
+                        accessoryId: null
+                      });
+                    }
+                  } else if (currentPlacements.length > maxConsoles) {
+                    // Trim excess slots
+                    currentPlacements = currentPlacements.slice(0, maxConsoles);
+                  }
+                  
+                  // Display all slots (including "none" ones) to maintain correct slot numbers
+                  return Array(maxConsoles).fill(null).map((_, index: number) => {
+                    const currentPlacement = currentPlacements[index] || {
+                      section: null,
+                      position: "none",
+                      afterSeat: null,
+                      accessoryId: null
+                    };
+                    
+                    // Check if this slot is active (not "none")
+                    const isActive = currentPlacement.position && 
+                                     currentPlacement.position !== "none" && 
+                                     currentPlacement.section;
+                    
+                    // Get current placement value for the select dropdown
+                    const currentPlacementValue = isActive
                       ? `${currentPlacement.section}_${currentPlacement.afterSeat || 1}`
-                      : null;
+                      : "none";
                     
                     // Filter out placements that are already selected by OTHER console slots
-                    // This ensures each console slot can only select unique placements
-                    const otherSelectedPlacements = validPlacements
-                      .filter((p: any, i: number) => i !== index) // Exclude current slot
-                      .map((p: any) => {
-                        if (p.position && p.section) {
+                    // Only consider ACTIVE slots (not "none") when filtering
+                    const otherActivePlacements = currentPlacements
+                      .map((p: any, i: number) => {
+                        if (i === index) return null; // Exclude current slot
+                        if (p.position && p.position !== "none" && p.section) {
                           return `${p.section}_${p.afterSeat || 1}`;
                         }
                         return null;
@@ -980,24 +1013,16 @@ const SofaConfigurator = ({
                       ? allPlacements.filter((placement) => {
                           // Always include the current placement (so user can see what's selected)
                           if (placement.value === currentPlacementValue) return true;
-                          // Exclude placements already selected by other console slots
-                          return !otherSelectedPlacements.includes(placement.value);
+                          // Exclude placements already selected by other ACTIVE console slots
+                          return !otherActivePlacements.includes(placement.value);
                         })
                       : [{ section: "front", position: "after_1", label: "After 1st Seat from Left (Front)", value: "front_1" }];
                     
-                    // Find current placement in available options
-                    const selectedPlacement = currentPlacementValue 
-                      ? availablePlacements.find(p => p.value === currentPlacementValue)
-                      : null;
-                    
-                    // Determine the current value - if placement exists, use it; otherwise show "none"
-                    const selectValue = selectedPlacement?.value || "none";
-                    
                     return (
-                      <div key={`console-${currentPlacement.section}-${currentPlacement.position}-${index}-${selectValue}`} className="space-y-3 p-4 bg-muted/30 rounded-lg border">
+                      <div key={`console-slot-${index}`} className="space-y-3 p-4 bg-muted/30 rounded-lg border">
                         <div className="flex items-center justify-between">
                           <Label className="text-sm font-semibold">Console Slot {index + 1}</Label>
-                          {selectedPlacement && (
+                          {isActive && (
                             <Badge variant="secondary" className="text-xs">
                               Active
                             </Badge>
@@ -1006,59 +1031,51 @@ const SofaConfigurator = ({
                         <div className="space-y-2">
                           <Label className="text-xs text-muted-foreground">Placement</Label>
                           <Select
-                            key={`console-select-${currentPlacement.section}-${currentPlacement.position}-${index}`}
-                            value={selectValue}
+                            key={`console-select-${index}`}
+                            value={currentPlacementValue}
                             onValueChange={(value) => {
+                              // Get fresh placements from configuration to ensure we have the latest state
+                              const freshPlacements = [...(configuration.console?.placements || [])];
+                              
+                              // Ensure we have exactly maxConsoles slots
+                              while (freshPlacements.length < maxConsoles) {
+                                freshPlacements.push({
+                                  section: null,
+                                  position: "none",
+                                  afterSeat: null,
+                                  accessoryId: null
+                                });
+                              }
+                              
                               if (value === "none") {
-                                // Remove this console from the placements array
-                                const currentPlacements = configuration.console?.placements || [];
-                                const filteredPlacements = currentPlacements.filter((p: any) => {
-                                  // Remove the placement that matches this console's position and section
-                                  return !(p && p.position === currentPlacement.position && p.section === currentPlacement.section);
-                                });
-                                
-                                updateConfiguration({
-                                  console: { 
-                                    ...configuration.console, 
-                                    placements: filteredPlacements,
-                                    quantity: filteredPlacements.length
-                                  },
-                                });
+                                // Set to "none" but keep in array
+                                freshPlacements[index] = {
+                                  section: null,
+                                  position: "none",
+                                  afterSeat: null,
+                                  accessoryId: null // Clear accessory when set to none
+                                };
                               } else {
-                                const placements = [...(configuration.console?.placements || [])];
+                                // Set to a valid placement
                                 const placement = availablePlacements.find(p => p.value === value);
                                 if (placement) {
                                   const afterSeat = parseInt(placement.position.split('_')[1] || "1", 10);
-                                  
-                                  // Find the current console slot by index (more reliable than matching position)
-                                  // Since we're mapping over validPlacements, the index corresponds to the slot
-                                  if (placements[index] !== undefined) {
-                                    // Update the placement for this specific slot
-                                    placements[index] = {
-                                      section: placement.section,
-                                      position: placement.position,
-                                      afterSeat: afterSeat,
-                                      accessoryId: placements[index]?.accessoryId || null
-                                    };
-                                  } else {
-                                    // Fallback: find by matching current position/section
-                                    const placementIndex = placements.findIndex(
-                                      (p: any) => p && p.position === currentPlacement.position && p.section === currentPlacement.section
-                                    );
-                                    if (placementIndex >= 0) {
-                                      placements[placementIndex] = {
-                                        section: placement.section,
-                                        position: placement.position,
-                                        afterSeat: afterSeat,
-                                        accessoryId: placements[placementIndex]?.accessoryId || null
-                                      };
-                                    }
-                                  }
+                                  freshPlacements[index] = {
+                                    section: placement.section,
+                                    position: placement.position,
+                                    afterSeat: afterSeat,
+                                    accessoryId: freshPlacements[index]?.accessoryId || null // Keep existing accessory or null
+                                  };
                                 }
-                                updateConfiguration({
-                                  console: { ...configuration.console, placements },
-                                });
                               }
+                              
+                              updateConfiguration({
+                                console: { 
+                                  ...configuration.console, 
+                                  placements: freshPlacements,
+                                  quantity: maxConsoles // Keep quantity at maxConsoles
+                                },
+                              });
                             }}
                           >
                             <SelectTrigger>
@@ -1079,51 +1096,52 @@ const SofaConfigurator = ({
                             </SelectContent>
                           </Select>
                         </div>
-                        <div className="space-y-2">
-                          <Label className="text-xs text-muted-foreground">Accessory</Label>
-                          <Select
-                            value={currentPlacement.accessoryId || "none"}
-                            onValueChange={(value) => {
-                              const placements = [...(configuration.console?.placements || [])];
-                              // Find the placement by matching position and section
-                              const placementIndex = placements.findIndex(
-                                (p: any) => p && p.position === currentPlacement.position && p.section === currentPlacement.section
-                              );
-                              if (placementIndex >= 0) {
-                                placements[placementIndex] = {
-                                  ...placements[placementIndex],
-                                  accessoryId: value === "none" ? null : value
-                                };
-                                updateConfiguration({
-                                  console: { ...configuration.console, placements },
-                                });
-                              }
-                            }}
-                          >
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select accessory (optional)" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="none">None</SelectItem>
-                              {loadingAccessories ? (
-                                <SelectItem value="loading" disabled>Loading...</SelectItem>
-                              ) : consoleAccessories && consoleAccessories.length > 0 ? (
-                                // Filter to ensure unique IDs and descriptions
-                                consoleAccessories
-                                  .filter((acc: any, index: number, self: any[]) => 
-                                    index === self.findIndex((a: any) => a.id === acc.id && a.description === acc.description)
-                                  )
-                                  .map((acc: any) => (
-                                    <SelectItem key={`${acc.id}-${acc.description}`} value={acc.id}>
-                                      {acc.description} - ₹{Number(acc.sale_price || 0).toLocaleString()}
-                                    </SelectItem>
-                                  ))
-                              ) : (
-                                <SelectItem value="no-data" disabled>No accessories available</SelectItem>
-                              )}
-                            </SelectContent>
-                          </Select>
-                        </div>
+                        
+                        {/* Only show accessory selector if placement is not "none" */}
+                        {isActive && (
+                          <div className="space-y-2">
+                            <Label className="text-xs text-muted-foreground">Accessory</Label>
+                            <Select
+                              value={currentPlacement.accessoryId || "none"}
+                              onValueChange={(value) => {
+                                // Get fresh placements from configuration to ensure we have the latest state
+                                const freshPlacements = [...(configuration.console?.placements || [])];
+                                // Ensure we have the slot at this index
+                                if (freshPlacements[index]) {
+                                  freshPlacements[index] = {
+                                    ...freshPlacements[index],
+                                    accessoryId: value === "none" ? null : value
+                                  };
+                                  updateConfiguration({
+                                    console: { ...configuration.console, placements: freshPlacements },
+                                  });
+                                }
+                              }}
+                            >
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select accessory (optional)" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="none">None</SelectItem>
+                                {loadingAccessories ? (
+                                  <SelectItem value="loading" disabled>Loading...</SelectItem>
+                                ) : consoleAccessories && consoleAccessories.length > 0 ? (
+                                  consoleAccessories
+                                    .filter((acc: any, idx: number, self: any[]) => 
+                                      idx === self.findIndex((a: any) => a.id === acc.id && a.description === acc.description)
+                                    )
+                                    .map((acc: any) => (
+                                      <SelectItem key={`${acc.id}-${acc.description}`} value={acc.id}>
+                                        {acc.description} - ₹{Number(acc.sale_price || 0).toLocaleString()}
+                                      </SelectItem>
+                                    ))
+                                ) : (
+                                  <SelectItem value="no-data" disabled>No accessories available</SelectItem>
+                                )}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        )}
                       </div>
                     );
                   });
