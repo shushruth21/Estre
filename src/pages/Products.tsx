@@ -60,6 +60,7 @@ type Product = {
   strikePrice?: number | null;
   discount_percent?: number | null;
   discount_rs?: number | null;
+  bom_rs?: number | null;
 };
 
 const Products = () => {
@@ -86,7 +87,7 @@ const Products = () => {
       // Using dynamic table names with Supabase requires runtime querying
       const { data, error } = await supabase
         .from(getCategoryTableName(category) as any)
-        .select(`id, title, images, ${columns.netPrice}, ${columns.strikePrice}, discount_percent, discount_rs`)
+        .select(`id, title, images, ${columns.netPrice}, ${columns.strikePrice}, discount_percent, discount_rs, bom_rs`)
         .eq("is_active", true)
         .order("title", { ascending: true }) as any;
 
@@ -139,7 +140,8 @@ const Products = () => {
           netPrice: item[columns.netPrice],
           strikePrice: item[columns.strikePrice],
           discount_percent: item.discount_percent,
-          discount_rs: item.discount_rs
+          discount_rs: item.discount_rs,
+          bom_rs: item.bom_rs
         };
       });
       
@@ -251,6 +253,12 @@ const Products = () => {
                       </span>
                     )}
                   </div>
+
+                  {product.bom_rs && (
+                    <p className="text-sm text-muted-foreground">
+                      BOM: ₹{product.bom_rs.toLocaleString()}
+                    </p>
+                  )}
 
                   {product.discount_percent && (
                     <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-primary/10 text-primary rounded-full text-sm font-semibold">
