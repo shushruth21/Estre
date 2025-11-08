@@ -88,7 +88,7 @@ const Products = () => {
         .from(getCategoryTableName(category) as any)
         .select(`id, title, images, ${columns.netPrice}, ${columns.strikePrice}, discount_percent, discount_rs`)
         .eq("is_active", true)
-        .order("created_at", { ascending: false }) as any;
+        .order("title", { ascending: true }) as any;
 
       if (error) throw error;
       
