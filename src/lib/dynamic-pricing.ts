@@ -1835,6 +1835,26 @@ async function calculateSofabedPricing(
   breakdown.mechanismUpgrade = reclinerTotal;
   totalPrice += breakdown.mechanismUpgrade;
 
+  // Pillows pricing
+  if (configuration.additionalPillows?.required === "Yes" || configuration.additionalPillows?.required === true) {
+    const pillowType = configuration.additionalPillows?.type || "Simple";
+    const quantity = configuration.additionalPillows?.quantity || 1;
+
+    // Get pillow price from formulas or use defaults
+    let pillowPrice = getFormulaValue(formulas, "pillow_simple_price", 1200); // Default
+    
+    if (pillowType === "Diamond" || pillowType === "Diamond Quilted" || pillowType === "Diamond Quilted pillow") {
+      pillowPrice = getFormulaValue(formulas, "pillow_diamond_quilted_price", 3500);
+    } else if (pillowType === "Belt Quilted") {
+      pillowPrice = getFormulaValue(formulas, "pillow_belt_quilted_price", 4000);
+    } else if (pillowType.includes("Tassels")) {
+      pillowPrice = getFormulaValue(formulas, "pillow_tassels_price", 2500);
+    }
+
+    breakdown.pillowsPrice = pillowPrice * quantity;
+    totalPrice += breakdown.pillowsPrice;
+  }
+
   // Console pricing
   if (configuration.console?.required === "Yes" || configuration.console?.required === true) {
     const consoleSize = configuration.console?.size || "";
