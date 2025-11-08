@@ -38,6 +38,10 @@ const CATEGORY_COLUMNS = {
     netPrice: 'net_price_single_no_storage_rs',
     strikePrice: 'strike_price_rs'
   },
+  sofabed: {
+    netPrice: 'net_price_rs',
+    strikePrice: 'strike_price_2seater_rs'
+  },
   database_pouffes: {
     netPrice: 'net_price',
     strikePrice: 'strike_price_rs'
@@ -84,10 +88,17 @@ const Products = () => {
     queryFn: async () => {
       const columns = getCategoryColumns(category);
       
+      // Build select query - for sofabed, also fetch strike_price_2seater_rs
+      let selectFields = `id, title, images, ${columns.netPrice}, ${columns.strikePrice}, discount_percent, discount_rs, bom_rs`;
+      if (category === "sofabed") {
+        // Ensure we fetch strike_price_2seater_rs for sofabed
+        selectFields = `id, title, images, ${columns.netPrice}, ${columns.strikePrice}, strike_price_2seater_rs, discount_percent, discount_rs, bom_rs`;
+      }
+      
       // Using dynamic table names with Supabase requires runtime querying
       const { data, error } = await supabase
         .from(getCategoryTableName(category) as any)
-        .select(`id, title, images, ${columns.netPrice}, ${columns.strikePrice}, discount_percent, discount_rs, bom_rs`)
+        .select(selectFields)
         .eq("is_active", true)
         .order("title", { ascending: true }) as any;
 
@@ -96,13 +107,16 @@ const Products = () => {
       // Debug: Log raw data from database in development only
       if (import.meta.env.DEV && data && data.length > 0) {
         console.log('📦 Raw product data from database:', {
+          category,
           count: data.length,
+          columns: columns,
           firstItem: {
             id: data[0].id,
             title: data[0].title,
-            images: data[0].images,
-            imagesType: typeof data[0].images,
-            isArray: Array.isArray(data[0].images)
+            netPrice: data[0][columns.netPrice],
+            strikePrice: data[0][columns.strikePrice],
+            strike_price_2seater_rs: category === "sofabed" ? data[0].strike_price_2seater_rs : undefined,
+            discount_percent: data[0].discount_percent,
           }
         });
       }
@@ -132,13 +146,26 @@ const Products = () => {
           }
         }
         
+        // For sofabed, use strike_price_2seater_rs if available, otherwise use the mapped strikePrice
+        const strikePrice = category === "sofabed" && item.strike_price_2seater_rs !== null && item.strike_price_2seater_rs !== undefined
+          ? item.strike_price_2seater_rs
+          : item[columns.strikePrice];
+        
+        // Ensure numeric values are properly converted
+        const netPrice = item[columns.netPrice] !== null && item[columns.netPrice] !== undefined 
+          ? Number(item[columns.netPrice]) 
+          : null;
+        const strikePriceNum = strikePrice !== null && strikePrice !== undefined 
+          ? Number(strikePrice) 
+          : null;
+        
         return {
           id: item.id,
           title: item.title,
           images: imageUrl, // First image URL for thumbnail
           imagesData: item.images, // Full image data for gallery (can be string, array, etc.)
-          netPrice: item[columns.netPrice],
-          strikePrice: item[columns.strikePrice],
+          netPrice: netPrice,
+          strikePrice: strikePriceNum,
           discount_percent: item.discount_percent,
           discount_rs: item.discount_rs,
           bom_rs: item.bom_rs
@@ -241,24 +268,31 @@ const Products = () => {
                     {product.title}
                   </h3>
                   
-                  <div className="flex items-baseline gap-3">
-                    {product.netPrice && (
-                      <p className="text-3xl font-bold text-foreground">
-                        ₹{product.netPrice.toLocaleString()}
-                      </p>
-                    )}
-                    {product.strikePrice && (
-                      <span className="text-lg line-through text-muted-foreground">
-                        ₹{product.strikePrice.toLocaleString()}
-                      </span>
+                  {/* Pricing Section */}
+                  <div className="space-y-2">
+                    <div className="flex items-baseline gap-3 flex-wrap">
+                      {product.netPrice ? (
+                        <p className="text-3xl font-bold text-foreground">
+                          ₹{Number(product.netPrice).toLocaleString('en-IN')}
+                        </p>
+                      ) : product.strikePrice ? (
+                        <p className="text-3xl font-bold text-foreground">
+                          ₹{Number(product.strikePrice).toLocaleString('en-IN')}
+                        </p>
+                      ) : null}
+                      {product.strikePrice && product.netPrice && product.strikePrice > product.netPrice && (
+                        <span className="text-lg line-through text-muted-foreground">
+                          ₹{Number(product.strikePrice).toLocaleString('en-IN')}
+                        </span>
+                      )}
+                    </div>
+
+                    {product.discount_percent && product.discount_percent > 0 && (
+                      <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-primary/10 text-primary rounded-full text-sm font-semibold">
+                        Save {product.discount_percent}%
+                      </div>
                     )}
                   </div>
-
-                  {product.discount_percent && (
-                    <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-primary/10 text-primary rounded-full text-sm font-semibold">
-                      Save {product.discount_percent}%
-                    </div>
-                  )}
                 </CardContent>
                 <CardFooter className="p-6 pt-0">
                   <Link to={`/configure/${category}/${product.id}`} className="w-full">
