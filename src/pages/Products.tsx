@@ -254,12 +254,6 @@ const Products = () => {
                     )}
                   </div>
 
-                  {product.bom_rs && (
-                    <p className="text-sm text-muted-foreground">
-                      ₹{product.bom_rs.toLocaleString()}
-                    </p>
-                  )}
-
                   {product.discount_percent && (
                     <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-primary/10 text-primary rounded-full text-sm font-semibold">
                       Save {product.discount_percent}%
