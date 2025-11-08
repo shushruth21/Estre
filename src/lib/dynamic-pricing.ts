@@ -2161,6 +2161,32 @@ async function calculateSofabedPricing(
 
   breakdown.total = Math.round(totalPrice);
 
+  // Debug logging for sofabed pricing
+  if (import.meta.env.DEV) {
+    console.log("💰 Sofabed pricing calculation complete:", {
+      basePrice: basePriceFor2Seater,
+      breakdown: {
+        baseSeatPrice: Math.round(breakdown.baseSeatPrice),
+        additionalSeatsPrice: Math.round(breakdown.additionalSeatsPrice),
+        cornerSeatsPrice: Math.round(breakdown.cornerSeatsPrice),
+        backrestSeatsPrice: Math.round(breakdown.backrestSeatsPrice),
+        loungerPrice: Math.round(breakdown.loungerPrice),
+        consolePrice: Math.round(breakdown.consolePrice),
+        pillowsPrice: Math.round(breakdown.pillowsPrice),
+        mechanismUpgrade: Math.round(breakdown.mechanismUpgrade),
+        foamUpgrade: Math.round(breakdown.foamUpgrade),
+        dimensionUpgrade: Math.round(breakdown.dimensionUpgrade),
+        fabricCharges: Math.round(breakdown.fabricCharges),
+        accessoriesPrice: Math.round(breakdown.accessoriesPrice),
+        armrestUpgrade: Math.round(breakdown.armrestUpgrade),
+        stitchTypePrice: Math.round(breakdown.stitchTypePrice),
+      },
+      subtotal: Math.round(breakdown.subtotal),
+      discountAmount: Math.round(breakdown.discountAmount),
+      total: breakdown.total,
+    });
+  }
+
   return {
     breakdown,
     total: breakdown.total,
