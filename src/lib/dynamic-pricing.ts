@@ -1836,7 +1836,7 @@ async function calculateSofabedPricing(
   totalPrice += breakdown.mechanismUpgrade;
 
   // Console pricing
-  if (configuration.console?.required === "Yes") {
+  if (configuration.console?.required === "Yes" || configuration.console?.required === true) {
     const consoleSize = configuration.console?.size || "";
     const quantity = configuration.console?.quantity || 0;
 
@@ -1849,6 +1849,27 @@ async function calculateSofabedPricing(
 
     breakdown.consolePrice = consolePrice * quantity;
     totalPrice += breakdown.consolePrice;
+    
+    // Add console accessories pricing (if any)
+    if (configuration.console?.accessories && Array.isArray(configuration.console.accessories)) {
+      const consoleAccessoryIds = configuration.console.accessories
+        .filter((id: any) => id !== null && id !== "none" && id !== undefined);
+      
+      if (consoleAccessoryIds.length > 0) {
+        const { data: consoleAccessories } = await supabase
+          .from("accessories_prices")
+          .select("sale_price")
+          .in("id", consoleAccessoryIds)
+          .eq("is_active", true);
+        
+        if (consoleAccessories) {
+          consoleAccessories.forEach((acc) => {
+            breakdown.accessoriesPrice += acc.sale_price || 0;
+            totalPrice += acc.sale_price || 0;
+          });
+        }
+      }
+    }
   }
 
   // Foam upgrade (per seat)
@@ -1932,23 +1953,8 @@ async function calculateSofabedPricing(
     totalPrice += breakdown.fabricCharges;
   }
 
-  // Console accessories
-  if (configuration.console?.accessories && Array.isArray(configuration.console.accessories)) {
-    const consoleAccessoryIds = configuration.console.accessories.filter((id: any) => id !== null && id !== "none");
-    if (consoleAccessoryIds.length > 0) {
-      const { data: consoleAccessories } = await supabase
-        .from("accessories_prices")
-        .select("sale_price")
-        .in("id", consoleAccessoryIds)
-        .eq("is_active", true);
-      if (consoleAccessories) {
-        consoleAccessories.forEach((acc) => {
-          breakdown.accessoriesPrice += acc.sale_price || 0;
-          totalPrice += acc.sale_price || 0;
-        });
-      }
-    }
-  }
+  // Console accessories are already handled in the console pricing section above
+  // (Removed duplicate calculation)
 
   // Legs/accessories pricing (legs only, not armrests)
   if (configuration.legs?.type || configuration.legType || configuration.legsCode) {
