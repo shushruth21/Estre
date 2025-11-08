@@ -1671,6 +1671,21 @@ async function calculateSofabedPricing(
   settings: AdminSetting[],
   basePrice: number
 ): Promise<{ breakdown: PricingBreakdown; total: number }> {
+  // Debug logging
+  if (import.meta.env.DEV) {
+    console.log("🔍 calculateSofabedPricing called with:", {
+      basePrice,
+      hasSections: !!configuration.sections,
+      sections: configuration.sections,
+      hasLounger: !!configuration.lounger,
+      lounger: configuration.lounger,
+      hasConsole: !!configuration.console,
+      console: configuration.console,
+      hasRecliner: !!configuration.recliner,
+      recliner: configuration.recliner,
+    });
+  }
+
   const breakdown: PricingBreakdown = {
     basePrice: basePrice,
     baseSeatPrice: 0,
