@@ -450,9 +450,9 @@ export const calculateDynamicPrice = async (
                   productData.adjusted_bom_rs || 0;
     } else if (category === "sofabed") {
       // Sofa bed uses 2-seater base price
+      // Note: bom_rs has been renamed to strike_price_2seater_rs in sofabed_database
       basePrice = productData.strike_price_2seater_rs ||
                   productData.net_price_rs || 
-                  productData.bom_rs || 
                   productData.adjusted_bom_rs || 0;
     } else {
       // For other categories, use existing fallback chain

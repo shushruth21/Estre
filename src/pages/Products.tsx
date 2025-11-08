@@ -88,11 +88,11 @@ const Products = () => {
     queryFn: async () => {
       const columns = getCategoryColumns(category);
       
-      // Build select query - for sofabed, also fetch strike_price_2seater_rs
+      // Build select query - for sofabed, fetch strike_price_2seater_rs instead of bom_rs
       let selectFields = `id, title, images, ${columns.netPrice}, ${columns.strikePrice}, discount_percent, discount_rs, bom_rs`;
       if (category === "sofabed") {
-        // Ensure we fetch strike_price_2seater_rs for sofabed
-        selectFields = `id, title, images, ${columns.netPrice}, ${columns.strikePrice}, strike_price_2seater_rs, discount_percent, discount_rs, bom_rs`;
+        // For sofabed, bom_rs has been renamed to strike_price_2seater_rs
+        selectFields = `id, title, images, ${columns.netPrice}, ${columns.strikePrice}, strike_price_2seater_rs, discount_percent, discount_rs`;
       }
       
       // Using dynamic table names with Supabase requires runtime querying
@@ -168,7 +168,7 @@ const Products = () => {
           strikePrice: strikePriceNum,
           discount_percent: item.discount_percent,
           discount_rs: item.discount_rs,
-          bom_rs: item.bom_rs
+          bom_rs: category === "sofabed" ? undefined : item.bom_rs // bom_rs doesn't exist for sofabed (renamed to strike_price_2seater_rs)
         };
       });
       

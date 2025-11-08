@@ -178,6 +178,11 @@ const AdminProducts = () => {
 
     // Get all form fields
     for (const [key, value] of formData.entries()) {
+      // Skip bom_rs for sofabed category (it has been renamed to strike_price_2seater_rs)
+      if (selectedCategory === "sofabed" && key === "bom_rs") {
+        continue;
+      }
+      
       if (key === "is_active") {
         data[key] = value === "on";
       } else if (key === "images") {
