@@ -256,7 +256,7 @@ const Products = () => {
 
                   {product.bom_rs && (
                     <p className="text-sm text-muted-foreground">
-                      BOM: ₹{product.bom_rs.toLocaleString()}
+                      ₹{product.bom_rs.toLocaleString()}
                     </p>
                   )}
 
