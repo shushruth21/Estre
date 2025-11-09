@@ -1431,20 +1431,52 @@ async function calculateCinemaChairPricing(
     totalPrice += breakdown.mechanismUpgrade;
   }
 
-  // Console pricing
+  // Console pricing - Fixed price per console based on size + accessory prices
   if (configuration.console?.required === "Yes" || configuration.console?.required === true) {
     const consoleSize = configuration.console?.size || "";
     const quantity = configuration.console?.quantity || 0;
+    const placements = configuration.console?.placements || [];
 
-    let consolePrice = 0;
+    // Base console price (per console)
+    let baseConsolePrice = 0;
     if (consoleSize.includes("6") || consoleSize === "6 in" || consoleSize === "Console-6 in") {
-      consolePrice = getFormulaValue(formulas, "console_6_inch", 8000);
+      baseConsolePrice = getFormulaValue(formulas, "console_6_inch", 8000);
     } else if (consoleSize.includes("10") || consoleSize === "10 in" || consoleSize === "Console-10 In") {
-      consolePrice = getFormulaValue(formulas, "console_10_inch", 12000);
+      baseConsolePrice = getFormulaValue(formulas, "console_10_inch", 12000);
     }
 
-    breakdown.consolePrice = consolePrice * quantity;
+    // Calculate console accessories prices from placements
+    let consoleAccessoriesTotal = 0;
+    const activePlacements = placements.filter((p: any) => 
+      p && p.position && p.position !== "none" && p.section
+    );
+
+    for (const placement of activePlacements) {
+      if (placement.accessoryId && placement.accessoryId !== "none" && placement.accessoryId !== null) {
+        try {
+          const { data: accessory } = await supabase
+            .from("accessories_prices")
+            .select("sale_price")
+            .eq("id", placement.accessoryId)
+            .eq("is_active", true)
+            .single();
+
+          if (accessory && accessory.sale_price) {
+            consoleAccessoriesTotal += Number(accessory.sale_price) || 0;
+          }
+        } catch (error) {
+          console.warn("Error fetching console accessory price:", error);
+        }
+      }
+    }
+
+    // Total console price = (base console price × quantity) + sum of all accessories
+    breakdown.consolePrice = (baseConsolePrice * quantity) + consoleAccessoriesTotal;
     totalPrice += breakdown.consolePrice;
+    
+    if (import.meta.env.DEV) {
+      console.log(`🎬 Cinema Chairs Console Pricing: Base=₹${baseConsolePrice} × ${quantity} = ₹${baseConsolePrice * quantity}, Accessories=₹${consoleAccessoriesTotal}, Total=₹${breakdown.consolePrice}`);
+    }
   }
 
   // Foam upgrade (per seat)
@@ -1985,40 +2017,51 @@ async function calculateSofabedPricing(
     totalPrice += breakdown.pillowsPrice;
   }
 
-  // Console pricing
+  // Console pricing - Fixed price per console based on size + accessory prices
   if (configuration.console?.required === "Yes" || configuration.console?.required === true) {
     const consoleSize = configuration.console?.size || "";
     const quantity = configuration.console?.quantity || 0;
+    const placements = configuration.console?.placements || [];
 
-    let consolePrice = 0;
+    // Base console price (per console)
+    let baseConsolePrice = 0;
     if (consoleSize.includes("6") || consoleSize === "6 in" || consoleSize === "Console-6 in") {
-      consolePrice = getFormulaValue(formulas, "console_6_inch", 8000);
+      baseConsolePrice = getFormulaValue(formulas, "console_6_inch", 8000);
     } else if (consoleSize.includes("10") || consoleSize === "10 in" || consoleSize === "Console-10 In") {
-      consolePrice = getFormulaValue(formulas, "console_10_inch", 12000);
+      baseConsolePrice = getFormulaValue(formulas, "console_10_inch", 12000);
     }
 
-    breakdown.consolePrice = consolePrice * quantity;
-    totalPrice += breakdown.consolePrice;
-    
-    // Add console accessories pricing (if any)
-    if (configuration.console?.accessories && Array.isArray(configuration.console.accessories)) {
-      const consoleAccessoryIds = configuration.console.accessories
-        .filter((id: any) => id !== null && id !== "none" && id !== undefined);
-      
-      if (consoleAccessoryIds.length > 0) {
-        const { data: consoleAccessories } = await supabase
-          .from("accessories_prices")
-          .select("sale_price")
-          .in("id", consoleAccessoryIds)
-          .eq("is_active", true);
-        
-        if (consoleAccessories) {
-          consoleAccessories.forEach((acc) => {
-            breakdown.accessoriesPrice += acc.sale_price || 0;
-            totalPrice += acc.sale_price || 0;
-          });
+    // Calculate console accessories prices from placements
+    let consoleAccessoriesTotal = 0;
+    const activePlacements = placements.filter((p: any) => 
+      p && p.position && p.position !== "none" && p.section
+    );
+
+    for (const placement of activePlacements) {
+      if (placement.accessoryId && placement.accessoryId !== "none" && placement.accessoryId !== null) {
+        try {
+          const { data: accessory } = await supabase
+            .from("accessories_prices")
+            .select("sale_price")
+            .eq("id", placement.accessoryId)
+            .eq("is_active", true)
+            .single();
+
+          if (accessory && accessory.sale_price) {
+            consoleAccessoriesTotal += Number(accessory.sale_price) || 0;
+          }
+        } catch (error) {
+          console.warn("Error fetching console accessory price:", error);
         }
       }
+    }
+
+    // Total console price = (base console price × quantity) + sum of all accessories
+    breakdown.consolePrice = (baseConsolePrice * quantity) + consoleAccessoriesTotal;
+    totalPrice += breakdown.consolePrice;
+    
+    if (import.meta.env.DEV) {
+      console.log(`🛋️ Sofabed Console Pricing: Base=₹${baseConsolePrice} × ${quantity} = ₹${baseConsolePrice * quantity}, Accessories=₹${consoleAccessoriesTotal}, Total=₹${breakdown.consolePrice}`);
     }
   }
 
