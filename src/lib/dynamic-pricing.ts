@@ -454,6 +454,12 @@ export const calculateDynamicPrice = async (
       basePrice = productData.strike_price_2seater_rs ||
                   productData.net_price_rs || 
                   productData.adjusted_bom_rs || 0;
+    } else if (category === "recliner") {
+      // Recliner doesn't have bom_rs column - use net_price_rs as primary
+      basePrice = productData.net_price_rs ||
+                  productData.net_markup_1seater_manual ||
+                  productData.strike_price_1seater_rs ||
+                  productData.adjusted_bom_rs || 0;
     } else {
       // For other categories, use existing fallback chain
       basePrice = productData.net_price_rs || 

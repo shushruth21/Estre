@@ -179,7 +179,8 @@ const AdminProducts = () => {
     // Get all form fields
     for (const [key, value] of formData.entries()) {
       // Skip bom_rs for sofabed category (it has been renamed to strike_price_2seater_rs)
-      if (selectedCategory === "sofabed" && key === "bom_rs") {
+      // Skip bom_rs for recliner category (it doesn't exist - use net_price_rs instead)
+      if ((selectedCategory === "sofabed" || selectedCategory === "recliner") && key === "bom_rs") {
         continue;
       }
       
