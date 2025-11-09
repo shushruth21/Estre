@@ -9,6 +9,7 @@ import { useDropdownOptions } from "@/hooks/useDropdownOptions";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { generateConsolePlacements, calculateMaxConsoles } from "@/lib/console-validation";
 
 interface CinemaChairConfiguratorProps {
   product: any;
@@ -57,7 +58,7 @@ const CinemaChairConfigurator = ({ product, configuration, onConfigurationChange
   };
 
   // Calculate max consoles (seats - 1)
-  const maxConsoles = Math.max(0, parseSeaterType(configuration.seaterType || configuration.numberOfSeats || 1) - 1);
+  const maxConsoles = calculateMaxConsoles(parseSeaterType(configuration.seaterType || configuration.numberOfSeats || 1));
 
   const updateConfiguration = (updates: any) => {
     onConfigurationChange({ ...configuration, ...updates });
@@ -105,7 +106,7 @@ const CinemaChairConfigurator = ({ product, configuration, onConfigurationChange
   // Auto-update console quantity when seats change
   useEffect(() => {
     const seatCount = parseSeaterType(configuration.seaterType || configuration.numberOfSeats || 1);
-    const newMaxConsoles = Math.max(0, seatCount - 1);
+    const newMaxConsoles = calculateMaxConsoles(seatCount);
     
     if (configuration.console?.required === "Yes") {
       const currentQuantity = configuration.console?.quantity || 0;
@@ -206,7 +207,7 @@ const CinemaChairConfigurator = ({ product, configuration, onConfigurationChange
                 value={configuration.console?.required || "No"}
                 onValueChange={(value) => {
                   const seatCount = parseSeaterType(configuration.seaterType || configuration.numberOfSeats || 1);
-                  const maxConsoles = Math.max(0, seatCount - 1);
+                  const maxConsoles = calculateMaxConsoles(seatCount);
                   updateConfiguration({
                     console: { 
                       ...configuration.console, 
@@ -282,10 +283,14 @@ const CinemaChairConfigurator = ({ product, configuration, onConfigurationChange
                   <div className="space-y-3">
                     <Label>Console Placements</Label>
                     {Array.from({ length: configuration.console.quantity }).map((_, index) => {
-                      const seatCount = parseSeaterType(configuration.seaterType || configuration.numberOfSeats || 1);
-                      const placementOptions = Array.from({ length: seatCount - 1 }, (_, i) => ({
-                        value: `after_${i + 1}`,
-                        label: `After ${i + 1}${i === 0 ? 'st' : i === 1 ? 'nd' : i === 2 ? 'rd' : 'th'} Seat from Left`,
+                      const seaterType = configuration.seaterType || "1-Seater";
+                      const consoleRequired = configuration.console?.required === "Yes" || configuration.console?.required === true;
+                      
+                      // Use console validation utility to generate placement options
+                      const placementOptions = generateConsolePlacements(consoleRequired, seaterType, "F");
+                      const formattedOptions = placementOptions.map(p => ({
+                        value: p.position,
+                        label: p.label.replace("Front: ", ""), // Remove "Front: " prefix for cinema chairs
                       }));
                       
                       return (
@@ -306,7 +311,7 @@ const CinemaChairConfigurator = ({ product, configuration, onConfigurationChange
                             </SelectTrigger>
                             <SelectContent>
                               <SelectItem value="none">None (Unassigned)</SelectItem>
-                              {placementOptions.map((opt) => (
+                              {formattedOptions.map((opt) => (
                                 <SelectItem key={opt.value} value={opt.value}>
                                   {opt.label}
                                 </SelectItem>

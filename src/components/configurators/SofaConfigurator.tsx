@@ -23,6 +23,7 @@ import { FabricLibrary } from "@/components/ui/FabricLibrary";
 import { SelectionCard } from "@/components/ui/SelectionCard";
 import { ChevronDown, Download, Info, Loader2, Square, LayoutGrid } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { generateAllConsolePlacements as generateConsolePlacementsUtil, calculateMaxConsoles, getSeatCountFromSeaterType } from "@/lib/console-validation";
 
 interface SofaConfiguratorProps {
   product: any;
@@ -232,43 +233,25 @@ const SofaConfigurator = ({
     return total;
   };
 
-  // Get section-specific seat counts for console placement
-  const getSectionSeatCounts = () => {
+  // Get section-specific seater types for console placement validation
+  const getSectionSeaterTypes = () => {
     const shape = normalizeShape(configuration.shape || 'standard');
-    const frontSeats = parseSeatCount(configuration.frontSeatCount || configuration.frontSeats || 2);
-    const leftSeats = (shape === 'l-shape' || shape === 'u-shape' || shape === 'combo') 
-      ? parseSeatCount(configuration.l2SeatCount || configuration.l2 || 0) 
-      : 0;
-    const rightSeats = (shape === 'u-shape' || shape === 'combo')
-      ? parseSeatCount(configuration.r2SeatCount || configuration.r2 || 0)
-      : 0;
+    const frontSeaterType = configuration.frontSeatCount || "2-Seater";
+    const leftSeaterType = (shape === 'l-shape' || shape === 'u-shape' || shape === 'combo') 
+      ? (configuration.l2SeatCount || "2-Seater")
+      : undefined;
+    const rightSeaterType = (shape === 'u-shape' || shape === 'combo')
+      ? (configuration.r2SeatCount || "2-Seater")
+      : undefined;
     
     return {
-      front: frontSeats,
-      left: leftSeats,
-      right: rightSeats,
-      hasCorner: shape === 'l-shape' || shape === 'u-shape' || shape === 'combo'
+      front: frontSeaterType,
+      left: leftSeaterType,
+      right: rightSeaterType,
     };
   };
 
-  // Generate console placement options for a specific section
-  // Consoles are placed ONLY between seats within each section (no corner junctions)
-  const generateConsolePlacementOptions = (section: 'front' | 'left' | 'right', seatCount: number, module?: number) => {
-    if (seatCount <= 1) return [];
-    const positions = [];
-    for (let i = 1; i < seatCount; i++) {
-      const ordinal = i === 1 ? 'st' : i === 2 ? 'nd' : i === 3 ? 'rd' : 'th';
-      const sectionLabel = section.charAt(0).toUpperCase() + section.slice(1);
-      const moduleLabel = module && module > 1 ? ` (Module ${module})` : '';
-      positions.push({
-        value: i.toString(),
-        label: `After ${i}${ordinal} Seat from Left (${sectionLabel}${moduleLabel})`
-      });
-    }
-    return positions;
-  };
-
-  // Helper for ordinal suffix
+  // Helper for ordinal suffix (kept for backward compatibility)
   const getOrdinalSuffix = (num: number) => {
     const j = num % 10;
     const k = num % 100;
@@ -278,50 +261,23 @@ const SofaConfigurator = ({
     return "th";
   };
 
-  // Generate all possible console placements based on sections
-  // Returns array of placement objects with section, position, and label (cleaner labels without console numbering)
+  // Generate all possible console placements based on sections using explicit validation formulas
+  // Returns array of placement objects with section, position, and label matching spreadsheet formulas
   const generateAllConsolePlacements = () => {
-    const placements: Array<{ section: string; position: string; label: string; value: string }> = [];
-    const sectionCounts = getSectionSeatCounts();
+    const consoleRequired = configuration.console?.required === "Yes" || configuration.console?.required === true;
+    const shape = configuration.shape || "STANDARD";
+    const sectionSeaterTypes = getSectionSeaterTypes();
 
-    // Front section consoles (between seats only)
-    if (sectionCounts.front > 1) {
-      for (let i = 1; i < sectionCounts.front; i++) {
-        const ordinal = getOrdinalSuffix(i);
-        placements.push({
-          section: 'front',
-          position: `after_${i}`,
-          label: `Front: After ${i}${ordinal} Seat from Left`,
-          value: `front_${i}`
-        });
-      }
-    }
-
-    // Left section consoles (L2 - between seats only)
-    if (sectionCounts.left > 1) {
-      for (let i = 1; i < sectionCounts.left; i++) {
-        const ordinal = getOrdinalSuffix(i);
-        placements.push({
-          section: 'left',
-          position: `after_${i}`,
-          label: `Left: After ${i}${ordinal} Seat from Left`,
-          value: `left_${i}`
-        });
-      }
-    }
-
-    // Right section consoles (R2 - between seats only)
-    if (sectionCounts.right > 1) {
-      for (let i = 1; i < sectionCounts.right; i++) {
-        const ordinal = getOrdinalSuffix(i);
-        placements.push({
-          section: 'right',
-          position: `after_${i}`,
-          label: `Right: After ${i}${ordinal} Seat from Left`,
-          value: `right_${i}`
-        });
-      }
-    }
+    // Use the console validation utility to generate placements
+    const placements = generateConsolePlacementsUtil(
+      consoleRequired,
+      {
+        front: sectionSeaterTypes.front,
+        left: sectionSeaterTypes.left,
+        right: sectionSeaterTypes.right,
+      },
+      shape
+    );
 
     return placements;
   };
@@ -330,7 +286,7 @@ const SofaConfigurator = ({
   const totalSeats = getTotalSeats();
   useEffect(() => {
     if (configuration.console?.required) {
-      const maxConsoles = Math.max(0, totalSeats - 1);
+      const maxConsoles = calculateMaxConsoles(totalSeats);
       const currentPlacements = configuration.console?.placements || [];
       
       // Always maintain maxConsoles slots in the array
@@ -862,7 +818,7 @@ const SofaConfigurator = ({
                 onValueChange={(value) => {
                   const isRequired = value === "Yes";
                   const totalSeats = getTotalSeats();
-                  const maxConsoles = Math.max(0, totalSeats - 1);
+                  const maxConsoles = calculateMaxConsoles(totalSeats);
                   const autoQuantity = isRequired ? maxConsoles : 0;
                   
                   // Initialize placements array - always maintain maxConsoles slots
@@ -942,7 +898,7 @@ const SofaConfigurator = ({
                     <p className="text-sm font-medium">
                       {configuration.console?.quantity || 0} Console{configuration.console?.quantity !== 1 ? 's' : ''} 
                       <span className="text-muted-foreground ml-2">
-                        (Auto-calculated: Total Seats - 1 = {getTotalSeats()} - 1 = {Math.max(0, getTotalSeats() - 1)})
+                        (Auto-calculated: Total Seats - 1 = {getTotalSeats()} - 1 = {calculateMaxConsoles(getTotalSeats())})
                       </span>
                     </p>
                     <p className="text-xs text-muted-foreground mt-1">
@@ -954,7 +910,7 @@ const SofaConfigurator = ({
                 {/* Console Placements & Accessories */}
                 {configuration.console?.quantity > 0 && (() => {
                   const allPlacements = generateAllConsolePlacements();
-                  const maxConsoles = Math.max(0, getTotalSeats() - 1);
+                  const maxConsoles = calculateMaxConsoles(getTotalSeats());
                   
                   // Always maintain maxConsoles slots in the array
                   // This ensures slots maintain their positions even when set to "none"

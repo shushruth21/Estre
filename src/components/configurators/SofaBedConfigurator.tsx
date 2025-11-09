@@ -18,6 +18,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Download, Info, Loader2, Square, LayoutGrid } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { generateAllConsolePlacements as generateConsolePlacementsUtil, calculateMaxConsoles } from "@/lib/console-validation";
 
 interface SofaBedConfiguratorProps {
   product: any;
@@ -145,7 +146,7 @@ const SofaBedConfigurator = ({ product, configuration, onConfigurationChange }: 
   };
 
   const getMaxConsoles = (): number => {
-    return Math.max(0, getTotalSeats() - 1);
+    return calculateMaxConsoles(getTotalSeats());
   };
 
   const getSectionOptions = (sectionId: string): string[] => {
@@ -171,78 +172,37 @@ const SofaBedConfigurator = ({ product, configuration, onConfigurationChange }: 
     return 'STANDARD';
   };
 
-  // Generate console placements (section-based, like SofaConfigurator)
+  // Generate console placements using explicit validation formulas
+  // Note: For SofaBed, console placements are based on seater type, not multiplied by quantity
+  // Each section module has its own console placements based on the seater type
   const generateAllConsolePlacements = () => {
-    const placements: Array<{ section: string; position: string; label: string; value: string }> = [];
+    const consoleRequired = configuration.console?.required === "Yes" || configuration.console?.required === true;
     const sections = configuration.sections || {};
     const shape = normalizeShape(configuration.baseShape || "STANDARD");
-    let consoleIndex = 1;
 
-    // Front section consoles
-    const frontSeats = parseSeatCount(sections.F?.seater || "2-Seater") * (sections.F?.qty || 1);
-    if (frontSeats > 1) {
-      for (let i = 1; i < frontSeats; i++) {
-        const ordinal = i === 1 ? 'st' : i === 2 ? 'nd' : i === 3 ? 'rd' : 'th';
-        placements.push({
-          section: 'front',
-          position: `after_${i}`,
-          label: `Front Console ${consoleIndex}: After ${i}${ordinal} Seat from Left`,
-          value: `front_${i}`
-        });
-        consoleIndex++;
-      }
-    }
+    // Get seater types for each section (use the seater type string, not multiplied by quantity)
+    const frontSeaterType = sections.F?.seater || "2-Seater";
+    const leftSeaterType = (shape === "L SHAPE" || shape === "U SHAPE" || shape === "COMBO") 
+      ? (sections.L2?.seater || "2-Seater")
+      : undefined;
+    const rightSeaterType = (shape === "U SHAPE" || shape === "COMBO")
+      ? (sections.R2?.seater || "2-Seater")
+      : undefined;
+    const comboSeaterType = (shape === "COMBO")
+      ? (sections.C2?.seater || "2-Seater")
+      : undefined;
 
-    // Left section consoles (L2)
-    if (shape === "L SHAPE" || shape === "U SHAPE" || shape === "COMBO") {
-      const leftSeats = parseSeatCount(sections.L2?.seater || "2-Seater") * (sections.L2?.qty || 1);
-      if (leftSeats > 1) {
-        for (let i = 1; i < leftSeats; i++) {
-          const ordinal = i === 1 ? 'st' : i === 2 ? 'nd' : i === 3 ? 'rd' : 'th';
-          placements.push({
-            section: 'left',
-            position: `after_${i}`,
-            label: `Left Console ${consoleIndex}: After ${i}${ordinal} Seat from Left (Left Section)`,
-            value: `left_${i}`
-          });
-          consoleIndex++;
-        }
-      }
-    }
-
-    // Right section consoles (R2)
-    if (shape === "U SHAPE" || shape === "COMBO") {
-      const rightSeats = parseSeatCount(sections.R2?.seater || "2-Seater") * (sections.R2?.qty || 1);
-      if (rightSeats > 1) {
-        for (let i = 1; i < rightSeats; i++) {
-          const ordinal = i === 1 ? 'st' : i === 2 ? 'nd' : i === 3 ? 'rd' : 'th';
-          placements.push({
-            section: 'right',
-            position: `after_${i}`,
-            label: `Right Console ${consoleIndex}: After ${i}${ordinal} Seat from Left (Right Section)`,
-            value: `right_${i}`
-          });
-          consoleIndex++;
-        }
-      }
-    }
-
-    // Combo section consoles (C2)
-    if (shape === "COMBO") {
-      const comboSeats = parseSeatCount(sections.C2?.seater || "2-Seater") * (sections.C2?.qty || 1);
-      if (comboSeats > 1) {
-        for (let i = 1; i < comboSeats; i++) {
-          const ordinal = i === 1 ? 'st' : i === 2 ? 'nd' : i === 3 ? 'rd' : 'th';
-          placements.push({
-            section: 'combo',
-            position: `after_${i}`,
-            label: `Combo Console ${consoleIndex}: After ${i}${ordinal} Seat from Left (Combo Section)`,
-            value: `combo_${i}`
-          });
-          consoleIndex++;
-        }
-      }
-    }
+    // Use the console validation utility to generate placements
+    const placements = generateConsolePlacementsUtil(
+      consoleRequired,
+      {
+        front: frontSeaterType,
+        left: leftSeaterType,
+        right: rightSeaterType,
+        combo: comboSeaterType,
+      },
+      shape
+    );
 
     return placements;
   };

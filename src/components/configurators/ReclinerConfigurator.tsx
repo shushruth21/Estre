@@ -19,6 +19,7 @@ import { SelectionCard } from "@/components/ui/SelectionCard";
 import { useDropdownOptions } from "@/hooks/useDropdownOptions";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { generateAllConsolePlacements as generateConsolePlacementsUtil, calculateMaxConsoles } from "@/lib/console-validation";
 
 interface ReclinerConfiguratorProps {
   product: any;
@@ -147,51 +148,28 @@ const ReclinerConfigurator = ({ product, configuration, onConfigurationChange }:
     return 'STANDARD';
   };
 
-  // Generate console placement options for recliner (similar to sofa but only F and L sections)
+  // Generate console placement options for recliner using explicit validation formulas
   const generateAllConsolePlacements = () => {
-    const placements: Array<{ section: string; position: string; label: string; value: string }> = [];
+    const consoleRequired = configuration.console?.required === "Yes" || configuration.console?.required === true;
     const sections = configuration.sections || {};
     const shape = normalizeShape(configuration.baseShape || "STANDARD");
-    
-    // Helper for ordinal suffix
-    const getOrdinalSuffix = (num: number) => {
-      const j = num % 10;
-      const k = num % 100;
-      if (j === 1 && k !== 11) return "st";
-      if (j === 2 && k !== 12) return "nd";
-      if (j === 3 && k !== 13) return "rd";
-      return "th";
-    };
 
-    // Front section consoles
-    const frontSeats = getSeatCount(sections.F?.type || "1-Seater") * (sections.F?.qty || 1);
-    if (frontSeats > 1) {
-      for (let i = 1; i < frontSeats; i++) {
-        const ordinal = getOrdinalSuffix(i);
-        placements.push({
-          section: 'front',
-          position: `after_${i}`,
-          label: `Front: After ${i}${ordinal} Seat from Left`,
-          value: `front_${i}`
-        });
-      }
-    }
+    // Get seater types for each section
+    // For recliner, sections use "type" field (e.g., "1-Seater", "2-Seater", "4-Seater")
+    const frontSeaterType = sections.F?.type || "1-Seater";
+    const leftSeaterType = (shape === "L SHAPE") 
+      ? (sections.L2?.type || "1-Seater")
+      : undefined;
 
-    // Left section consoles (L2 - only for L SHAPE)
-    if (shape === "L SHAPE") {
-      const leftSeats = getSeatCount(sections.L2?.type || "1-Seater") * (sections.L2?.qty || 1);
-      if (leftSeats > 1) {
-        for (let i = 1; i < leftSeats; i++) {
-          const ordinal = getOrdinalSuffix(i);
-          placements.push({
-            section: 'left',
-            position: `after_${i}`,
-            label: `Left: After ${i}${ordinal} Seat from Left`,
-            value: `left_${i}`
-          });
-        }
-      }
-    }
+    // Use the console validation utility to generate placements
+    const placements = generateConsolePlacementsUtil(
+      consoleRequired,
+      {
+        front: frontSeaterType,
+        left: leftSeaterType,
+      },
+      shape
+    );
 
     return placements;
   };

@@ -723,9 +723,9 @@ async function calculateSofaPricing(
   }
 
   // Console pricing - Fixed price per console based on size + accessory prices
+  // Only charge for ACTIVE consoles (where position !== "none")
   if (configuration.console?.required) {
     const consoleSize = configuration.console?.size || "";
-    const quantity = configuration.console?.quantity || 1;
 
     // Base console price (per console)
     let baseConsolePrice = 0;
@@ -735,10 +735,17 @@ async function calculateSofaPricing(
       baseConsolePrice = getFormulaValue(formulas, "console_10_inch", 12000);
     }
 
-    // Calculate total console price: base price * quantity + sum of all accessory prices
+    // Count only ACTIVE console placements (not "none")
+    // Match the same logic used in Active Consoles Summary
+    const activePlacements = (configuration.console?.placements || []).filter(
+      (p: any) => p && p.position && p.position !== null && p.section !== null && p.position !== "none"
+    );
+    const activeConsoleCount = activePlacements.length;
+
+    // Calculate console accessories prices from ACTIVE placements only
     let consoleAccessoriesTotal = 0;
-    if (configuration.console?.placements && Array.isArray(configuration.console.placements)) {
-      const accessoryIds = configuration.console.placements
+    if (activePlacements.length > 0) {
+      const accessoryIds = activePlacements
         .map((p: any) => p?.accessoryId)
         .filter((id: any) => id && id !== null && id !== "none");
       
@@ -750,7 +757,7 @@ async function calculateSofaPricing(
           .eq("is_active", true);
         
         if (accessories && accessories.length > 0) {
-          // Sum all accessory prices (each console placement can have one accessory)
+          // Sum all accessory prices from active console placements only
           consoleAccessoriesTotal = accessories.reduce((sum: number, acc: any) => {
             return sum + (Number(acc.sale_price) || 0);
           }, 0);
@@ -758,9 +765,13 @@ async function calculateSofaPricing(
       }
     }
 
-    // Total console price = (base console price * quantity) + (sum of all accessories)
-    breakdown.consolePrice = (baseConsolePrice * quantity) + consoleAccessoriesTotal;
+    // Total console price = (base console price × ACTIVE console count) + (sum of all accessories from active consoles)
+    breakdown.consolePrice = (baseConsolePrice * activeConsoleCount) + consoleAccessoriesTotal;
     totalPrice += breakdown.consolePrice;
+
+    if (import.meta.env.DEV) {
+      console.log(`🛋️ Sofa Console Pricing: Active Consoles=${activeConsoleCount}, Base=₹${baseConsolePrice} × ${activeConsoleCount} = ₹${baseConsolePrice * activeConsoleCount}, Accessories=₹${consoleAccessoriesTotal}, Total=₹${breakdown.consolePrice}`);
+    }
   }
 
   // Pillows pricing - Type-based pricing with quantity multiplier
@@ -1245,9 +1256,9 @@ async function calculateReclinerPricing(
   }
 
   // Console pricing (includes base console price + accessories)
+  // Only charge for ACTIVE consoles (where position !== "none")
   if (configuration.console?.required === "Yes" || configuration.console?.required === true) {
     const consoleSize = configuration.console?.size || "";
-    const quantity = configuration.console?.quantity || 1;
     const placements = configuration.console?.placements || [];
 
     // Base console price
@@ -1258,14 +1269,17 @@ async function calculateReclinerPricing(
       baseConsolePrice = getFormulaValue(formulas, "console_10_inch", 12000);
     }
 
-    // Calculate console accessories prices
-    let consoleAccessoriesTotal = 0;
+    // Count only ACTIVE console placements (not "none")
+    // Match the same logic used in Active Consoles Summary
     const activePlacements = placements.filter((p: any) => 
-      p && p.position && p.position !== "none" && p.section
+      p && p.position && p.position !== null && p.section !== null && p.position !== "none"
     );
+    const activeConsoleCount = activePlacements.length;
 
+    // Calculate console accessories prices from ACTIVE placements only
+    let consoleAccessoriesTotal = 0;
     for (const placement of activePlacements) {
-      if (placement.accessoryId && placement.accessoryId !== "none") {
+      if (placement.accessoryId && placement.accessoryId !== "none" && placement.accessoryId !== null) {
         try {
           const { data: accessory } = await supabase
             .from("accessories_prices")
@@ -1283,12 +1297,12 @@ async function calculateReclinerPricing(
       }
     }
 
-    // Total console price = (base console price × quantity) + sum of all accessories
-    breakdown.consolePrice = (baseConsolePrice * quantity) + consoleAccessoriesTotal;
+    // Total console price = (base console price × ACTIVE console count) + sum of all accessories from active consoles
+    breakdown.consolePrice = (baseConsolePrice * activeConsoleCount) + consoleAccessoriesTotal;
     totalPrice += breakdown.consolePrice;
-    
+
     if (import.meta.env.DEV) {
-      console.log(`🪑 Console Pricing: Base=₹${baseConsolePrice} × ${quantity} = ₹${baseConsolePrice * quantity}, Accessories=₹${consoleAccessoriesTotal}, Total=₹${breakdown.consolePrice}`);
+      console.log(`🪑 Recliner Console Pricing: Active Consoles=${activeConsoleCount}, Base=₹${baseConsolePrice} × ${activeConsoleCount} = ₹${baseConsolePrice * activeConsoleCount}, Accessories=₹${consoleAccessoriesTotal}, Total=₹${breakdown.consolePrice}`);
     }
   }
 
@@ -1432,9 +1446,9 @@ async function calculateCinemaChairPricing(
   }
 
   // Console pricing - Fixed price per console based on size + accessory prices
+  // Only charge for ACTIVE consoles (where placement !== "none" and !== null)
   if (configuration.console?.required === "Yes" || configuration.console?.required === true) {
     const consoleSize = configuration.console?.size || "";
-    const quantity = configuration.console?.quantity || 0;
     const placements = configuration.console?.placements || [];
 
     // Base console price (per console)
@@ -1445,37 +1459,51 @@ async function calculateCinemaChairPricing(
       baseConsolePrice = getFormulaValue(formulas, "console_10_inch", 12000);
     }
 
-    // Calculate console accessories prices from placements
-    let consoleAccessoriesTotal = 0;
+    // Count only ACTIVE console placements (not "none" or null)
+    // For Cinema Chairs, placements are stored as strings (e.g., "after_1") or null/"none"
     const activePlacements = placements.filter((p: any) => 
-      p && p.position && p.position !== "none" && p.section
+      p && p !== null && p !== "none" && p !== undefined
     );
+    const activeConsoleCount = activePlacements.length;
 
-    for (const placement of activePlacements) {
-      if (placement.accessoryId && placement.accessoryId !== "none" && placement.accessoryId !== null) {
-        try {
-          const { data: accessory } = await supabase
-            .from("accessories_prices")
-            .select("sale_price")
-            .eq("id", placement.accessoryId)
-            .eq("is_active", true)
-            .single();
-
-          if (accessory && accessory.sale_price) {
-            consoleAccessoriesTotal += Number(accessory.sale_price) || 0;
+    // Calculate console accessories prices from ACTIVE consoles only
+    // Cinema Chairs stores accessories in configuration.accessories.consoleAccessories array
+    // Accessories are indexed by console slot, so we need to match them with active placements by index
+    let consoleAccessoriesTotal = 0;
+    if (configuration.accessories?.consoleAccessories && Array.isArray(configuration.accessories.consoleAccessories)) {
+      // Collect accessory IDs only for active console placements (by index)
+      const activeAccessoryIds: string[] = [];
+      placements.forEach((placement: any, index: number) => {
+        // If this placement is active, check if there's an accessory at this index
+        if (placement && placement !== null && placement !== "none" && placement !== undefined) {
+          const accessoryId = configuration.accessories.consoleAccessories[index];
+          if (accessoryId && accessoryId !== null && accessoryId !== "none" && accessoryId !== undefined) {
+            activeAccessoryIds.push(accessoryId.toString());
           }
-        } catch (error) {
-          console.warn("Error fetching console accessory price:", error);
+        }
+      });
+      
+      if (activeAccessoryIds.length > 0) {
+        const { data: accessories } = await supabase
+          .from("accessories_prices")
+          .select("id, sale_price")
+          .in("id", activeAccessoryIds)
+          .eq("is_active", true);
+        
+        if (accessories && accessories.length > 0) {
+          consoleAccessoriesTotal = accessories.reduce((sum: number, acc: any) => {
+            return sum + (Number(acc.sale_price) || 0);
+          }, 0);
         }
       }
     }
 
-    // Total console price = (base console price × quantity) + sum of all accessories
-    breakdown.consolePrice = (baseConsolePrice * quantity) + consoleAccessoriesTotal;
+    // Total console price = (base console price × ACTIVE console count) + sum of all accessories from active consoles
+    breakdown.consolePrice = (baseConsolePrice * activeConsoleCount) + consoleAccessoriesTotal;
     totalPrice += breakdown.consolePrice;
-    
+
     if (import.meta.env.DEV) {
-      console.log(`🎬 Cinema Chairs Console Pricing: Base=₹${baseConsolePrice} × ${quantity} = ₹${baseConsolePrice * quantity}, Accessories=₹${consoleAccessoriesTotal}, Total=₹${breakdown.consolePrice}`);
+      console.log(`🎬 Cinema Chairs Console Pricing: Active Consoles=${activeConsoleCount}, Base=₹${baseConsolePrice} × ${activeConsoleCount} = ₹${baseConsolePrice * activeConsoleCount}, Accessories=₹${consoleAccessoriesTotal}, Total=₹${breakdown.consolePrice}`);
     }
   }
 
@@ -2018,9 +2046,9 @@ async function calculateSofabedPricing(
   }
 
   // Console pricing - Fixed price per console based on size + accessory prices
+  // Only charge for ACTIVE consoles (where position !== "none")
   if (configuration.console?.required === "Yes" || configuration.console?.required === true) {
     const consoleSize = configuration.console?.size || "";
-    const quantity = configuration.console?.quantity || 0;
     const placements = configuration.console?.placements || [];
 
     // Base console price (per console)
@@ -2031,12 +2059,15 @@ async function calculateSofabedPricing(
       baseConsolePrice = getFormulaValue(formulas, "console_10_inch", 12000);
     }
 
-    // Calculate console accessories prices from placements
-    let consoleAccessoriesTotal = 0;
+    // Count only ACTIVE console placements (not "none")
+    // Match the same logic used in Active Consoles Summary
     const activePlacements = placements.filter((p: any) => 
-      p && p.position && p.position !== "none" && p.section
+      p && p.position && p.position !== null && p.section !== null && p.position !== "none"
     );
+    const activeConsoleCount = activePlacements.length;
 
+    // Calculate console accessories prices from ACTIVE placements only
+    let consoleAccessoriesTotal = 0;
     for (const placement of activePlacements) {
       if (placement.accessoryId && placement.accessoryId !== "none" && placement.accessoryId !== null) {
         try {
@@ -2056,12 +2087,12 @@ async function calculateSofabedPricing(
       }
     }
 
-    // Total console price = (base console price × quantity) + sum of all accessories
-    breakdown.consolePrice = (baseConsolePrice * quantity) + consoleAccessoriesTotal;
+    // Total console price = (base console price × ACTIVE console count) + sum of all accessories from active consoles
+    breakdown.consolePrice = (baseConsolePrice * activeConsoleCount) + consoleAccessoriesTotal;
     totalPrice += breakdown.consolePrice;
-    
+
     if (import.meta.env.DEV) {
-      console.log(`🛋️ Sofabed Console Pricing: Base=₹${baseConsolePrice} × ${quantity} = ₹${baseConsolePrice * quantity}, Accessories=₹${consoleAccessoriesTotal}, Total=₹${breakdown.consolePrice}`);
+      console.log(`🛋️ Sofabed Console Pricing: Active Consoles=${activeConsoleCount}, Base=₹${baseConsolePrice} × ${activeConsoleCount} = ₹${baseConsolePrice * activeConsoleCount}, Accessories=₹${consoleAccessoriesTotal}, Total=₹${breakdown.consolePrice}`);
     }
   }
 
