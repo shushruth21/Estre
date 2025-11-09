@@ -183,40 +183,62 @@ export const FabricLibrary = ({
     onOpenChange(false);
   };
 
-  // Get fabric image URL from colour column
+  // Get fabric image URL from colour_link column (primary source for image URLs)
   const getFabricImageUrl = (fabric: Fabric): string | null => {
-    // Try colour column first (may contain image URL)
-    if (fabric.colour) {
-      const colourValue = String(fabric.colour).trim();
+    // PRIMARY: Use colour_link column - this is where image URLs should be stored
+    if (fabric.colour_link) {
+      const colourLinkValue = String(fabric.colour_link).trim();
       
-      // Use getFirstImageUrl to handle various formats (string, array, comma-separated, JSON)
-      const imageUrl = getFirstImageUrl(colourValue);
-      if (imageUrl && imageUrl !== '/placeholder.svg') {
+      // Skip empty values
+      if (!colourLinkValue || colourLinkValue === '') {
+        return null;
+      }
+      
+      // Try parsing as image URL (handles various formats: string, array, comma-separated, JSON)
+      const imageUrl = getFirstImageUrl(colourLinkValue);
+      if (imageUrl && imageUrl !== '/placeholder.svg' && isValidImageUrl(imageUrl)) {
         return imageUrl;
       }
       
-      // If getFirstImageUrl didn't work, try direct normalization (more lenient)
-      if (colourValue && colourValue.length > 3) {
-        const normalized = normalizeImageUrl(colourValue);
-        if (normalized && normalized !== '/placeholder.svg') {
+      // If getFirstImageUrl didn't work, try direct normalization
+      // This handles cases where the URL might not be in a standard format
+      const normalized = normalizeImageUrl(colourLinkValue);
+      if (normalized && normalized !== '/placeholder.svg') {
+        // Additional validation: check if it looks like a URL or file path
+        if (normalized.includes('.jpg') || normalized.includes('.jpeg') || 
+            normalized.includes('.png') || normalized.includes('.webp') || 
+            normalized.includes('.gif') || normalized.includes('http') ||
+            normalized.startsWith('/') || normalized.startsWith('//')) {
           return normalized;
         }
       }
     }
     
-    // Fallback to colour_link column
-    if (fabric.colour_link) {
-      const colourLinkValue = String(fabric.colour_link).trim();
-      const imageUrl = getFirstImageUrl(colourLinkValue);
-      if (imageUrl && imageUrl !== '/placeholder.svg') {
-        return imageUrl;
-      }
+    // FALLBACK: Try colour column (some old data might have URLs here)
+    if (fabric.colour) {
+      const colourValue = String(fabric.colour).trim();
       
-      // If getFirstImageUrl didn't work, try direct normalization
-      if (colourLinkValue && colourLinkValue.length > 3) {
-        const normalized = normalizeImageUrl(colourLinkValue);
+      // Only process if it looks like a URL/path (not just a color name like "Red")
+      if (colourValue && (
+        colourValue.includes('http') || 
+        colourValue.includes('.jpg') || 
+        colourValue.includes('.jpeg') || 
+        colourValue.includes('.png') ||
+        colourValue.startsWith('/') ||
+        colourValue.startsWith('//')
+      )) {
+        const imageUrl = getFirstImageUrl(colourValue);
+        if (imageUrl && imageUrl !== '/placeholder.svg' && isValidImageUrl(imageUrl)) {
+          return imageUrl;
+        }
+        
+        const normalized = normalizeImageUrl(colourValue);
         if (normalized && normalized !== '/placeholder.svg') {
-          return normalized;
+          if (normalized.includes('.jpg') || normalized.includes('.jpeg') || 
+              normalized.includes('.png') || normalized.includes('.webp') || 
+              normalized.includes('.gif') || normalized.includes('http')) {
+            return normalized;
+          }
         }
       }
     }
@@ -226,10 +248,24 @@ export const FabricLibrary = ({
 
   // Generate color from fabric code or use default (fallback when no image)
   const getFabricColor = (fabric: Fabric): string => {
-    // Try to extract color from code or use a hash-based color
-    if (fabric.colour_link) return fabric.colour_link;
+    // Use colour column for color value (not colour_link, which is for image URLs)
+    // Only use if it's a simple color name/value, not a URL
+    if (fabric.colour) {
+      const colourValue = String(fabric.colour).trim();
+      // Only use as color if it doesn't look like a URL
+      if (colourValue && !colourValue.includes('http') && !colourValue.includes('.jpg') && 
+          !colourValue.includes('.png') && !colourValue.includes('.jpeg') && 
+          !colourValue.startsWith('/') && colourValue.length < 50) {
+        // It's likely a color name/value, use it for background
+        // Try to parse as CSS color, otherwise generate from hash
+        if (colourValue.match(/^#[0-9A-Fa-f]{3,6}$/) || 
+            colourValue.match(/^rgb\(|^hsl\(|^rgba\(|^hsla\(/)) {
+          return colourValue;
+        }
+      }
+    }
     
-    // Generate a consistent color from the code
+    // Generate a consistent color from the fabric code (hash-based)
     let hash = 0;
     for (let i = 0; i < fabric.estre_code.length; i++) {
       hash = fabric.estre_code.charCodeAt(i) + ((hash << 5) - hash);
