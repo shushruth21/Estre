@@ -189,38 +189,66 @@ export const FabricLibrary = ({
     if (fabric.colour_link) {
       const colourLinkValue = String(fabric.colour_link).trim();
       
-      // Skip empty values
-      if (!colourLinkValue || colourLinkValue === '') {
+      // Skip empty values, NULL, or error values
+      if (!colourLinkValue || 
+          colourLinkValue === '' || 
+          colourLinkValue === 'NULL' || 
+          colourLinkValue === '#VALUE!' ||
+          colourLinkValue.toLowerCase() === 'null') {
+        if (import.meta.env.DEV) {
+          console.log(`[FabricLibrary] Skipping invalid colour_link for ${fabric.estre_code}:`, colourLinkValue);
+        }
         return null;
       }
       
-      // Try parsing as image URL (handles various formats: string, array, comma-separated, JSON)
+      // Try parsing as image URL first (handles various formats: string, array, comma-separated, JSON)
+      // This will automatically convert Google Drive URLs via normalizeImageUrl
       const imageUrl = getFirstImageUrl(colourLinkValue);
-      if (imageUrl && imageUrl !== '/placeholder.svg' && isValidImageUrl(imageUrl)) {
+      if (imageUrl && imageUrl !== '/placeholder.svg') {
+        if (import.meta.env.DEV) {
+          console.log(`[FabricLibrary] Using image URL for ${fabric.estre_code}:`, imageUrl);
+        }
+        // Return the URL - let the browser try to load it
+        // Don't use strict validation here as it might reject valid URLs
         return imageUrl;
       }
       
       // If getFirstImageUrl didn't work, try direct normalization
-      // This handles cases where the URL might not be in a standard format
+      // This handles Google Drive URLs and other non-standard formats
       const normalized = normalizeImageUrl(colourLinkValue);
       if (normalized && normalized !== '/placeholder.svg') {
-        // Additional validation: check if it looks like a URL or file path
-        if (normalized.includes('.jpg') || normalized.includes('.jpeg') || 
-            normalized.includes('.png') || normalized.includes('.webp') || 
-            normalized.includes('.gif') || normalized.includes('http') ||
-            normalized.startsWith('/') || normalized.startsWith('//')) {
-          return normalized;
+        if (import.meta.env.DEV) {
+          console.log(`[FabricLibrary] Using normalized image URL for ${fabric.estre_code}:`, normalized, '(original:', colourLinkValue + ')');
         }
+        // Accept any normalized URL - the normalization function handles validation
+        // This includes Google Drive URLs (converted to direct image URLs),
+        // regular HTTP/HTTPS URLs, and relative paths
+        return normalized;
+      }
+      
+      if (import.meta.env.DEV) {
+        console.warn(`[FabricLibrary] Could not process colour_link for ${fabric.estre_code}:`, colourLinkValue);
+      }
+    } else {
+      if (import.meta.env.DEV) {
+        console.log(`[FabricLibrary] No colour_link for ${fabric.estre_code}, falling back to colour column`);
       }
     }
     
     // FALLBACK: Try colour column (some old data might have URLs here)
+    // Only if colour_link didn't have a valid URL
     if (fabric.colour) {
       const colourValue = String(fabric.colour).trim();
+      
+      // Skip error values
+      if (colourValue === 'NULL' || colourValue === '#VALUE!' || colourValue.toLowerCase() === 'null') {
+        return null;
+      }
       
       // Only process if it looks like a URL/path (not just a color name like "Red")
       if (colourValue && (
         colourValue.includes('http') || 
+        colourValue.includes('drive.google.com') ||
         colourValue.includes('.jpg') || 
         colourValue.includes('.jpeg') || 
         colourValue.includes('.png') ||
@@ -228,21 +256,26 @@ export const FabricLibrary = ({
         colourValue.startsWith('//')
       )) {
         const imageUrl = getFirstImageUrl(colourValue);
-        if (imageUrl && imageUrl !== '/placeholder.svg' && isValidImageUrl(imageUrl)) {
+        if (imageUrl && imageUrl !== '/placeholder.svg') {
+          if (import.meta.env.DEV) {
+            console.log(`[FabricLibrary] Using colour column image URL for ${fabric.estre_code}:`, imageUrl);
+          }
           return imageUrl;
         }
         
         const normalized = normalizeImageUrl(colourValue);
         if (normalized && normalized !== '/placeholder.svg') {
-          if (normalized.includes('.jpg') || normalized.includes('.jpeg') || 
-              normalized.includes('.png') || normalized.includes('.webp') || 
-              normalized.includes('.gif') || normalized.includes('http')) {
-            return normalized;
+          if (import.meta.env.DEV) {
+            console.log(`[FabricLibrary] Using normalized colour column URL for ${fabric.estre_code}:`, normalized);
           }
+          return normalized;
         }
       }
     }
     
+    if (import.meta.env.DEV) {
+      console.log(`[FabricLibrary] No valid image URL found for ${fabric.estre_code}, will use color fallback`);
+    }
     return null;
   };
 

@@ -4,14 +4,80 @@
  */
 
 /**
+ * Convert Google Drive sharing URL to direct image URL
+ * Handles various Google Drive URL formats and converts them to direct image URLs
+ */
+export const convertGoogleDriveUrl = (url: string): string | null => {
+  if (!url || typeof url !== 'string') return null;
+  
+  // Only process Google Drive URLs
+  if (!url.includes('drive.google.com')) return null;
+  
+  // Extract file ID from various Google Drive URL formats
+  // Try multiple patterns to catch different URL formats
+  const patterns = [
+    // Format: https://drive.google.com/open?id=FILE_ID&usp=drive_copy (most common)
+    // Use a more specific pattern that requires at least 25 characters (typical Google Drive file IDs)
+    /[?&]id=([a-zA-Z0-9_-]{25,})/,
+    // Format: https://drive.google.com/file/d/FILE_ID/view
+    /\/file\/d\/([a-zA-Z0-9_-]{25,})/,
+    // Format: https://drive.google.com/d/FILE_ID
+    /\/d\/([a-zA-Z0-9_-]{25,})/,
+    // Fallback: any id= parameter (less strict, for shorter IDs)
+    /[?&]id=([a-zA-Z0-9_-]+)/,
+  ];
+  
+  for (const pattern of patterns) {
+    const match = url.match(pattern);
+    if (match && match[1]) {
+      const fileId = match[1];
+      // Convert to direct image URL that can be used in <img> tags
+      // Note: File must be shared with "Anyone with the link can view" for this to work
+      const directUrl = `https://drive.google.com/uc?export=view&id=${fileId}`;
+      
+      if (import.meta.env.DEV) {
+        console.log('[ImageUtils] Converted Google Drive URL:', {
+          original: url,
+          fileId: fileId,
+          directUrl: directUrl
+        });
+      }
+      
+      return directUrl;
+    }
+  }
+  
+  if (import.meta.env.DEV) {
+    console.warn('[ImageUtils] Could not extract file ID from Google Drive URL:', url);
+  }
+  
+  return null;
+};
+
+/**
  * Normalize a single image URL - ensure it has proper protocol
+ * Also converts Google Drive sharing URLs to direct image URLs
  */
 export const normalizeImageUrl = (url: string | null | undefined): string | null => {
   if (!url || url.trim() === '' || url === '/placeholder.svg') {
     return null;
   }
   
-  url = url.trim();
+  // Handle error values from database
+  const urlStr = String(url).trim();
+  if (urlStr === 'NULL' || urlStr === '#VALUE!' || urlStr.toLowerCase() === 'null') {
+    return null;
+  }
+  
+  url = urlStr;
+  
+  // Check if it's a Google Drive URL and convert it first
+  if (url.includes('drive.google.com')) {
+    const convertedUrl = convertGoogleDriveUrl(url);
+    if (convertedUrl) {
+      return convertedUrl;
+    }
+  }
   
   // If already a valid URL with protocol, return as is
   if (url.match(/^https?:\/\//i)) {
