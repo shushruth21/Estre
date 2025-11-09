@@ -94,14 +94,18 @@ const ReclinerConfigurator = ({ product, configuration, onConfigurationChange }:
           L2: null, // Only for L SHAPE
         },
         mechanism: {
-          front: "Manual",
-          left: "Manual", // Only for L SHAPE
+          sections: {
+            front: "Manual",
+            left: "Manual", // Only for L SHAPE
+          },
         },
         dummySeats: {
-          required: "No",
-          F: 0,
-          L: 0,
-          placements: {},
+          required: false,
+          quantity_per_section: {
+            front: 0,
+            left: 0,
+          },
+          placements: [],
         },
         console: {
           required: "No",
@@ -125,22 +129,8 @@ const ReclinerConfigurator = ({ product, configuration, onConfigurationChange }:
     }
   }, [product?.id, configuration.productId, onConfigurationChange]);
 
-  // Auto-update console quantity when seats change
-  useEffect(() => {
-    if (configuration.console?.required === "Yes") {
-      const totalSeats = getTotalSeats();
-      const maxConsoles = Math.max(0, totalSeats - 1);
-      if (configuration.console.quantity !== maxConsoles) {
-        onConfigurationChange({
-          ...configuration,
-          console: {
-            ...configuration.console,
-            quantity: maxConsoles,
-          },
-        });
-      }
-    }
-  }, [configuration.sections, configuration.console?.required]);
+  // Note: Console quantity is NOT auto-calculated for recliner (manually set by user)
+  // This is different from sofa/sofabed where quantity = totalSeats - 1
 
   const updateConfiguration = (updates: any) => {
     onConfigurationChange({ ...configuration, ...updates });
@@ -376,10 +366,18 @@ const ReclinerConfigurator = ({ product, configuration, onConfigurationChange }:
               <div className="space-y-2">
                 <Label>Front Recliner Mechanism</Label>
                 <Select
-                  value={configuration.mechanism?.front || "Manual"}
-                  onValueChange={(value) => updateConfiguration({
-                    mechanism: { ...configuration.mechanism, front: value }
-                  })}
+                  value={configuration.mechanism?.sections?.front || configuration.mechanism?.front || "Manual"}
+                  onValueChange={(value) => {
+                    const mechanismSections = configuration.mechanism?.sections || configuration.mechanism || {};
+                    updateConfiguration({
+                      mechanism: {
+                        sections: {
+                          ...mechanismSections,
+                          front: value
+                        }
+                      }
+                    });
+                  }}
                 >
                   <SelectTrigger>
                     <SelectValue />
@@ -399,10 +397,18 @@ const ReclinerConfigurator = ({ product, configuration, onConfigurationChange }:
                 <div className="space-y-2">
                   <Label>Left Recliner Mechanism</Label>
                   <Select
-                    value={configuration.mechanism?.left || "Manual"}
-                    onValueChange={(value) => updateConfiguration({
-                      mechanism: { ...configuration.mechanism, left: value }
-                    })}
+                    value={configuration.mechanism?.sections?.left || configuration.mechanism?.left || "Manual"}
+                    onValueChange={(value) => {
+                      const mechanismSections = configuration.mechanism?.sections || configuration.mechanism || {};
+                      updateConfiguration({
+                        mechanism: {
+                          sections: {
+                            ...mechanismSections,
+                            left: value
+                          }
+                        }
+                      });
+                    }}
                   >
                     <SelectTrigger>
                       <SelectValue />
@@ -427,13 +433,12 @@ const ReclinerConfigurator = ({ product, configuration, onConfigurationChange }:
                   <RadioGroup
                     value={configuration.console?.required || "No"}
                     onValueChange={(value) => {
-                      const totalSeats = getTotalSeats();
-                      const maxConsoles = Math.max(0, totalSeats - 1);
                       updateConfiguration({
                         console: {
                           ...configuration.console,
                           required: value,
-                          quantity: value === "Yes" ? maxConsoles : 0,
+                          quantity: value === "Yes" ? (configuration.console?.quantity || 1) : 0,
+                          placements: value === "Yes" ? (configuration.console?.placements || []) : [],
                         }
                       });
                     }}
@@ -468,9 +473,43 @@ const ReclinerConfigurator = ({ product, configuration, onConfigurationChange }:
                         </SelectContent>
                       </Select>
                     </div>
-                    <div className="p-3 bg-muted rounded-lg">
-                      <p className="text-sm text-muted-foreground">
-                        Console quantity: <strong>{configuration.console?.quantity || 0}</strong> (Auto-calculated: Total Seats - 1)
+                    <div className="space-y-2">
+                      <Label>Console Quantity</Label>
+                      <Input
+                        type="number"
+                        min="0"
+                        max={getTotalSeats()}
+                        value={configuration.console?.quantity || 0}
+                        onChange={(e) => {
+                          const quantity = parseInt(e.target.value, 10) || 0;
+                          // Initialize placements array if needed
+                          const currentPlacements = configuration.console?.placements || [];
+                          let placements = [...currentPlacements];
+                          
+                          // Ensure placements array matches quantity
+                          if (placements.length < quantity) {
+                            while (placements.length < quantity) {
+                              placements.push({
+                                section: "F",
+                                position: "none",
+                                accessoryId: null
+                              });
+                            }
+                          } else if (placements.length > quantity) {
+                            placements = placements.slice(0, quantity);
+                          }
+                          
+                          updateConfiguration({
+                            console: {
+                              ...configuration.console,
+                              quantity: quantity,
+                              placements: placements,
+                            }
+                          });
+                        }}
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Manually set console quantity (max: {getTotalSeats()} based on total seats)
                       </p>
                     </div>
                   </>
@@ -675,15 +714,20 @@ const ReclinerConfigurator = ({ product, configuration, onConfigurationChange }:
               <div className="space-y-2">
                 <Label>Dummy Seats Required</Label>
                 <RadioGroup
-                  value={configuration.dummySeats?.required || "No"}
-                  onValueChange={(value) => updateConfiguration({
-                    dummySeats: {
-                      ...configuration.dummySeats,
-                      required: value,
-                      F: value === "No" ? 0 : configuration.dummySeats?.F || 0,
-                      L: value === "No" ? 0 : configuration.dummySeats?.L || 0,
-                    }
-                  })}
+                  value={configuration.dummySeats?.required === true || configuration.dummySeats?.required === "Yes" ? "Yes" : "No"}
+                  onValueChange={(value) => {
+                    const isRequired = value === "Yes";
+                    updateConfiguration({
+                      dummySeats: {
+                        required: isRequired,
+                        quantity_per_section: {
+                          front: isRequired ? (configuration.dummySeats?.quantity_per_section?.front || configuration.dummySeats?.F || 0) : 0,
+                          left: isRequired ? (configuration.dummySeats?.quantity_per_section?.left || configuration.dummySeats?.L || 0) : 0,
+                        },
+                        placements: isRequired ? (configuration.dummySeats?.placements || []) : [],
+                      }
+                    });
+                  }}
                 >
                   <div className="flex items-center space-x-2">
                     <RadioGroupItem value="Yes" id="dummy-yes" />
@@ -696,7 +740,7 @@ const ReclinerConfigurator = ({ product, configuration, onConfigurationChange }:
                 </RadioGroup>
               </div>
 
-              {configuration.dummySeats?.required === "Yes" && (
+              {(configuration.dummySeats?.required === true || configuration.dummySeats?.required === "Yes") && (
                 <>
                   <Separator />
                   
@@ -709,19 +753,43 @@ const ReclinerConfigurator = ({ product, configuration, onConfigurationChange }:
                         type="number"
                         min="0"
                         max={fSeatCount}
-                        value={configuration.dummySeats?.F || 0}
+                        value={configuration.dummySeats?.quantity_per_section?.front || configuration.dummySeats?.F || 0}
                         onChange={(e) => {
                           const count = parseInt(e.target.value, 10) || 0;
-                          const placements = { ...configuration.dummySeats?.placements || {} };
-                          // Remove placements for removed dummy seats
-                          for (let i = count + 1; i <= fSeatCount; i++) {
-                            delete placements[`front_dummy_${i}`];
+                          const currentPlacements = Array.isArray(configuration.dummySeats?.placements) 
+                            ? configuration.dummySeats.placements 
+                            : [];
+                          
+                          // Update placements array - remove excess front placements
+                          const updatedPlacements = currentPlacements
+                            .filter((p: any) => !(p.section === "F" && p.slot > count))
+                            .map((p: any, idx: number) => {
+                              if (p.section === "F") {
+                                // Re-index slots
+                                const slotIndex = currentPlacements.filter((pl: any) => pl.section === "F" && pl.slot <= p.slot).length;
+                                return { ...p, slot: slotIndex };
+                              }
+                              return p;
+                            });
+                          
+                          // Add new placements if count increased
+                          const currentFrontCount = currentPlacements.filter((p: any) => p.section === "F").length;
+                          for (let i = currentFrontCount; i < count; i++) {
+                            updatedPlacements.push({
+                              section: "F",
+                              slot: i + 1,
+                              position: "none"
+                            });
                           }
+                          
                           updateConfiguration({
                             dummySeats: {
                               ...configuration.dummySeats,
-                              F: count,
-                              placements,
+                              quantity_per_section: {
+                                front: count,
+                                left: configuration.dummySeats?.quantity_per_section?.left || configuration.dummySeats?.L || 0,
+                              },
+                              placements: updatedPlacements,
                             }
                           });
                         }}
@@ -729,26 +797,44 @@ const ReclinerConfigurator = ({ product, configuration, onConfigurationChange }:
                     </div>
                     
                     {/* Dummy Seat Placements for Front */}
-                    {Array.from({ length: configuration.dummySeats?.F || 0 }, (_, i) => {
-                      const dummyIndex = i + 1;
-                      const placementKey = `front_dummy_${dummyIndex}`;
-                      const currentPlacement = configuration.dummySeats?.placements?.[placementKey] || "none";
+                    {Array.from({ length: (configuration.dummySeats?.quantity_per_section?.front || configuration.dummySeats?.F || 0) }, (_, i) => {
+                      const slot = i + 1;
+                      const currentPlacements = Array.isArray(configuration.dummySeats?.placements) 
+                        ? configuration.dummySeats.placements 
+                        : [];
+                      const placement = currentPlacements.find((p: any) => p.section === "F" && p.slot === slot) || {
+                        section: "F",
+                        slot: slot,
+                        position: "none"
+                      };
                       const placementOptions = generateDummyPlacementOptions("F", fSeatCount);
                       
                       return (
                         <div key={i} className="space-y-2 p-3 border rounded-lg">
-                          <Label className="text-sm">Front Dummy Seat {dummyIndex} Placement</Label>
+                          <Label className="text-sm">Front Dummy Seat {slot} Placement</Label>
                           <Select
-                            value={currentPlacement}
+                            value={placement.position || "none"}
                             onValueChange={(value) => {
-                              const placements = {
-                                ...configuration.dummySeats?.placements || {},
-                                [placementKey]: value,
-                              };
+                              const updatedPlacements = [...(Array.isArray(configuration.dummySeats?.placements) ? configuration.dummySeats.placements : [])];
+                              const existingIndex = updatedPlacements.findIndex((p: any) => p.section === "F" && p.slot === slot);
+                              
+                              if (existingIndex >= 0) {
+                                updatedPlacements[existingIndex] = {
+                                  ...updatedPlacements[existingIndex],
+                                  position: value
+                                };
+                              } else {
+                                updatedPlacements.push({
+                                  section: "F",
+                                  slot: slot,
+                                  position: value
+                                });
+                              }
+                              
                               updateConfiguration({
                                 dummySeats: {
                                   ...configuration.dummySeats,
-                                  placements,
+                                  placements: updatedPlacements,
                                 }
                               });
                             }}
@@ -781,19 +867,43 @@ const ReclinerConfigurator = ({ product, configuration, onConfigurationChange }:
                             type="number"
                             min="0"
                             max={l2SeatCount}
-                            value={configuration.dummySeats?.L || 0}
+                            value={configuration.dummySeats?.quantity_per_section?.left || configuration.dummySeats?.L || 0}
                             onChange={(e) => {
                               const count = parseInt(e.target.value, 10) || 0;
-                              const placements = { ...configuration.dummySeats?.placements || {} };
-                              // Remove placements for removed dummy seats
-                              for (let i = count + 1; i <= l2SeatCount; i++) {
-                                delete placements[`left_dummy_${i}`];
+                              const currentPlacements = Array.isArray(configuration.dummySeats?.placements) 
+                                ? configuration.dummySeats.placements 
+                                : [];
+                              
+                              // Update placements array - remove excess left placements
+                              const updatedPlacements = currentPlacements
+                                .filter((p: any) => !(p.section === "L" && p.slot > count))
+                                .map((p: any) => {
+                                  if (p.section === "L") {
+                                    // Re-index slots
+                                    const slotIndex = currentPlacements.filter((pl: any) => pl.section === "L" && pl.slot <= p.slot).length;
+                                    return { ...p, slot: slotIndex };
+                                  }
+                                  return p;
+                                });
+                              
+                              // Add new placements if count increased
+                              const currentLeftCount = currentPlacements.filter((p: any) => p.section === "L").length;
+                              for (let i = currentLeftCount; i < count; i++) {
+                                updatedPlacements.push({
+                                  section: "L",
+                                  slot: i + 1,
+                                  position: "none"
+                                });
                               }
+                              
                               updateConfiguration({
                                 dummySeats: {
                                   ...configuration.dummySeats,
-                                  L: count,
-                                  placements,
+                                  quantity_per_section: {
+                                    front: configuration.dummySeats?.quantity_per_section?.front || configuration.dummySeats?.F || 0,
+                                    left: count,
+                                  },
+                                  placements: updatedPlacements,
                                 }
                               });
                             }}
@@ -801,26 +911,44 @@ const ReclinerConfigurator = ({ product, configuration, onConfigurationChange }:
                         </div>
                         
                         {/* Dummy Seat Placements for Left */}
-                        {Array.from({ length: configuration.dummySeats?.L || 0 }, (_, i) => {
-                          const dummyIndex = i + 1;
-                          const placementKey = `left_dummy_${dummyIndex}`;
-                          const currentPlacement = configuration.dummySeats?.placements?.[placementKey] || "none";
+                        {Array.from({ length: (configuration.dummySeats?.quantity_per_section?.left || configuration.dummySeats?.L || 0) }, (_, i) => {
+                          const slot = i + 1;
+                          const currentPlacements = Array.isArray(configuration.dummySeats?.placements) 
+                            ? configuration.dummySeats.placements 
+                            : [];
+                          const placement = currentPlacements.find((p: any) => p.section === "L" && p.slot === slot) || {
+                            section: "L",
+                            slot: slot,
+                            position: "none"
+                          };
                           const placementOptions = generateDummyPlacementOptions("L", l2SeatCount);
                           
                           return (
                             <div key={i} className="space-y-2 p-3 border rounded-lg">
-                              <Label className="text-sm">Left Dummy Seat {dummyIndex} Placement</Label>
+                              <Label className="text-sm">Left Dummy Seat {slot} Placement</Label>
                               <Select
-                                value={currentPlacement}
+                                value={placement.position || "none"}
                                 onValueChange={(value) => {
-                                  const placements = {
-                                    ...configuration.dummySeats?.placements || {},
-                                    [placementKey]: value,
-                                  };
+                                  const updatedPlacements = [...(Array.isArray(configuration.dummySeats?.placements) ? configuration.dummySeats.placements : [])];
+                                  const existingIndex = updatedPlacements.findIndex((p: any) => p.section === "L" && p.slot === slot);
+                                  
+                                  if (existingIndex >= 0) {
+                                    updatedPlacements[existingIndex] = {
+                                      ...updatedPlacements[existingIndex],
+                                      position: value
+                                    };
+                                  } else {
+                                    updatedPlacements.push({
+                                      section: "L",
+                                      slot: slot,
+                                      position: value
+                                    });
+                                  }
+                                  
                                   updateConfiguration({
                                     dummySeats: {
                                       ...configuration.dummySeats,
-                                      placements,
+                                      placements: updatedPlacements,
                                     }
                                   });
                                 }}

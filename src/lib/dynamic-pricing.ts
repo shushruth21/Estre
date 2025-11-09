@@ -215,7 +215,63 @@ export const calculateFabricMeters = (
       break;
     }
 
-    case "recliner":
+    case "recliner": {
+      // Recliner fabric calculation based on sections
+      const sections = configuration.sections || configuration.basic_recliner?.sections || {};
+      const getSeatCount = (type: string): number => {
+        if (!type || type === "Corner" || type === "Backrest" || type === "none") return 0;
+        const match = type.match(/(\d+)-Seater/);
+        return match ? parseInt(match[1], 10) : 0;
+      };
+
+      let totalSeats = 0;
+      
+      // Count seats from Front section
+      if (sections.F?.type) {
+        totalSeats += getSeatCount(sections.F.type);
+      }
+      
+      // Count seats from L2 section (if L SHAPE)
+      if (sections.L2?.type) {
+        totalSeats += getSeatCount(sections.L2.type);
+      }
+
+      // First recliner: 6.0 meters (or from settings)
+      const firstReclinerMeters = getSettingValue(settings, "fabric_first_recliner_mtrs", 6.0);
+      totalMeters += firstReclinerMeters;
+
+      // Additional seats: +3.5 meters per seat (or from settings)
+      if (totalSeats > 1) {
+        const additionalSeatMeters = getSettingValue(settings, "fabric_additional_seat_mtrs", 3.5);
+        totalMeters += (totalSeats - 1) * additionalSeatMeters;
+      }
+
+      // Corner and Backrest fabric (if applicable)
+      if (sections.L1?.type) {
+        if (sections.L1.type === "Corner") {
+          const cornerMeters = getSettingValue(settings, "fabric_corner_mtrs", 7.0);
+          totalMeters += cornerMeters;
+        } else if (sections.L1.type === "Backrest") {
+          const backrestMeters = getSettingValue(settings, "fabric_backrest_mtrs", 2.0);
+          totalMeters += backrestMeters;
+        }
+      }
+
+      // Consoles
+      const consoleSize = configuration.console?.size || null;
+      const consoleQuantity = configuration.console?.quantity || 0;
+      if (consoleSize && consoleQuantity > 0) {
+        if (consoleSize.includes("6") || consoleSize === "6 in" || consoleSize === "Console-6 in") {
+          const consoleMeters = getSettingValue(settings, "fabric_console_6_mtrs", 1.5);
+          totalMeters += consoleQuantity * consoleMeters;
+        } else if (consoleSize.includes("10") || consoleSize === "10 in" || consoleSize === "Console-10 In") {
+          const consoleMeters = getSettingValue(settings, "fabric_console_10_mtrs", 2.0);
+          totalMeters += consoleQuantity * consoleMeters;
+        }
+      }
+
+      break;
+    }
     case "cinema_chairs": {
       const seatCount = configuration.numberOfSeats || configuration.seats?.length || 1;
       const consoleSize = configuration.console?.size || configuration.consoleSize || null;
@@ -1133,54 +1189,107 @@ async function calculateReclinerPricing(
     totalPrice += l2Result.price;
   }
 
-  // Dummy Seat Adjustment
-  // Dummy seats replace regular seats and are priced at 55% instead of 70%
-  const dummySeatsF = configuration.dummySeats?.F || 0;
-  const dummySeatsL = configuration.dummySeats?.L || 0;
-  const totalDummySeats = dummySeatsF + dummySeatsL;
+  // Dummy Seats Calculation ⭐ UNIQUE TO RECLINER
+  // Dummy seats are priced at 55% of per-seat base price
+  // They are separate from regular seats and don't replace them
+  const dummySeatsConfig = configuration.dummySeats || configuration.dummy_seats || {};
+  const dummySeatsRequired = dummySeatsConfig.required === true || dummySeatsConfig.required === "Yes";
   
-  if (totalDummySeats > 0) {
-    // Each dummy seat: (55% - 70%) = -15% adjustment
-    const dummyAdjustment = (basePrice * -0.15) * totalDummySeats;
-    breakdown.additionalSeatsPrice += dummyAdjustment; // Negative adjustment
-    totalPrice += dummyAdjustment;
+  if (dummySeatsRequired) {
+    const quantityPerSection = dummySeatsConfig.quantity_per_section || {};
+    const frontDummyQty = quantityPerSection.front || 0;
+    const leftDummyQty = quantityPerSection.left || 0;
+    const totalDummySeats = frontDummyQty + leftDummyQty;
+    
+    if (totalDummySeats > 0) {
+      // Dummy seat price: 55% of per-seat base price
+      const dummySeatPrice = basePrice * 0.55;
+      const dummySeatsTotal = dummySeatPrice * totalDummySeats;
+      
+      // Add to additional seats price (since they're additional seats, just at different rate)
+      breakdown.additionalSeatsPrice += dummySeatsTotal;
+      totalPrice += dummySeatsTotal;
+      
+      if (import.meta.env.DEV) {
+        console.log(`📊 Dummy Seats: ${totalDummySeats} × ₹${dummySeatPrice.toFixed(2)} = ₹${dummySeatsTotal.toFixed(2)}`);
+      }
+    }
   }
 
-  // Mechanism pricing
-  // Manual = 0, Manual-RRR = 6800, Electric = 29000, Electric-RRR = 16500, Only Sofa = 0
+  // Mechanism pricing (REQUIRED per section)
+  // Manual = 0, Manual-RRR = 6800, Electrical = 14500, Electrical-RRR = 16500, Only Sofa = 0
   const mechanismPrices: Record<string, number> = {
     "Manual": 0,
     "Manual-RRR": 6800,
-    "Electric": 29000,
-    "Electrical": 29000, // Alternative spelling
-    "Electric-RRR": 16500,
+    "Electrical": 14500,
+    "Electric": 14500, // Alternative spelling
+    "Electrical-RRR": 16500,
+    "Electric-RRR": 16500, // Alternative spelling
     "Only Sofa": 0,
   };
 
-  const frontMechanism = configuration.mechanism?.front || "Manual";
-  const leftMechanism = configuration.mechanism?.left || "Manual";
-  const isLShape = configuration.baseShape === "L SHAPE";
+  // Get mechanism from sections object (new structure) or legacy structure
+  const mechanismSections = configuration.mechanism?.sections || configuration.mechanism || {};
+  const frontMechanism = mechanismSections.front || mechanismSections.F || "Manual";
+  const leftMechanism = mechanismSections.left || mechanismSections.L;
+  const isLShape = configuration.baseShape === "L SHAPE" || configuration.basic_recliner?.shape === "L SHAPE";
   
   const frontMechanismPrice = mechanismPrices[frontMechanism] || 0;
   const leftMechanismPrice = isLShape ? (mechanismPrices[leftMechanism] || 0) : 0;
   
   breakdown.mechanismUpgrade = frontMechanismPrice + leftMechanismPrice;
   totalPrice += breakdown.mechanismUpgrade;
+  
+  if (import.meta.env.DEV) {
+    console.log(`⚙️ Mechanism Pricing: Front=${frontMechanism} (₹${frontMechanismPrice}), Left=${leftMechanism || "N/A"} (₹${leftMechanismPrice}), Total=₹${breakdown.mechanismUpgrade}`);
+  }
 
-  // Console pricing
+  // Console pricing (includes base console price + accessories)
   if (configuration.console?.required === "Yes" || configuration.console?.required === true) {
     const consoleSize = configuration.console?.size || "";
     const quantity = configuration.console?.quantity || 1;
+    const placements = configuration.console?.placements || [];
 
-    let consolePrice = 0;
+    // Base console price
+    let baseConsolePrice = 0;
     if (consoleSize.includes("6") || consoleSize === "6 in" || consoleSize === "Console-6 in") {
-      consolePrice = getFormulaValue(formulas, "console_6_inch", 8000);
+      baseConsolePrice = getFormulaValue(formulas, "console_6_inch", 8000);
     } else if (consoleSize.includes("10") || consoleSize === "10 in" || consoleSize === "Console-10 In") {
-      consolePrice = getFormulaValue(formulas, "console_10_inch", 12000);
+      baseConsolePrice = getFormulaValue(formulas, "console_10_inch", 12000);
     }
 
-    breakdown.consolePrice = consolePrice * quantity;
+    // Calculate console accessories prices
+    let consoleAccessoriesTotal = 0;
+    const activePlacements = placements.filter((p: any) => 
+      p && p.position && p.position !== "none" && p.section
+    );
+
+    for (const placement of activePlacements) {
+      if (placement.accessoryId && placement.accessoryId !== "none") {
+        try {
+          const { data: accessory } = await supabase
+            .from("accessories_prices")
+            .select("sale_price")
+            .eq("id", placement.accessoryId)
+            .eq("is_active", true)
+            .single();
+
+          if (accessory && accessory.sale_price) {
+            consoleAccessoriesTotal += Number(accessory.sale_price) || 0;
+          }
+        } catch (error) {
+          console.warn("Error fetching console accessory price:", error);
+        }
+      }
+    }
+
+    // Total console price = (base console price × quantity) + sum of all accessories
+    breakdown.consolePrice = (baseConsolePrice * quantity) + consoleAccessoriesTotal;
     totalPrice += breakdown.consolePrice;
+    
+    if (import.meta.env.DEV) {
+      console.log(`🪑 Console Pricing: Base=₹${baseConsolePrice} × ${quantity} = ₹${baseConsolePrice * quantity}, Accessories=₹${consoleAccessoriesTotal}, Total=₹${breakdown.consolePrice}`);
+    }
   }
 
   // Foam upgrade (applied to base total)
