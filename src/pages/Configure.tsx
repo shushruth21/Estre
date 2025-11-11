@@ -19,6 +19,8 @@ import BenchConfigurator from "@/components/configurators/BenchConfigurator";
 import PlaceholderConfigurator from "@/components/configurators/PlaceholderConfigurator";
 import SofaBedConfigurator from "@/components/configurators/SofaBedConfigurator";
 import PricingSummary from "@/components/configurators/PricingSummary";
+import KidsBedConfigurator from "@/components/configurators/KidsBedConfigurator";
+import PouffeConfigurator from "@/components/configurators/PouffeConfigurator";
 
 const Configure = () => {
   const { category, productId } = useParams();
@@ -32,9 +34,10 @@ const Configure = () => {
   const { data: product, isLoading: loadingProduct } = useQuery({
     queryKey: ["product", productId],
     queryFn: async () => {
-      const tableName = `${category}_database` as any;
+      // Handle special case for database_pouffes which already includes '_database' in the name
+      const tableName = category === "database_pouffes" ? "database_pouffes" : `${category}_database`;
       const { data, error } = await supabase
-        .from(tableName)
+        .from(tableName as any)
         .select("*")
         .eq("id", productId)
         .single() as any;
@@ -184,7 +187,7 @@ const Configure = () => {
           <div className="lg:col-span-2">
             <div className="sticky top-24 space-y-6">
               <ProductImageGallery 
-                images={product?.images || null}
+                images={category === "database_pouffes" ? product?.image : product?.images || null}
                 productTitle={product.title}
               />
               
@@ -264,12 +267,18 @@ const Configure = () => {
                     onConfigurationChange={setConfiguration}
                   />
                 )}
-                {(category === "kids_bed" || category === "database_pouffes") && (
-                  <PlaceholderConfigurator
+                {category === "kids_bed" && (
+                  <KidsBedConfigurator
                     product={product}
                     configuration={configuration}
                     onConfigurationChange={setConfiguration}
-                    categoryName={category}
+                  />
+                )}
+                {category === "database_pouffes" && (
+                  <PouffeConfigurator
+                    product={product}
+                    configuration={configuration}
+                    onConfigurationChange={setConfiguration}
                   />
                 )}
               </CardContent>

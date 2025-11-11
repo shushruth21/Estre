@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useMemo, useCallback } from "react";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
@@ -27,15 +27,184 @@ interface ReclinerConfiguratorProps {
   onConfigurationChange: (config: any) => void;
 }
 
-// Mechanism price mapping
-const MECHANISM_PRICES: Record<string, number> = {
-  "Manual": 0,
-  "Manual-RRR": 6800,
-  "Electrical": 14500,
-  "Electric": 14500,
-  "Electrical-RRR": 16500,
-  "Electric-RRR": 16500,
-  "Only Sofa": 0,
+type NormalizedShape = "STANDARD" | "L SHAPE";
+
+const SECTION_ACTIVATION: Record<NormalizedShape, Record<string, boolean>> = {
+  STANDARD: {
+    F: true,
+    L1: false,
+    L2: false,
+  },
+  "L SHAPE": {
+    F: true,
+    L1: true,
+    L2: true,
+  },
+};
+
+const SECTION_OPTION_MAP: Record<string, string[]> = {
+  F: ["1-Seater", "2-Seater", "3-Seater", "4-Seater"],
+  L1: ["Corner", "Backrest", "none"],
+  L2: ["1-Seater", "2-Seater", "3-Seater", "4-Seater", "none"],
+};
+
+const SECTION_DEFAULTS: Record<string, { type: string; qty: number }> = {
+  F: { type: "1-Seater", qty: 1 },
+  L1: { type: "Corner", qty: 1 },
+  L2: { type: "1-Seater", qty: 1 },
+};
+
+const CORNER_WIDTH_BY_SEAT: Record<number, number> = {
+  22: 36,
+  24: 38,
+  26: 40,
+  28: 42,
+};
+
+const BACKREST_WIDTH = 14;
+
+const RECLINER_PRICING_PERCENTAGES = {
+  firstSeat: 100,
+  additionalSeat: 70,
+  corner: 50,
+  backrest: 20,
+  dummySeat: 55,
+};
+
+const RECLINER_POSITION_OPTIONS: Array<{ value: "LHS" | "RHS" | "Both"; label: string }> = [
+  { value: "LHS", label: "Left Hand Side (LHS)" },
+  { value: "RHS", label: "Right Hand Side (RHS)" },
+  { value: "Both", label: "Both LHS & RHS" },
+];
+
+const RECLINER_SECTION_LABELS: Record<"F" | "L", string> = {
+  F: "Front",
+  L: "Left",
+};
+
+const RECLINER_PRICE_PER_UNIT_DEFAULT = 14000;
+const RECLINER_WIDTH_PER_UNIT = 30;
+
+const formatCurrency = (value: number) => {
+  if (!Number.isFinite(value)) return "₹0";
+  return new Intl.NumberFormat("en-IN", {
+    style: "currency",
+    currency: "INR",
+    maximumFractionDigits: 0,
+  }).format(Math.round(value));
+};
+
+const normalizeShape = (shape: string): NormalizedShape => {
+  if (!shape) return "STANDARD";
+  const upper = shape.toUpperCase();
+  if (upper.includes("L SHAPE") || upper.includes("L-SHAPE")) return "L SHAPE";
+  return "STANDARD";
+};
+
+const getAllowedSectionOptions = (shape: NormalizedShape, sectionId: string) => {
+  if (!SECTION_ACTIVATION[shape]?.[sectionId]) return ["none"];
+  return SECTION_OPTION_MAP[sectionId] || ["none"];
+};
+
+const normalizeSectionValue = (
+  shape: NormalizedShape,
+  sectionId: string,
+  value?: { type?: string; qty?: number } | null
+) => {
+  if (!SECTION_ACTIVATION[shape]?.[sectionId]) return undefined;
+  const defaults = SECTION_DEFAULTS[sectionId] || { type: "none", qty: 1 };
+  const allowedOptions = getAllowedSectionOptions(shape, sectionId);
+  const selectedType = value?.type || defaults.type;
+  const normalizedType = allowedOptions.includes(selectedType) ? selectedType : allowedOptions[0] || "none";
+  const qty = Math.max(1, value?.qty ?? defaults.qty ?? 1);
+  return { type: normalizedType, qty };
+};
+
+const normalizeSectionsForShape = (
+  shape: NormalizedShape,
+  sections: Record<string, { type?: string; qty?: number } | null | undefined> = {}
+) => {
+  const normalized: Record<string, { type: string; qty: number }> = {};
+  Object.keys(SECTION_ACTIVATION[shape]).forEach((sectionId) => {
+    const normalizedValue = normalizeSectionValue(shape, sectionId, sections[sectionId] || undefined);
+    if (normalizedValue) normalized[sectionId] = normalizedValue;
+  });
+  return normalized;
+};
+
+const getSeatCount = (type: string): number => {
+  if (!type || type === "Corner" || type === "Backrest" || type === "none") return 0;
+  const match = type.match(/(\d+)-Seater/);
+  return match ? parseInt(match[1], 10) : 0;
+};
+
+const parseSeatWidthValue = (value?: number) => {
+  if (!value || Number.isNaN(value)) return 22;
+  return value;
+};
+
+const calculateSectionWidth = (seaterType: string, seatWidth: number): number => {
+  if (!seaterType || seaterType === "none") return 0;
+  const lower = seaterType.toLowerCase();
+  if (lower.includes("backrest")) return BACKREST_WIDTH;
+  if (lower.includes("corner")) return CORNER_WIDTH_BY_SEAT[seatWidth] ?? CORNER_WIDTH_BY_SEAT[28] ?? seatWidth;
+  return getSeatCount(seaterType) * seatWidth;
+};
+
+const getMechanismPriceFromOption = (option: any): number => {
+  if (!option) return 0;
+  const metadata = option.metadata || {};
+  const price = Number(metadata?.price ?? metadata?.price_rs ?? metadata?.priceRs ?? 0);
+  return Number.isFinite(price) ? price : 0;
+};
+
+const calculateReclinerSectionPrice = (seaterType: string, basePerSeat: number): number => {
+  if (!seaterType || seaterType === "none") return 0;
+  const lower = seaterType.toLowerCase();
+  if (lower.includes("corner")) return (basePerSeat * RECLINER_PRICING_PERCENTAGES.corner) / 100;
+  if (lower.includes("backrest")) return (basePerSeat * RECLINER_PRICING_PERCENTAGES.backrest) / 100;
+
+  const seatCount = getSeatCount(seaterType);
+  if (seatCount <= 0) return 0;
+
+  if (seatCount === 1) {
+    return (basePerSeat * RECLINER_PRICING_PERCENTAGES.firstSeat) / 100;
+  }
+
+  let price = (basePerSeat * RECLINER_PRICING_PERCENTAGES.firstSeat) / 100;
+  price += (seatCount - 1) * ((basePerSeat * RECLINER_PRICING_PERCENTAGES.additionalSeat) / 100);
+  return price;
+};
+
+const calculateFabricForSection = (seaterType: string, metadata?: any) => {
+  if (!seaterType || seaterType === "none") return 0;
+  const defaultBase = Number(metadata?.base_fabric_meters ?? metadata?.fabric_base ?? 0) || 4.5;
+  const perSeat = Number(metadata?.fabric_per_seat ?? metadata?.additional_per_seat ?? 0) || 1.5;
+  const seatCount = getSeatCount(seaterType);
+  if (seaterType.toLowerCase().includes("corner")) {
+    return Number(metadata?.fabric_corner ?? metadata?.corner_fabric ?? 3.5) || defaultBase;
+  }
+  if (seaterType.toLowerCase().includes("backrest")) {
+    return Number(metadata?.fabric_backrest ?? metadata?.backrest_fabric ?? 1.0) || 1;
+  }
+  if (seatCount <= 0) return defaultBase;
+  return defaultBase + Math.max(0, seatCount - 1) * perSeat;
+};
+
+const areSectionsEqual = (
+  a: Record<string, { type: string; qty: number }> = {},
+  b: Record<string, { type: string; qty: number }> = {}
+) => {
+  const keys = new Set([...Object.keys(a), ...Object.keys(b)]);
+  for (const key of keys) {
+    const first = a[key];
+    const second = b[key];
+    if (!first && !second) continue;
+    if (!first || !second) return false;
+    if (first.type !== second.type) return false;
+    if (first.qty !== second.qty) return false;
+  }
+  return true;
 };
 
 const ReclinerConfigurator = ({ product, configuration, onConfigurationChange }: ReclinerConfiguratorProps) => {
@@ -62,6 +231,291 @@ const ReclinerConfigurator = ({ product, configuration, onConfigurationChange }:
   // Check loading state
   const isLoadingDropdowns = shapesResult.isLoading || seatTypesResult.isLoading;
 
+  const updateConfiguration = useCallback(
+    (updates: any) => {
+      onConfigurationChange({ ...configuration, ...updates });
+    },
+    [configuration, onConfigurationChange]
+  );
+
+  const normalizedShape = normalizeShape(configuration.baseShape || "STANDARD");
+  const normalizedSections = useMemo(
+    () => normalizeSectionsForShape(normalizedShape, configuration.sections || {}),
+    [normalizedShape, configuration.sections]
+  );
+
+  useEffect(() => {
+    if (!areSectionsEqual(normalizedSections, configuration.sections || {})) {
+      updateConfiguration({
+        sections: normalizedSections,
+      });
+    }
+  }, [normalizedSections, configuration.sections, updateConfiguration]);
+
+  const seatWidth = parseSeatWidthValue(configuration.dimensions?.seatWidth);
+
+  const mechanismPriceLookup = useMemo(() => {
+    const map = new Map<string, number>();
+    mechanismTypes?.forEach((option: any) => {
+      if (!option?.option_value) return;
+      map.set(option.option_value, getMechanismPriceFromOption(option));
+    });
+    return map;
+  }, [mechanismTypes]);
+
+  const getMechanismPrice = useCallback(
+    (mechanismType: string) => mechanismPriceLookup.get(mechanismType) ?? 0,
+    [mechanismPriceLookup]
+  );
+
+  const seatTypeMetadataLookup = useMemo(() => {
+    const map = new Map<string, any>();
+    seatTypes?.forEach((option: any) => {
+      if (!option?.option_value) return;
+      map.set(option.option_value, option.metadata || {});
+    });
+    map.set("Corner", seatTypes?.find((o: any) => o.option_value === "Corner")?.metadata || {});
+    map.set("Backrest", seatTypes?.find((o: any) => o.option_value === "Backrest")?.metadata || {});
+    return map;
+  }, [seatTypes]);
+
+  const basePerSeatPrice = useMemo(() => {
+    const metadata = product?.metadata || {};
+    const explicitPrice =
+      Number(metadata?.recliner_base_per_seat) ||
+      Number(metadata?.base_price_per_seat) ||
+      Number(metadata?.per_seat_price);
+    if (explicitPrice) return explicitPrice;
+    const netPrice = Number(product?.net_price_rs ?? product?.strike_price_2seater_rs ?? product?.base_price ?? 0);
+    const defaultSeatCount = Number(metadata?.default_seat_count ?? metadata?.base_seat_count ?? 1);
+    if (netPrice && defaultSeatCount > 0) return Math.round(netPrice / defaultSeatCount);
+    return RECLINER_PRICE_PER_UNIT_DEFAULT;
+  }, [product?.metadata, product?.net_price_rs, product?.strike_price_2seater_rs, product?.base_price]);
+
+  const sectionSummaries = useMemo(() => {
+    return Object.entries(normalizedSections)
+      .filter(([_, value]) => value?.type && value.type !== "none")
+      .map(([sectionId, value]) => {
+        const metadata = seatTypeMetadataLookup.get(value.type) || {};
+        const width = calculateSectionWidth(value.type, seatWidth);
+        const fabricMeters = calculateFabricForSection(value.type, metadata);
+        const price = calculateReclinerSectionPrice(value.type, basePerSeatPrice);
+        return {
+          sectionId,
+          type: value.type,
+          qty: value.qty ?? 1,
+          width,
+          fabricMeters,
+          price,
+        };
+      });
+  }, [normalizedSections, seatWidth, seatTypeMetadataLookup, basePerSeatPrice]);
+
+  const totalSeats = useMemo(() => {
+    return sectionSummaries.reduce((sum, summary) => {
+      const seatCount = getSeatCount(summary.type) * (summary.qty ?? 1);
+      return sum + seatCount;
+    }, 0);
+  }, [sectionSummaries]);
+
+  const totalWidth = useMemo(
+    () => sectionSummaries.reduce((sum, summary) => sum + summary.width, 0),
+    [sectionSummaries]
+  );
+
+  const totalFabricMeters = useMemo(
+    () => sectionSummaries.reduce((sum, summary) => sum + summary.fabricMeters, 0),
+    [sectionSummaries]
+  );
+
+  const consolePriceLookup = useMemo(() => {
+    const map = new Map<string, number>();
+    consoleSizes?.forEach((option: any) => {
+      if (!option?.option_value) return;
+      const metadata = option.metadata || {};
+      const price =
+        Number(metadata?.sale_price) ||
+        Number(metadata?.base_price) ||
+        Number(metadata?.price) ||
+        Number(metadata?.price_rs);
+      if (Number.isFinite(price) && price > 0) {
+        map.set(option.option_value, price);
+      }
+    });
+    return map;
+  }, [consoleSizes]);
+
+  const getConsoleBasePrice = useCallback(
+    (size: string) => {
+      const price = consolePriceLookup.get(size);
+      if (Number.isFinite(price) && price && price > 0) return price;
+      if (!size) return 0;
+      return size.includes("6") ? 8000 : 12000;
+    },
+    [consolePriceLookup]
+  );
+
+  const generateAllConsolePlacements = useCallback(() => {
+    const consoleRequired = configuration.console?.required === "Yes" || configuration.console?.required === true;
+    if (!consoleRequired) return [];
+
+    const frontSeaterType = normalizedSections.F?.type || "1-Seater";
+    const leftSeaterType = normalizedShape === "L SHAPE" ? normalizedSections.L2?.type : undefined;
+
+    return generateConsolePlacementsUtil(
+      consoleRequired,
+      {
+        front: frontSeaterType,
+        left: leftSeaterType,
+      },
+      normalizedShape
+    );
+  }, [configuration.console?.required, normalizedSections, normalizedShape]);
+
+  const isLShape = normalizedShape === "L SHAPE";
+  const fSeatCount = normalizedSections.F ? getSeatCount(normalizedSections.F.type) : 0;
+  const l2SeatCount = isLShape && normalizedSections.L2 ? getSeatCount(normalizedSections.L2.type) : 0;
+
+  const mechanismSummaryText = useMemo(() => {
+    if (!mechanismTypes || mechanismTypes.length === 0) return "";
+    return mechanismTypes
+      .map((option: any) => {
+        const price = getMechanismPrice(option.option_value);
+        const priceLabel = price > 0 ? `(${formatCurrency(price)})` : "(Included)";
+        return `${option.display_label || option.option_value} ${priceLabel}`;
+      })
+      .join(" • ");
+  }, [getMechanismPrice, mechanismTypes]);
+
+  const maxConsoleSlots = useMemo(() => calculateMaxConsoles(totalSeats), [totalSeats]);
+
+  useEffect(() => {
+    const consoleConfig = configuration.console || {};
+    const consoleRequired = consoleConfig.required === "Yes" || consoleConfig.required === true;
+    if (!consoleRequired) {
+      if ((consoleConfig.quantity ?? 0) !== 0 || (consoleConfig.placements?.length ?? 0) !== 0) {
+        updateConfiguration({
+          console: {
+            ...consoleConfig,
+            quantity: 0,
+            placements: [],
+          },
+        });
+      }
+      return;
+    }
+
+    const nextQuantity = Math.min(consoleConfig.quantity ?? maxConsoleSlots, maxConsoleSlots);
+    const availablePlacements = generateAllConsolePlacements();
+    const sanitizedPlacements = (consoleConfig.placements || [])
+      .slice(0, nextQuantity)
+      .map((placement: any) => {
+        if (!placement || !placement.section || placement.position === "none") {
+          return {
+            section: null,
+            position: "none",
+            afterSeat: null,
+            accessoryId: null,
+          };
+        }
+        const valueKey = `${placement.section}_${placement.afterSeat ?? placement.position?.split("_")[1] ?? 1}`;
+        const isStillValid = availablePlacements.some((p) => p.value === valueKey);
+        if (!isStillValid) {
+          return {
+            section: null,
+            position: "none",
+            afterSeat: null,
+            accessoryId: null,
+          };
+        }
+        return placement;
+      });
+
+    while (sanitizedPlacements.length < nextQuantity) {
+      sanitizedPlacements.push({
+        section: null,
+        position: "none",
+        afterSeat: null,
+        accessoryId: null,
+      });
+    }
+
+    if (
+      (consoleConfig.quantity ?? 0) !== nextQuantity ||
+      JSON.stringify(consoleConfig.placements || []) !== JSON.stringify(sanitizedPlacements)
+    ) {
+      updateConfiguration({
+        console: {
+          ...consoleConfig,
+          quantity: nextQuantity,
+          placements: sanitizedPlacements,
+        },
+      });
+    }
+  }, [
+    configuration.console,
+    generateAllConsolePlacements,
+    maxConsoleSlots,
+    updateConfiguration,
+  ]);
+
+  useEffect(() => {
+    const dummyConfig = configuration.dummySeats || {};
+    const isRequired = dummyConfig.required === true || dummyConfig.required === "Yes";
+    if (!isRequired) {
+      if (
+        (dummyConfig.quantity_per_section?.front ?? dummyConfig.F ?? 0) !== 0 ||
+        (dummyConfig.quantity_per_section?.left ?? dummyConfig.L ?? 0) !== 0 ||
+        (dummyConfig.placements?.length ?? 0) > 0
+      ) {
+        updateConfiguration({
+          dummySeats: {
+            required: false,
+            quantity_per_section: {
+              front: 0,
+              left: 0,
+            },
+            placements: [],
+          },
+        });
+      }
+      return;
+    }
+
+    const maxFront = fSeatCount;
+    const maxLeft = l2SeatCount;
+    const currentFront = Math.min(dummyConfig.quantity_per_section?.front ?? dummyConfig.F ?? 0, maxFront);
+    const currentLeft = Math.min(dummyConfig.quantity_per_section?.left ?? dummyConfig.L ?? 0, maxLeft);
+
+    const sanitizedPlacements = (dummyConfig.placements || []).filter((placement: any) => {
+      if (!placement?.section) return false;
+      if (placement.section === "L" && !isLShape) return false;
+      if (placement.position === "none") return true;
+      const seatCountForSection = placement.section === "F" ? maxFront : maxLeft;
+      const value = placement.position?.split("_")[1];
+      const afterSeat = Number(value);
+      return Number.isFinite(afterSeat) && afterSeat > 0 && afterSeat <= seatCountForSection;
+    });
+
+    const needsUpdate =
+      (dummyConfig.quantity_per_section?.front ?? dummyConfig.F ?? 0) !== currentFront ||
+      (dummyConfig.quantity_per_section?.left ?? dummyConfig.L ?? 0) !== currentLeft ||
+      sanitizedPlacements.length !== (dummyConfig.placements || []).length;
+
+    if (needsUpdate) {
+      updateConfiguration({
+        dummySeats: {
+          required: true,
+          quantity_per_section: {
+            front: currentFront,
+            left: currentLeft,
+          },
+          placements: sanitizedPlacements,
+        },
+      });
+    }
+  }, [configuration.dummySeats, fSeatCount, isLShape, l2SeatCount, updateConfiguration]);
+
   // Load console accessories
   const { data: consoleAccessories, isLoading: loadingAccessories } = useQuery({
     queryKey: ["recliner-console-accessories"],
@@ -85,94 +539,6 @@ const ReclinerConfigurator = ({ product, configuration, onConfigurationChange }:
       return uniqueAccessories;
     },
   });
-
-  // Helper: Get seat count from type string
-  const getSeatCount = (type: string): number => {
-    if (type === "Corner" || type === "Backrest") return 0;
-    const match = type.match(/(\d+)-Seater/);
-    return match ? parseInt(match[1], 10) : 0;
-  };
-
-  // Calculate total seats across all sections
-  const getTotalSeats = (): number => {
-    let total = 0;
-    if (configuration.sections?.F?.type) {
-      total += getSeatCount(configuration.sections.F.type);
-    }
-    if (configuration.sections?.L2?.type) {
-      total += getSeatCount(configuration.sections.L2.type);
-    }
-    return total;
-  };
-
-  // Calculate physical width per section based on seater type and seat width
-  const calculateSectionWidth = (seaterType: string, seatWidth: number): number => {
-    const seatCount = getSeatCount(seaterType);
-    if (seaterType === "Backrest") {
-      return seatWidth === 22 ? 14 : 0;
-    }
-    if (seaterType === "Corner") {
-      return seatWidth;
-    }
-    return seatCount * seatWidth;
-  };
-
-  // Calculate total physical width
-  const calculateTotalWidth = (): number => {
-    const seatWidth = configuration.dimensions?.seatWidth || 22;
-    let totalWidth = 0;
-    
-    if (configuration.sections?.F) {
-      totalWidth += calculateSectionWidth(configuration.sections.F.type, seatWidth);
-    }
-    if (configuration.sections?.L1) {
-      totalWidth += calculateSectionWidth(configuration.sections.L1.type, seatWidth);
-    }
-    if (configuration.sections?.L2) {
-      totalWidth += calculateSectionWidth(configuration.sections.L2.type, seatWidth);
-    }
-    
-    return totalWidth;
-  };
-
-  // Get mechanism price
-  const getMechanismPrice = (mechanismType: string): number => {
-    return MECHANISM_PRICES[mechanismType] || 0;
-  };
-
-  // Normalize shape for comparison
-  const normalizeShape = (shape: string): 'STANDARD' | 'L SHAPE' => {
-    if (!shape) return 'STANDARD';
-    const upper = shape.toUpperCase();
-    if (upper.includes('L SHAPE') || upper.includes('L-SHAPE')) return 'L SHAPE';
-    return 'STANDARD';
-  };
-
-  // Generate console placement options for recliner using explicit validation formulas
-  const generateAllConsolePlacements = () => {
-    const consoleRequired = configuration.console?.required === "Yes" || configuration.console?.required === true;
-    const sections = configuration.sections || {};
-    const shape = normalizeShape(configuration.baseShape || "STANDARD");
-
-    // Get seater types for each section
-    // For recliner, sections use "type" field (e.g., "1-Seater", "2-Seater", "4-Seater")
-    const frontSeaterType = sections.F?.type || "1-Seater";
-    const leftSeaterType = (shape === "L SHAPE") 
-      ? (sections.L2?.type || "1-Seater")
-      : undefined;
-
-    // Use the console validation utility to generate placements
-    const placements = generateConsolePlacementsUtil(
-      consoleRequired,
-      {
-        front: frontSeaterType,
-        left: leftSeaterType,
-      },
-      shape
-    );
-
-    return placements;
-  };
 
   // Generate dummy seat placement options
   const generateDummyPlacementOptions = (section: "F" | "L", seatCount: number) => {
@@ -237,26 +603,52 @@ const ReclinerConfigurator = ({ product, configuration, onConfigurationChange }:
     }
   }, [product?.id, configuration.productId, onConfigurationChange]);
 
-  const updateConfiguration = (updates: any) => {
-    onConfigurationChange({ ...configuration, ...updates });
-  };
+  const updateSection = useCallback(
+    (sectionId: "F" | "L1" | "L2", field: "type" | "qty", value: any) => {
+      const draft = { ...normalizedSections };
+      const current = draft[sectionId] ? { ...draft[sectionId] } : { type: "none", qty: 1 };
+      if (field === "type") {
+        current.type = value;
+      } else {
+        current.qty = Math.max(1, Number(value) || 1);
+      }
+      const sanitized = normalizeSectionValue(normalizedShape, sectionId, current);
+      if (!sanitized) {
+        delete draft[sectionId];
+      } else {
+        draft[sectionId] = sanitized;
+      }
+      updateConfiguration({ sections: draft });
+    },
+    [normalizedSections, normalizedShape, updateConfiguration]
+  );
 
-  const updateSection = (section: "F" | "L1" | "L2", field: string, value: any) => {
-    const sections = { ...configuration.sections };
-    if (!sections[section]) {
-      sections[section] = { type: "", qty: 1 };
-    }
-    sections[section] = { ...sections[section], [field]: value };
-    updateConfiguration({ sections });
-  };
+  const getSectionOptions = useCallback(
+    (sectionId: "F" | "L1" | "L2") => {
+      const allowed = new Set(getAllowedSectionOptions(normalizedShape, sectionId));
+      if (sectionId === "L1") {
+        return ["Corner", "Backrest"].map((value) => ({
+          option_value: value,
+          display_label: value,
+        }));
+      }
+      const options = seatTypes?.filter((option: any) => allowed.has(option.option_value));
+      if (!options || options.length === 0) {
+        return Array.from(allowed).map((value) => ({
+          option_value: value,
+          display_label: value,
+        }));
+      }
+      return options;
+    },
+    [normalizedShape, seatTypes]
+  );
 
-  const totalSeats = getTotalSeats();
-  const isLShape = normalizeShape(configuration.baseShape || "STANDARD") === 'L SHAPE';
-  const fSeatCount = configuration.sections?.F ? getSeatCount(configuration.sections.F.type) : 0;
-  const l2SeatCount = configuration.sections?.L2 ? getSeatCount(configuration.sections.L2.type) : 0;
-  
-  const frontMechanism = configuration.mechanism?.sections?.front || configuration.mechanism?.front || "Manual";
-  const leftMechanism = configuration.mechanism?.sections?.left || configuration.mechanism?.left || "Manual";
+  const defaultMechanism = mechanismTypes?.[0]?.option_value || "Manual";
+  const frontMechanism =
+    configuration.mechanism?.sections?.front || configuration.mechanism?.front || defaultMechanism;
+  const leftMechanism =
+    configuration.mechanism?.sections?.left || configuration.mechanism?.left || defaultMechanism;
   const frontMechanismPrice = getMechanismPrice(frontMechanism);
   const leftMechanismPrice = isLShape ? getMechanismPrice(leftMechanism) : 0;
   const totalMechanismPrice = frontMechanismPrice + leftMechanismPrice;
@@ -273,7 +665,7 @@ const ReclinerConfigurator = ({ product, configuration, onConfigurationChange }:
     );
   }
 
-  const sections = configuration.sections || {};
+  const sections = normalizedSections;
 
   return (
     <div className="space-y-6">
@@ -372,15 +764,15 @@ const ReclinerConfigurator = ({ product, configuration, onConfigurationChange }:
                       <div className="space-y-2">
                         <Label className="text-sm">Seat Type</Label>
                         <Select
-                          value={sections.F?.type || "1-Seater"}
+                          value={sections.F?.type || SECTION_DEFAULTS.F.type}
                           onValueChange={(value) => updateSection("F", "type", value)}
                         >
                           <SelectTrigger>
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
-                            {seatTypes?.map((type: any) => (
-                              <SelectItem key={type.id} value={type.option_value}>
+                            {getSectionOptions("F").map((type: any) => (
+                              <SelectItem key={type.option_value} value={type.option_value}>
                                 {type.display_label || type.option_value}
                               </SelectItem>
                             ))}
@@ -408,15 +800,18 @@ const ReclinerConfigurator = ({ product, configuration, onConfigurationChange }:
                       <CardContent className="p-4 space-y-3">
                         <Label>Left Corner (L1)</Label>
                         <Select
-                          value={sections.L1?.type || "Corner"}
+                          value={sections.L1?.type || SECTION_DEFAULTS.L1.type}
                           onValueChange={(value) => updateSection("L1", "type", value)}
                         >
                           <SelectTrigger>
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="Corner">Corner</SelectItem>
-                            <SelectItem value="Backrest">Backrest</SelectItem>
+                            {getSectionOptions("L1").map((option: any) => (
+                              <SelectItem key={option.option_value} value={option.option_value}>
+                                {option.display_label || option.option_value}
+                              </SelectItem>
+                            ))}
                           </SelectContent>
                         </Select>
                         <p className="text-xs text-muted-foreground">
@@ -432,20 +827,20 @@ const ReclinerConfigurator = ({ product, configuration, onConfigurationChange }:
                           <div className="space-y-2">
                             <Label className="text-sm">Seat Type</Label>
                             <Select
-                              value={sections.L2?.type || "1-Seater"}
+                          value={sections.L2?.type || SECTION_DEFAULTS.L2.type}
                               onValueChange={(value) => updateSection("L2", "type", value)}
                             >
                               <SelectTrigger>
                                 <SelectValue />
                               </SelectTrigger>
                               <SelectContent>
-                                {seatTypes?.filter((type: any) => 
-                                  type.option_value !== "Corner" && type.option_value !== "Backrest"
-                                ).map((type: any) => (
-                                  <SelectItem key={type.id} value={type.option_value}>
-                                    {type.display_label || type.option_value}
-                                  </SelectItem>
-                                ))}
+                            {getSectionOptions("L2")
+                              .filter((type: any) => type.option_value !== "Corner" && type.option_value !== "Backrest")
+                              .map((type: any) => (
+                                <SelectItem key={type.option_value} value={type.option_value}>
+                                  {type.display_label || type.option_value}
+                                </SelectItem>
+                              ))}
                               </SelectContent>
                             </Select>
                           </div>
@@ -472,6 +867,67 @@ const ReclinerConfigurator = ({ product, configuration, onConfigurationChange }:
                     <p className="text-2xl font-bold">{totalSeats}</p>
                   </CardContent>
                 </Card>
+
+                {sectionSummaries.length > 0 && (
+                  <Card>
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-lg font-semibold">Active Sections Summary</CardTitle>
+                      <CardDescription>
+                        Width and fabric requirements calculated with seat width {seatWidth}" and admin multipliers.
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="grid gap-3">
+                        {sectionSummaries.map((summary) => (
+                          <div
+                            key={summary.sectionId}
+                            className="flex flex-col gap-1 rounded-lg border border-border/60 p-3 bg-muted/40"
+                          >
+                            <div className="flex items-center gap-2 text-sm font-semibold">
+                              <Badge variant="outline">{summary.sectionId}</Badge>
+                              <span>{summary.type}</span>
+                            </div>
+                            <div className="grid grid-cols-2 gap-2 text-xs sm:text-sm text-muted-foreground">
+                              <div className="space-y-1">
+                                <p className="font-medium text-foreground">Width</p>
+                                <p>{summary.width.toFixed(0)} in</p>
+                              </div>
+                              <div className="space-y-1">
+                                <p className="font-medium text-foreground">Fabric</p>
+                                <p>{summary.fabricMeters.toFixed(2)} m</p>
+                              </div>
+                              <div className="space-y-1">
+                                <p className="font-medium text-foreground">Seats</p>
+                                <p>{getSeatCount(summary.type)}</p>
+                              </div>
+                              <div className="space-y-1">
+                                <p className="font-medium text-foreground">Price</p>
+                                <p>{formatCurrency(summary.price)}</p>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+
+                      <Separator />
+
+                      <div className="grid gap-2 text-sm">
+                        <div className="flex items-center justify-between">
+                          <span className="font-semibold">Total Width</span>
+                          <span>{totalWidth.toFixed(0)} in</span>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className="font-semibold">Fabric Required</span>
+                          <span>{totalFabricMeters.toFixed(2)} m</span>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className="font-semibold">Base Section Price</span>
+                          <span>{formatCurrency(sectionSummaries.reduce((sum, item) => sum + item.price, 0))}</span>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
               </div>
 
               <Separator />
@@ -484,7 +940,7 @@ const ReclinerConfigurator = ({ product, configuration, onConfigurationChange }:
             <Alert>
               <Info className="h-4 w-4" />
               <AlertDescription>
-                Mechanism pricing: Manual (₹0), Manual-RRR (₹6,800), Electrical (₹14,500), Electrical-RRR (₹16,500), Only Sofa (₹0)
+                {mechanismSummaryText || "Mechanism pricing is loaded from admin settings."}
               </AlertDescription>
             </Alert>
 
@@ -629,7 +1085,7 @@ const ReclinerConfigurator = ({ product, configuration, onConfigurationChange }:
                 <Alert>
                   <Info className="h-4 w-4" />
                   <AlertDescription>
-                    Console quantity is manually set (not auto-calculated). Maximum: {getTotalSeats()} based on total seats.
+                    Maximum console slots based on active seats: {maxConsoleSlots}. Additional placements are disabled automatically.
                   </AlertDescription>
                 </Alert>
 
@@ -670,7 +1126,7 @@ const ReclinerConfigurator = ({ product, configuration, onConfigurationChange }:
                   <Input
                     type="number"
                     min="0"
-                    max={getTotalSeats()}
+                    max={maxConsoleSlots}
                     value={configuration.console?.quantity || 0}
                     onChange={(e) => {
                       const quantity = parseInt(e.target.value, 10) || 0;
@@ -701,7 +1157,7 @@ const ReclinerConfigurator = ({ product, configuration, onConfigurationChange }:
                     }}
                   />
                   <p className="text-xs text-muted-foreground">
-                    Manually set console quantity (max: {getTotalSeats()})
+                    Console quantity cannot exceed {maxConsoleSlots} (total seats - 1)
                   </p>
                 </div>
 
@@ -891,8 +1347,7 @@ const ReclinerConfigurator = ({ product, configuration, onConfigurationChange }:
                   if (activePlacements.length === 0) return null;
 
                   const consoleSize = configuration.console?.size || "";
-                  const is6Inch = consoleSize.includes("6") || consoleSize === "Console-6 in";
-                  const baseConsolePrice = is6Inch ? 8000 : 12000;
+                  const baseConsolePrice = getConsoleBasePrice(consoleSize);
 
                   return (
                     <Card className="p-4 bg-gradient-to-r from-green-50 to-blue-50 border-green-300 dark:from-green-950/20 dark:to-blue-950/20 dark:border-green-800">

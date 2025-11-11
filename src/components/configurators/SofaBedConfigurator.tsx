@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -19,6 +19,441 @@ import { supabase } from "@/integrations/supabase/client";
 import { Download, Info, Loader2, Square, LayoutGrid } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { generateAllConsolePlacements as generateConsolePlacementsUtil, calculateMaxConsoles } from "@/lib/console-validation";
+
+const SECTION_ACTIVATION: Record<"STANDARD" | "L SHAPE" | "U SHAPE" | "COMBO", Record<string, boolean>> = {
+  STANDARD: { F: true, L1: false, L2: false, R1: false, R2: false, C1: false, C2: false },
+  "L SHAPE": { F: true, L1: true, L2: true, R1: false, R2: false, C1: false, C2: false },
+  "U SHAPE": { F: true, L1: true, L2: true, R1: true, R2: true, C1: false, C2: false },
+  COMBO: { F: true, L1: true, L2: true, R1: true, R2: true, C1: true, C2: true },
+};
+
+const SECTION_OPTION_MAP: Record<string, string[]> = {
+  F: ["2-Seater", "3-Seater", "4-Seater", "2-Seater No Mech", "3-Seater No Mech", "4-Seater No Mech"],
+  L1: ["Corner", "Backrest", "none"],
+  L2: ["2-Seater", "3-Seater", "4-Seater", "2-Seater No Mech", "3-Seater No Mech", "4-Seater No Mech", "none"],
+  R1: ["Corner", "Backrest", "none"],
+  R2: ["2-Seater", "3-Seater", "4-Seater", "2-Seater No Mech", "3-Seater No Mech", "4-Seater No Mech", "none"],
+  C1: ["Backrest", "none"],
+  C2: ["2-Seater", "3-Seater", "4-Seater", "2-Seater No Mech", "3-Seater No Mech", "4-Seater No Mech", "none"],
+};
+
+const SECTION_DEFAULTS: Record<string, { seater: string; qty: number }> = {
+  F: { seater: "2-Seater", qty: 1 },
+  L1: { seater: "Corner", qty: 1 },
+  L2: { seater: "2-Seater", qty: 1 },
+  R1: { seater: "Corner", qty: 1 },
+  R2: { seater: "2-Seater", qty: 1 },
+  C1: { seater: "Backrest", qty: 1 },
+  C2: { seater: "2-Seater", qty: 1 },
+};
+
+const CORNER_WIDTH_BY_SEAT: Record<number, number> = {
+  22: 36,
+  24: 38,
+  26: 40,
+  30: 42,
+};
+
+const BACKREST_WIDTH = 14;
+
+const PRICING_PERCENTAGES = {
+  base: 100,
+  additionalSeat: 35,
+  corner: 65,
+  backrest: 14,
+};
+
+const parseSeatWidthValue = (value?: string | number): number => {
+  if (!value && value !== 0) return 24;
+  if (typeof value === "number") return value;
+  const numericMatch = value.match(/([\d.]+)/);
+  if (numericMatch && numericMatch[1]) {
+    return Number(numericMatch[1]);
+  }
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : 24;
+};
+
+const calculateSectionWidth = (seaterType: string, seatWidth: number): number => {
+  if (!seaterType || seaterType === "none") return 0;
+  const lowerType = seaterType.toLowerCase();
+  if (lowerType.includes("backrest")) {
+    return BACKREST_WIDTH;
+  }
+  if (lowerType.includes("corner")) {
+    return CORNER_WIDTH_BY_SEAT[seatWidth] ?? CORNER_WIDTH_BY_SEAT[30];
+  }
+  const seatMatch = seaterType.match(/(\d+)-Seater/);
+  if (!seatMatch) return 0;
+  const seatCount = parseInt(seatMatch[1], 10);
+  return seatCount * seatWidth;
+};
+
+const calculateFabricMetersForSection = (seaterType: string, width: number): number => {
+  if (!seaterType || seaterType === "none") return 0;
+  const lowerType = seaterType.toLowerCase();
+  if (lowerType.includes("backrest")) {
+    return 2.0;
+  }
+  if (lowerType.includes("corner")) {
+    return 7.0;
+  }
+  if (width <= 0) return 0;
+  const meters = (width / 120) * 21;
+  return Number(meters.toFixed(2));
+};
+
+const isSectionActive = (shape: "STANDARD" | "L SHAPE" | "U SHAPE" | "COMBO", sectionId: string) => {
+  return SECTION_ACTIVATION[shape]?.[sectionId] ?? false;
+};
+
+const getAllowedOptionsForSection = (shape: "STANDARD" | "L SHAPE" | "U SHAPE" | "COMBO", sectionId: string) => {
+  if (!isSectionActive(shape, sectionId)) {
+    return ["none"];
+  }
+  const options = SECTION_OPTION_MAP[sectionId] || ["none"];
+  if (sectionId === "C1" && shape !== "COMBO") {
+    // When C1 is not active (STANDARD/L/U) the map won't be used,
+    // but ensure we return none-only guard if invoked.
+    return ["none"];
+  }
+  return options;
+};
+
+const normalizeSectionValue = (
+  shape: "STANDARD" | "L SHAPE" | "U SHAPE" | "COMBO",
+  sectionId: string,
+  value?: { seater?: string; qty?: number }
+) => {
+  if (!isSectionActive(shape, sectionId)) {
+    return undefined;
+  }
+  const allowedOptions = getAllowedOptionsForSection(shape, sectionId);
+  const defaultValue = SECTION_DEFAULTS[sectionId] || { seater: "none", qty: 1 };
+  const currentSeater = value?.seater || defaultValue.seater;
+  const normalizedSeater = allowedOptions.includes(currentSeater) ? currentSeater : allowedOptions[0] || "none";
+  const qty = value?.qty ?? defaultValue.qty ?? 1;
+  return { seater: normalizedSeater, qty: Math.max(1, qty) };
+};
+
+const normalizeSectionsForShape = (
+  shape: "STANDARD" | "L SHAPE" | "U SHAPE" | "COMBO",
+  currentSections: Record<string, { seater?: string; qty?: number }> = {}
+) => {
+  const normalizedSections: Record<string, { seater: string; qty: number }> = {};
+  Object.keys(SECTION_ACTIVATION[shape]).forEach((sectionId) => {
+    const normalized = normalizeSectionValue(shape, sectionId, currentSections[sectionId]);
+    if (normalized) {
+      normalizedSections[sectionId] = normalized;
+    }
+  });
+  return normalizedSections;
+};
+
+const formatCurrency = (value: number) => {
+  if (!Number.isFinite(value)) return "₹0";
+  return new Intl.NumberFormat("en-IN", {
+    style: "currency",
+    currency: "INR",
+    maximumFractionDigits: 0,
+  }).format(Math.round(value));
+};
+
+type NormalizedShape = "STANDARD" | "L SHAPE" | "U SHAPE" | "COMBO";
+type LoungerCountOption = "1 No." | "2 Nos.";
+type LoungerPlacementValue = "LHS" | "RHS" | "Both";
+
+function normalizeShape(shape: string): NormalizedShape {
+  const upper = (shape || "STANDARD").toUpperCase().replace(/\s+/g, " ") as NormalizedShape;
+  if (upper === "L SHAPE" || upper === "U SHAPE" || upper === "COMBO") {
+    return upper;
+  }
+  return "STANDARD";
+}
+
+interface LoungerConfig {
+  required: "Yes" | "No";
+  numberOfLoungers: LoungerCountOption;
+  size: string;
+  placement: LoungerPlacementValue;
+  storage: "Yes" | "No";
+  quantity: number;
+}
+
+const LOUNGER_DEFAULT: LoungerConfig = {
+  required: "No",
+  numberOfLoungers: "1 No.",
+  size: "Lounger-5 ft 6 in",
+  placement: "LHS",
+  storage: "No",
+  quantity: 1,
+};
+
+const LOUNGER_PLACEMENT_OPTIONS: Record<NormalizedShape, Array<{ value: LoungerPlacementValue; label: string }>> = {
+  STANDARD: [
+    { value: "LHS", label: "Left Hand Side (LHS)" },
+    { value: "RHS", label: "Right Hand Side (RHS)" },
+    { value: "Both", label: "Both LHS & RHS" },
+  ],
+  "L SHAPE": [{ value: "LHS", label: "Left Hand Side (LHS)" }],
+  "U SHAPE": [
+    { value: "LHS", label: "Left Hand Side (LHS)" },
+    { value: "RHS", label: "Right Hand Side (RHS)" },
+    { value: "Both", label: "Both LHS & RHS" },
+  ],
+  COMBO: [
+    { value: "LHS", label: "Left Hand Side (LHS)" },
+    { value: "RHS", label: "Right Hand Side (RHS)" },
+    { value: "Both", label: "Both LHS & RHS" },
+  ],
+};
+
+const getLoungerPlacementOptions = (shape: NormalizedShape, numberOfLoungers: LoungerCountOption) => {
+  const options = LOUNGER_PLACEMENT_OPTIONS[shape] || LOUNGER_PLACEMENT_OPTIONS.STANDARD;
+  if (numberOfLoungers === "2 Nos.") {
+    return options.filter((option) => option.value === "Both");
+  }
+  return options.filter((option) => {
+    if (option.value === "Both") return false;
+    if (shape === "L SHAPE" && option.value === "RHS") return false;
+    return true;
+  });
+};
+
+const normalizeLoungerConfig = (
+  loungerConfig: Partial<LoungerConfig> | undefined,
+  shape: NormalizedShape
+): LoungerConfig => {
+  // Normalize required field: handle both boolean and string values
+  let normalizedRequired: "Yes" | "No" = "No";
+  if (loungerConfig?.required === true || loungerConfig?.required === "Yes") {
+    normalizedRequired = "Yes";
+  } else if (loungerConfig?.required === false || loungerConfig?.required === "No") {
+    normalizedRequired = "No";
+  }
+
+  // If required is "No", return default with normalized required
+  if (normalizedRequired !== "Yes") {
+    return { ...LOUNGER_DEFAULT, required: normalizedRequired };
+  }
+
+  // If required is "Yes", merge with defaults but preserve existing values
+  const merged: LoungerConfig = {
+    ...LOUNGER_DEFAULT,
+    ...loungerConfig,
+    required: normalizedRequired,
+  };
+
+  const supportsDualLounger = shape !== "L SHAPE";
+  if (merged.numberOfLoungers === "2 Nos." && !supportsDualLounger) {
+    merged.numberOfLoungers = "1 No.";
+  }
+
+  if (merged.numberOfLoungers === "2 Nos.") {
+    merged.placement = "Both";
+  } else {
+    const allowedPlacements = getLoungerPlacementOptions(shape, "1 No.").map((option) => option.value);
+    if (!allowedPlacements.includes(merged.placement)) {
+      merged.placement = allowedPlacements[0] || "LHS";
+    }
+  }
+
+  merged.quantity = merged.numberOfLoungers === "2 Nos." ? 2 : 1;
+  return merged;
+};
+
+type ReclinerSectionKey = "F" | "L" | "R" | "C";
+
+interface ReclinerSectionConfig {
+  required: "Yes" | "No";
+  numberOfRecliners: number;
+  positioning: LoungerPlacementValue;
+}
+
+type ReclinerConfigMap = Record<ReclinerSectionKey, ReclinerSectionConfig>;
+
+const RECLINER_DEFAULT_SECTION: ReclinerSectionConfig = {
+  required: "No",
+  numberOfRecliners: 0,
+  positioning: "LHS",
+};
+
+const RECLINER_ACTIVE_SECTIONS: Record<NormalizedShape, ReclinerSectionKey[]> = {
+  STANDARD: ["F"],
+  "L SHAPE": ["F", "L"],
+  "U SHAPE": ["F", "L", "R"],
+  COMBO: ["F", "L", "R", "C"],
+};
+
+const RECLINER_POSITION_OPTIONS: Array<{ value: LoungerPlacementValue; label: string }> = [
+  { value: "LHS", label: "Left Hand Side (LHS)" },
+  { value: "RHS", label: "Right Hand Side (RHS)" },
+  { value: "Both", label: "Both LHS & RHS" },
+];
+
+const normalizeReclinerConfig = (
+  shape: NormalizedShape,
+  config?: Partial<Record<ReclinerSectionKey, Partial<ReclinerSectionConfig>>>
+): ReclinerConfigMap => {
+  const activeSections = RECLINER_ACTIVE_SECTIONS[shape] || RECLINER_ACTIVE_SECTIONS.STANDARD;
+  const normalized: ReclinerConfigMap = {
+    F: { ...RECLINER_DEFAULT_SECTION },
+    L: { ...RECLINER_DEFAULT_SECTION },
+    R: { ...RECLINER_DEFAULT_SECTION },
+    C: { ...RECLINER_DEFAULT_SECTION },
+  };
+
+  Object.entries(config || {}).forEach(([key, value]) => {
+    const sectionKey = key as ReclinerSectionKey;
+    if (normalized[sectionKey]) {
+      normalized[sectionKey] = {
+        ...RECLINER_DEFAULT_SECTION,
+        ...value,
+        positioning: (value?.positioning as LoungerPlacementValue) || "LHS",
+      };
+    }
+  });
+
+  (["F", "L", "R", "C"] as ReclinerSectionKey[]).forEach((sectionKey) => {
+    if (!activeSections.includes(sectionKey)) {
+      normalized[sectionKey] = { ...RECLINER_DEFAULT_SECTION };
+    } else {
+      const sectionConfig = normalized[sectionKey];
+      if (sectionConfig.required !== "Yes") {
+        normalized[sectionKey] = { ...RECLINER_DEFAULT_SECTION };
+      } else {
+        normalized[sectionKey] = {
+          required: "Yes",
+          numberOfRecliners: Math.max(1, sectionConfig.numberOfRecliners || 1),
+          positioning: sectionConfig.positioning || "LHS",
+        };
+      }
+    }
+  });
+
+  return normalized;
+};
+
+const RECLINER_SECTION_LABELS: Record<ReclinerSectionKey, string> = {
+  F: "Front",
+  L: "Left",
+  R: "Right",
+  C: "Center",
+};
+
+const RECLINER_PRICE_PER_UNIT = 14000;
+const RECLINER_STANDARD_WIDTH = 30;
+
+const calculateReclinerSummaries = (shape: NormalizedShape, reclinerConfig: ReclinerConfigMap) => {
+  const activeSections = RECLINER_ACTIVE_SECTIONS[shape] || RECLINER_ACTIVE_SECTIONS.STANDARD;
+
+  return activeSections.map((sectionKey) => {
+    const config = reclinerConfig[sectionKey];
+    if (config.required !== "Yes") {
+      return {
+        section: sectionKey,
+        label: RECLINER_SECTION_LABELS[sectionKey],
+        positioning: config.positioning,
+        quantity: 0,
+        price: 0,
+        width: 0,
+        status: "Not required",
+      };
+    }
+
+    const quantity = Math.max(1, config.numberOfRecliners || 1);
+    return {
+      section: sectionKey,
+      label: RECLINER_SECTION_LABELS[sectionKey],
+      positioning: config.positioning,
+      quantity,
+      price: quantity * RECLINER_PRICE_PER_UNIT,
+      width: RECLINER_STANDARD_WIDTH,
+      status: "Active",
+    };
+  });
+};
+const calculateSofaBedSectionPrice = (seaterType: string, base2SeaterPrice: number): number => {
+  if (!seaterType || seaterType === "none") return 0;
+  const lowerType = seaterType.toLowerCase();
+
+  if (lowerType.includes("backrest")) {
+    return (base2SeaterPrice * PRICING_PERCENTAGES.backrest) / 100;
+  }
+  if (lowerType.includes("corner")) {
+    return (base2SeaterPrice * PRICING_PERCENTAGES.corner) / 100;
+  }
+
+  const seatMatch = seaterType.match(/(\d+)-Seater/);
+  if (!seatMatch) return 0;
+
+  const seatCount = parseInt(seatMatch[1], 10);
+  if (seatCount <= 0) return 0;
+
+  if (seatCount === 2) {
+    return (base2SeaterPrice * PRICING_PERCENTAGES.base) / 100;
+  }
+
+  const additionalSeats = seatCount - 2;
+  const additionalValue = additionalSeats * (PRICING_PERCENTAGES.additionalSeat / 100);
+  return base2SeaterPrice * ((PRICING_PERCENTAGES.base / 100) + additionalValue);
+};
+
+const calculateSofaBedSectionSummary = (
+  shape: "STANDARD" | "L SHAPE" | "U SHAPE" | "COMBO",
+  sections: Record<string, { seater?: string; qty?: number }>,
+  seatWidth: number,
+  base2SeaterPrice: number
+) => {
+  const summaries: Array<{
+    section: string;
+    type: string;
+    qty: number;
+    width: number;
+    fabric: number;
+    price: number;
+    active: boolean;
+  }> = [];
+
+  if (!base2SeaterPrice || base2SeaterPrice <= 0) {
+    return summaries;
+  }
+
+  Object.entries(SECTION_ACTIVATION[shape]).forEach(([sectionId, isActiveSection]) => {
+    if (!isActiveSection) {
+      summaries.push({
+        section: sectionId,
+        type: "none",
+        qty: 0,
+        width: 0,
+        fabric: 0,
+        price: 0,
+        active: false,
+      });
+      return;
+    }
+
+    const normalizedSection = normalizeSectionValue(shape, sectionId, sections[sectionId]);
+    const seaterType = normalizedSection?.seater || "none";
+    const qty = normalizedSection?.qty || 1;
+    const width = calculateSectionWidth(seaterType, seatWidth);
+    const fabricPerUnit = calculateFabricMetersForSection(seaterType, width);
+    const fabric = fabricPerUnit * qty;
+    const sectionPrice = calculateSofaBedSectionPrice(seaterType, base2SeaterPrice) * qty;
+
+    summaries.push({
+      section: sectionId,
+      type: seaterType,
+      qty,
+      width,
+      fabric,
+      price: sectionPrice,
+      active: seaterType !== "none",
+    });
+  });
+
+  return summaries;
+};
 
 interface SofaBedConfiguratorProps {
   product: any;
@@ -129,10 +564,16 @@ const SofaBedConfigurator = ({ product, configuration, onConfigurationChange }: 
     return 0;
   };
 
+  const normalizedShape = normalizeShape(configuration.baseShape || "STANDARD");
+
+  const rawSections = configuration.sections as Record<string, { seater?: string; qty?: number }> | undefined;
+  const sections = useMemo(
+    () => normalizeSectionsForShape(normalizedShape, rawSections || {}),
+    [normalizedShape, rawSections]
+  );
+
   const getTotalSeats = (): number => {
     let total = 0;
-    const sections = configuration.sections || {};
-    
     ["F", "L2", "R2", "C2"].forEach((sectionId) => {
       const section = sections[sectionId];
       if (section?.seater && section.seater !== "none") {
@@ -141,29 +582,32 @@ const SofaBedConfigurator = ({ product, configuration, onConfigurationChange }: 
         total += seatCount * qty;
       }
     });
-    
     return total;
   };
 
-  const getMaxConsoles = (): number => {
-    return calculateMaxConsoles(getTotalSeats());
+  const getMaxConsoles = (currentSections = sections): number => {
+    return calculateMaxConsoles(
+      (() => {
+        let total = 0;
+        ["F", "L2", "R2", "C2"].forEach((sectionId) => {
+          const section = currentSections[sectionId];
+          if (section?.seater && section.seater !== "none") {
+            const seatCount = parseSeatCount(section.seater);
+            const qty = section.qty || 1;
+            total += seatCount * qty;
+          }
+        });
+        return total;
+      })()
+    );
   };
 
   const getSectionOptions = (sectionId: string): string[] => {
-    if (["F", "L2", "R2", "C2"].includes(sectionId)) {
-      return ["2-Seater", "3-Seater", "4-Seater", "2-Seater No Mech", "3-Seater No Mech", "4-Seater No Mech", "none"];
-    }
-    if (["L1", "R1"].includes(sectionId)) {
-      return ["Corner", "Backrest", "none"];
-    }
-    if (sectionId === "C1") {
-      return ["Backrest", "none"];
-    }
-    return ["none"];
+    return getAllowedOptionsForSection(normalizedShape, sectionId);
   };
 
-  // Normalize shape for comparison
-  const normalizeShape = (shape: string): 'STANDARD' | 'L SHAPE' | 'U SHAPE' | 'COMBO' => {
+  // Normalize shape for comparison (avoid shadowing top-level normalizeShape)
+  const normalizeShapeValue = (shape: string): 'STANDARD' | 'L SHAPE' | 'U SHAPE' | 'COMBO' => {
     if (!shape) return 'STANDARD';
     const upper = shape.toUpperCase();
     if (upper.includes('L SHAPE') || upper.includes('L-SHAPE')) return 'L SHAPE';
@@ -175,24 +619,24 @@ const SofaBedConfigurator = ({ product, configuration, onConfigurationChange }: 
   // Generate console placements using explicit validation formulas
   // Note: For SofaBed, console placements are based on seater type, not multiplied by quantity
   // Each section module has its own console placements based on the seater type
-  const generateAllConsolePlacements = () => {
+  const generateAllConsolePlacements = useCallback(() => {
     const consoleRequired = configuration.console?.required === "Yes" || configuration.console?.required === true;
-    const sections = configuration.sections || {};
-    const shape = normalizeShape(configuration.baseShape || "STANDARD");
 
-    // Get seater types for each section (use the seater type string, not multiplied by quantity)
+    if (!consoleRequired) {
+      return [];
+    }
+
     const frontSeaterType = sections.F?.seater || "2-Seater";
-    const leftSeaterType = (shape === "L SHAPE" || shape === "U SHAPE" || shape === "COMBO") 
-      ? (sections.L2?.seater || "2-Seater")
-      : undefined;
-    const rightSeaterType = (shape === "U SHAPE" || shape === "COMBO")
-      ? (sections.R2?.seater || "2-Seater")
-      : undefined;
-    const comboSeaterType = (shape === "COMBO")
-      ? (sections.C2?.seater || "2-Seater")
-      : undefined;
+    const leftSeaterType =
+      normalizedShape === "L SHAPE" || normalizedShape === "U SHAPE" || normalizedShape === "COMBO"
+        ? sections.L2?.seater || "2-Seater"
+        : undefined;
+    const rightSeaterType =
+      normalizedShape === "U SHAPE" || normalizedShape === "COMBO"
+        ? sections.R2?.seater || "2-Seater"
+        : undefined;
+    const comboSeaterType = normalizedShape === "COMBO" ? sections.C2?.seater || "2-Seater" : undefined;
 
-    // Use the console validation utility to generate placements
     const placements = generateConsolePlacementsUtil(
       consoleRequired,
       {
@@ -201,15 +645,93 @@ const SofaBedConfigurator = ({ product, configuration, onConfigurationChange }: 
         right: rightSeaterType,
         combo: comboSeaterType,
       },
-      shape
+      normalizedShape
     );
 
-    return placements;
-  };
+    return placements.map((placement) => ({
+      ...placement,
+      width: 40,
+    }));
+  }, [configuration.console?.required, normalizedShape, sections]);
 
-  const updateConfiguration = (updates: any) => {
-    onConfigurationChange({ ...configuration, ...updates });
-  };
+  const updateConfiguration = useCallback(
+    (updates: any) => {
+      onConfigurationChange({ ...configuration, ...updates });
+    },
+    [configuration, onConfigurationChange]
+  );
+
+  // Declare loungerConfig and reclinerConfig before handlers that use them
+  const loungerConfig = useMemo(
+    () => normalizeLoungerConfig(normalizedShape, configuration.lounger),
+    [normalizedShape, configuration.lounger]
+  );
+
+  const reclinerConfig = useMemo(
+    () => normalizeReclinerConfig(normalizedShape, configuration.recliner),
+    [normalizedShape, configuration.recliner]
+  );
+
+  const handleLoungerChange = useCallback(
+    (changes: Partial<LoungerConfig>) => {
+      // Merge current config with changes before normalizing
+      const updatedConfig = { ...loungerConfig, ...changes };
+      const normalized = normalizeLoungerConfig(normalizedShape, updatedConfig);
+      updateConfiguration({ lounger: normalized });
+    },
+    [loungerConfig, normalizedShape, updateConfiguration]
+  );
+
+  const handleReclinerChange = useCallback(
+    (section: ReclinerSectionKey, changes: Partial<ReclinerSectionConfig>) => {
+      const updated = {
+        ...reclinerConfig,
+        [section]: {
+          ...reclinerConfig[section],
+          ...changes,
+        },
+      };
+      const normalized = normalizeReclinerConfig(normalizedShape, updated);
+      updateConfiguration({ recliner: normalized });
+    },
+    [reclinerConfig, normalizedShape, updateConfiguration]
+  );
+
+  const rawSectionsKey = useMemo(() => JSON.stringify(rawSections || {}), [rawSections]);
+  const normalizedSectionsKey = useMemo(() => JSON.stringify(sections), [sections]);
+
+  useEffect(() => {
+    if (rawSectionsKey !== normalizedSectionsKey) {
+      updateConfiguration({ sections });
+    }
+  }, [rawSectionsKey, normalizedSectionsKey, sections, updateConfiguration]);
+
+  const loungerOriginalKey = useMemo(() => JSON.stringify(configuration.lounger || {}), [configuration.lounger]);
+  const loungerNormalizedKey = useMemo(() => JSON.stringify(loungerConfig), [loungerConfig]);
+
+  useEffect(() => {
+    if (loungerOriginalKey !== loungerNormalizedKey) {
+      updateConfiguration({ lounger: loungerConfig });
+    }
+  }, [loungerOriginalKey, loungerNormalizedKey, loungerConfig, updateConfiguration]);
+
+  const loungerPlacementOptions = useMemo(
+    () => getLoungerPlacementOptions(normalizedShape, loungerConfig.numberOfLoungers),
+    [normalizedShape, loungerConfig.numberOfLoungers]
+  );
+  const reclinerOriginalKey = useMemo(() => JSON.stringify(configuration.recliner || {}), [configuration.recliner]);
+  const reclinerNormalizedKey = useMemo(() => JSON.stringify(reclinerConfig), [reclinerConfig]);
+
+  useEffect(() => {
+    if (reclinerOriginalKey !== reclinerNormalizedKey) {
+      updateConfiguration({ recliner: reclinerConfig });
+    }
+  }, [reclinerOriginalKey, reclinerNormalizedKey, reclinerConfig, updateConfiguration]);
+
+  const activeReclinerSections = useMemo(
+    () => RECLINER_ACTIVE_SECTIONS[normalizedShape] || RECLINER_ACTIVE_SECTIONS.STANDARD,
+    [normalizedShape]
+  );
 
   // Initialize configuration
   useEffect(() => {
@@ -218,21 +740,13 @@ const SofaBedConfigurator = ({ product, configuration, onConfigurationChange }: 
         productId: product.id,
         category: "sofabed",
         baseShape: "STANDARD",
-        sections: {
-          F: { seater: "2-Seater", qty: 1 },
-        },
-        lounger: {
-          required: "No",
-          numberOfLoungers: "1 No.",
-          size: "Lounger-5 ft 6 in",
-          placement: "LHS",
-          storage: "No",
-        },
+        sections: normalizeSectionsForShape(normalizedShape, { F: { seater: "2-Seater", qty: 1 } }),
+        lounger: { ...LOUNGER_DEFAULT },
         recliner: {
-          F: { required: "No", numberOfRecliners: 0 },
-          L: { required: "No", numberOfRecliners: 0 },
-          R: { required: "No", numberOfRecliners: 0 },
-          C: { required: "No", numberOfRecliners: 0 },
+          F: { ...RECLINER_DEFAULT_SECTION },
+          L: { ...RECLINER_DEFAULT_SECTION },
+          R: { ...RECLINER_DEFAULT_SECTION },
+          C: { ...RECLINER_DEFAULT_SECTION },
         },
         console: {
           required: "No",
@@ -281,50 +795,96 @@ const SofaBedConfigurator = ({ product, configuration, onConfigurationChange }: 
   // Auto-update console quantity when seats change
   useEffect(() => {
     if (configuration.console?.required === "Yes") {
-      const maxConsoles = getMaxConsoles();
       const currentPlacements = configuration.console?.placements || [];
-      
-      // Always maintain maxConsoles slots in the array
-      // This ensures slots maintain their positions even when set to "none"
+      const maxConsolesForLayout = getMaxConsoles(sections);
+
       let placements = [...currentPlacements];
-      
-      // Ensure we have exactly maxConsoles slots
-      if (placements.length < maxConsoles) {
-        // Fill missing slots with "none" placeholder
-        while (placements.length < maxConsoles) {
+
+      if (placements.length < maxConsolesForLayout) {
+        while (placements.length < maxConsolesForLayout) {
           placements.push({
             section: null,
             position: "none",
             afterSeat: null,
-            accessoryId: null
+            accessoryId: null,
           });
         }
-      } else if (placements.length > maxConsoles) {
-        // Trim excess slots
-        placements = placements.slice(0, maxConsoles);
+      } else if (placements.length > maxConsolesForLayout) {
+        placements = placements.slice(0, maxConsolesForLayout);
       }
-      
-      // Only update if placements array changed or quantity is different
+
       const placementsChanged = JSON.stringify(placements) !== JSON.stringify(currentPlacements);
-      
-      if (placementsChanged || configuration.console?.quantity !== maxConsoles) {
+
+      if (placementsChanged || configuration.console?.quantity !== maxConsolesForLayout) {
+        const normalizedAccessories = [...(configuration.console?.accessories || [])];
+        if (normalizedAccessories.length > maxConsolesForLayout) {
+          normalizedAccessories.length = maxConsolesForLayout;
+        }
+        while (normalizedAccessories.length < maxConsolesForLayout) {
+          normalizedAccessories.push(null);
+        }
+
         updateConfiguration({
           console: {
             ...configuration.console,
-            quantity: maxConsoles,
-            placements: placements
+            quantity: maxConsolesForLayout,
+            placements,
+            accessories: normalizedAccessories,
           },
         });
       }
     }
-  }, [getTotalSeats(), configuration.console?.required]);
+  }, [configuration.console, sections]);
 
-  const shape = configuration.baseShape || "STANDARD";
-  const sections = configuration.sections || {};
-  const maxConsoles = getMaxConsoles();
-  const isLShape = shape === "L SHAPE";
-  const isUShape = shape === "U SHAPE";
-  const isCombo = shape === "COMBO";
+  const totalSeatCount = getTotalSeats();
+  const maxConsoles = useMemo(() => getMaxConsoles(sections), [sections]);
+  const isLShape = normalizedShape === "L SHAPE";
+  const isUShape = normalizedShape === "U SHAPE";
+  const isCombo = normalizedShape === "COMBO";
+
+  const seatWidthValue = parseSeatWidthValue(configuration.dimensions?.seatWidth ?? 24);
+  const base2SeaterPrice = Number(
+    product?.net_price_rs ??
+      product?.net_price ??
+      product?.strike_price_rs ??
+      product?.strike_price ??
+      0
+  );
+
+  const sectionSummaries = useMemo(
+    () => calculateSofaBedSectionSummary(normalizedShape, sections, seatWidthValue, base2SeaterPrice),
+    [normalizedShape, sections, seatWidthValue, base2SeaterPrice]
+  );
+  const activeSectionSummaries = sectionSummaries.filter((summary) => summary.active);
+  const totalSectionPrice = activeSectionSummaries.reduce((sum, item) => sum + item.price, 0);
+  const totalSectionFabric = activeSectionSummaries.reduce((sum, item) => sum + item.fabric, 0);
+
+  const consolePlacements = useMemo(() => generateAllConsolePlacements(), [generateAllConsolePlacements]);
+  const activeConsolePlacements = useMemo(() => {
+    const placementMap = new Map<string, { label: string; width?: number }>();
+    consolePlacements.forEach((placement) => {
+      placementMap.set(placement.value, { label: placement.label, width: placement.width });
+    });
+
+    return (configuration.console?.placements || [])
+      .map((placement: any) => {
+        if (!placement || placement.position === "none" || !placement.section) return null;
+        const key = `${placement.section}_${placement.afterSeat || 1}`;
+        const meta = placementMap.get(key);
+        return {
+          ...placement,
+          label: meta?.label || `${placement.section.toUpperCase()} Console ${placement.afterSeat || 1}`,
+          width: meta?.width || 0,
+        };
+      })
+      .filter(Boolean) as Array<{ label: string; width: number }>;
+  }, [configuration.console?.placements, consolePlacements]);
+
+  const reclinerSummaries = useMemo(
+    () => calculateReclinerSummaries(normalizedShape, reclinerConfig),
+    [normalizedShape, reclinerConfig]
+  );
+  const totalReclinerPrice = reclinerSummaries.reduce((sum, item) => sum + item.price, 0);
 
   // Get dimension percentage from metadata
   const getDimensionPercentage = (dimension: string, value: string | number) => {
@@ -349,11 +909,11 @@ const SofaBedConfigurator = ({ product, configuration, onConfigurationChange }: 
   // Calculate dimensions for preview
   const calculateDimensions = (): { width: number; depth: number; label: string } => {
     try {
-      const totalSeats = getTotalSeats();
+      const totalSeats = totalSeatCount;
       const baseWidth = 48;
       const totalWidth = totalSeats * baseWidth;
       const depth = 95;
-      const shapeLabel = shape.replace(' ', '-');
+      const shapeLabel = normalizedShape.replace(' ', '-');
       
       return {
         width: totalWidth,
@@ -412,8 +972,8 @@ const SofaBedConfigurator = ({ product, configuration, onConfigurationChange }: 
                   .filter((shape: any) => shape && shape.option_value)
                   .map((shape: any) => {
                     const shapeValue = shape.option_value;
-                    const normalizedShapeValue = normalizeShape(shapeValue);
-                    const currentNormalizedShape = normalizeShape(configuration.baseShape || '');
+                    const normalizedShapeValue = normalizeShapeValue(shapeValue);
+                    const currentNormalizedShape = normalizeShapeValue(configuration.baseShape || '');
                     const isSelected = currentNormalizedShape === normalizedShapeValue;
                     
                     const getShapeIcon = () => {
@@ -447,22 +1007,8 @@ const SofaBedConfigurator = ({ product, configuration, onConfigurationChange }: 
                         icon={getShapeIcon()}
                         isSelected={isSelected}
                         onClick={() => {
-                          const normalized = normalizeShape(shapeValue);
-                          const newSections: any = { F: sections.F || { seater: "2-Seater", qty: 1 } };
-                          
-                          if (normalized === "L SHAPE" || normalized === "U SHAPE" || normalized === "COMBO") {
-                            newSections.L1 = sections.L1 || { seater: "Corner", qty: 1 };
-                            newSections.L2 = sections.L2 || { seater: "2-Seater", qty: 1 };
-                          }
-                          if (normalized === "U SHAPE" || normalized === "COMBO") {
-                            newSections.R1 = sections.R1 || { seater: "Corner", qty: 1 };
-                            newSections.R2 = sections.R2 || { seater: "2-Seater", qty: 1 };
-                          }
-                          if (normalized === "COMBO") {
-                            newSections.C1 = sections.C1 || { seater: "Backrest", qty: 1 };
-                            newSections.C2 = sections.C2 || { seater: "2-Seater", qty: 1 };
-                          }
-                          
+                          const normalized = normalizeShapeValue(shapeValue);
+                          const newSections = normalizeSectionsForShape(normalized, sections);
                           updateConfiguration({ baseShape: normalized, sections: newSections });
                         }}
                       />
@@ -784,10 +1330,67 @@ const SofaBedConfigurator = ({ product, configuration, onConfigurationChange }: 
                 <Card className="bg-muted">
                   <CardContent className="p-4">
                     <p className="text-sm font-medium">Total Seats</p>
-                    <p className="text-2xl font-bold">{getTotalSeats()}</p>
+                  <p className="text-2xl font-bold">{totalSeatCount}</p>
                   </CardContent>
                 </Card>
               </div>
+
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-lg">Active Sections Summary</CardTitle>
+                  <CardDescription>
+                    Uses sofa bed pricing percentages: base 2-seater (100%), additional seat (35%), corner (65%), backrest (14%).
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {base2SeaterPrice > 0 && activeSectionSummaries.length > 0 ? (
+                    <div className="overflow-x-auto">
+                      <table className="min-w-full text-sm">
+                        <thead>
+                          <tr className="text-left text-muted-foreground border-b">
+                            <th className="py-2 pr-4">Section</th>
+                            <th className="py-2 pr-4">Type</th>
+                            <th className="py-2 pr-4">Qty</th>
+                            <th className="py-2 pr-4">Width (in)</th>
+                            <th className="py-2 pr-4">Fabric (m)</th>
+                            <th className="py-2 pr-4 text-right">Price</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {activeSectionSummaries.map((summary) => (
+                            <tr key={summary.section} className="border-b last:border-0">
+                              <td className="py-2 pr-4 font-medium">{summary.section}</td>
+                              <td className="py-2 pr-4">{summary.type}</td>
+                              <td className="py-2 pr-4">{summary.qty}</td>
+                              <td className="py-2 pr-4">{summary.width > 0 ? summary.width : "-"}</td>
+                              <td className="py-2 pr-4">
+                                {summary.fabric > 0 ? summary.fabric.toFixed(1) : "-"}
+                              </td>
+                              <td className="py-2 pr-4 text-right">
+                                {summary.price > 0 ? formatCurrency(summary.price) : "-"}
+                              </td>
+                            </tr>
+                          ))}
+                          <tr className="font-semibold">
+                            <td className="py-3 pr-4" colSpan={3}>
+                              Totals
+                            </td>
+                            <td className="py-3 pr-4">—</td>
+                            <td className="py-3 pr-4">{totalSectionFabric.toFixed(1)}</td>
+                            <td className="py-3 pr-4 text-right">{formatCurrency(totalSectionPrice)}</td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+                  ) : (
+                    <Alert>
+                      <AlertDescription>
+                        Section summary unavailable. Please ensure base 2-seater price is defined and sections are active.
+                      </AlertDescription>
+                    </Alert>
+                  )}
+                </CardContent>
+              </Card>
 
               <Separator />
             </>
@@ -801,8 +1404,8 @@ const SofaBedConfigurator = ({ product, configuration, onConfigurationChange }: 
                 value={configuration.console?.required === "Yes" ? "Yes" : "No"}
                 onValueChange={(value) => {
                   const isRequired = value === "Yes";
-                  const maxConsoles = getMaxConsoles();
-                  const autoQuantity = isRequired ? maxConsoles : 0;
+                  const maxConsolesForShape = getMaxConsoles(sections);
+                  const autoQuantity = isRequired ? maxConsolesForShape : 0;
                   
                   // Initialize placements array - always maintain maxConsoles slots
                   // Use "none" placeholder to maintain slot positions
@@ -885,7 +1488,7 @@ const SofaBedConfigurator = ({ product, configuration, onConfigurationChange }: 
                     <p className="text-sm font-medium">
                       {configuration.console?.quantity || 0} Console{configuration.console?.quantity !== 1 ? 's' : ''} 
                       <span className="text-muted-foreground ml-2">
-                        (Auto-calculated: Total Seats - 1 = {getTotalSeats()} - 1 = {maxConsoles})
+                    (Auto-calculated: Total Seats - 1 = {totalSeatCount} - 1 = {maxConsoles})
                       </span>
                     </p>
                     <p className="text-xs text-muted-foreground mt-1">
@@ -896,10 +1499,8 @@ const SofaBedConfigurator = ({ product, configuration, onConfigurationChange }: 
 
                 {/* Console Placements & Accessories */}
                 {configuration.console?.quantity > 0 && (() => {
-                  const allPlacements = generateAllConsolePlacements();
-                  
-                  const maxConsoles = getMaxConsoles();
-                  
+                  const allPlacements = consolePlacements;
+
                   // Always maintain maxConsoles slots in the array
                   // This ensures slots maintain their positions even when set to "none"
                   let currentPlacements = configuration.console?.placements || [];
@@ -1089,6 +1690,31 @@ const SofaBedConfigurator = ({ product, configuration, onConfigurationChange }: 
                     );
                   });
                 })()}
+
+                <Card className="bg-muted/40">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm font-semibold">Active Console Placements</CardTitle>
+                    <CardDescription>Only consoles in active sections are counted for pricing.</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-2 text-sm">
+                    {activeConsolePlacements.length > 0 ? (
+                      <ul className="space-y-1">
+                        {activeConsolePlacements.map((placement, index) => (
+                          <li key={`${placement.label}-${index}`} className="flex items-center justify-between">
+                            <span>{placement.label}</span>
+                            <span className="text-muted-foreground">
+                              Width: {placement.width ? `${placement.width} in` : "—"}
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p className="text-xs text-muted-foreground">
+                        Select a console placement above to activate pricing for that slot.
+                      </p>
+                    )}
+                  </CardContent>
+                </Card>
               </div>
             )}
           </div>
@@ -1100,19 +1726,15 @@ const SofaBedConfigurator = ({ product, configuration, onConfigurationChange }: 
             <div className="flex items-center justify-between">
               <Label className="text-base font-semibold">Lounger</Label>
               <Select
-                value={configuration.lounger?.required === "Yes" ? "Yes" : "No"}
-                onValueChange={(value) =>
-                  updateConfiguration({
-                    lounger: {
-                      ...configuration.lounger,
-                      required: value === "Yes" ? "Yes" : "No",
-                      numberOfLoungers: value === "Yes" ? (configuration.lounger?.numberOfLoungers || "1 No.") : "1 No.",
-                    },
-                  })
-                }
+                value={loungerConfig?.required || "No"}
+                onValueChange={(value) => {
+                  handleLoungerChange({
+                    required: value as LoungerConfig["required"],
+                  });
+                }}
               >
                 <SelectTrigger className="w-32">
-                  <SelectValue />
+                  <SelectValue placeholder="Select..." />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="Yes">Yes</SelectItem>
@@ -1120,21 +1742,15 @@ const SofaBedConfigurator = ({ product, configuration, onConfigurationChange }: 
                 </SelectContent>
               </Select>
             </div>
-            {configuration.lounger?.required === "Yes" && (
+            {loungerConfig?.required === "Yes" && (
               <div className="space-y-4 pt-2 pl-4 border-l-2 border-muted">
                 <div className="space-y-2">
                   <Label>Number of Loungers</Label>
                   <Select
-                    value={configuration.lounger?.numberOfLoungers || "1 No."}
-                    onValueChange={(value) => {
-                      updateConfiguration({
-                        lounger: {
-                          ...configuration.lounger,
-                          numberOfLoungers: value,
-                          placement: value === "2 Nos." ? "Both" : configuration.lounger?.placement || "LHS",
-                        },
-                      });
-                    }}
+                    value={loungerConfig.numberOfLoungers}
+                    onValueChange={(value) =>
+                      handleLoungerChange({ numberOfLoungers: value as LoungerCountOption })
+                    }
                   >
                     <SelectTrigger>
                       <SelectValue />
@@ -1148,12 +1764,8 @@ const SofaBedConfigurator = ({ product, configuration, onConfigurationChange }: 
                 <div className="space-y-2">
                   <Label>Lounger Size</Label>
                   <Select
-                    value={configuration.lounger?.size || ""}
-                    onValueChange={(value) =>
-                      updateConfiguration({
-                        lounger: { ...configuration.lounger, size: value },
-                      })
-                    }
+                    value={loungerConfig.size}
+                    onValueChange={(value) => handleLoungerChange({ size: value })}
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Select size" />
@@ -1184,38 +1796,27 @@ const SofaBedConfigurator = ({ product, configuration, onConfigurationChange }: 
                 <div className="space-y-2">
                   <Label>Placement</Label>
                   <Select
-                    value={configuration.lounger?.placement || "LHS"}
-                    onValueChange={(value) =>
-                      updateConfiguration({
-                        lounger: { ...configuration.lounger, placement: value },
-                      })
-                    }
-                    disabled={configuration.lounger?.numberOfLoungers === "2 Nos."}
+                    value={loungerConfig.placement}
+                    onValueChange={(value) => handleLoungerChange({ placement: value as LoungerPlacementValue })}
+                    disabled={loungerPlacementOptions.length <= 1}
                   >
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      {configuration.lounger?.numberOfLoungers === "2 Nos." ? (
-                        <SelectItem value="Both">Both LHS & RHS</SelectItem>
-                      ) : (
-                        <>
-                          <SelectItem value="LHS">Left Hand Side (LHS)</SelectItem>
-                          <SelectItem value="RHS">Right Hand Side (RHS)</SelectItem>
-                        </>
-                      )}
+                      {loungerPlacementOptions.map((option) => (
+                        <SelectItem key={option.value} value={option.value}>
+                          {option.label}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
                 <div className="space-y-2">
                   <Label>Storage</Label>
                   <Select
-                    value={configuration.lounger?.storage || "No"}
-                    onValueChange={(value) =>
-                      updateConfiguration({
-                        lounger: { ...configuration.lounger, storage: value },
-                      })
-                    }
+                    value={loungerConfig.storage}
+                    onValueChange={(value) => handleLoungerChange({ storage: value as LoungerConfig["storage"] })}
                   >
                     <SelectTrigger>
                       <SelectValue />
@@ -1225,7 +1826,7 @@ const SofaBedConfigurator = ({ product, configuration, onConfigurationChange }: 
                       <SelectItem value="No">No</SelectItem>
                     </SelectContent>
                   </Select>
-                  {configuration.lounger?.storage === "No" && (
+                  {loungerConfig.storage === "No" && (
                     <p className="text-xs text-muted-foreground">
                       Storage-related options are disabled when Storage is set to "No"
                     </p>
@@ -1851,73 +2452,111 @@ const SofaBedConfigurator = ({ product, configuration, onConfigurationChange }: 
           <CardDescription>Configure electric recliner mechanisms per section (₹14,000 per recliner)</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          {["F", "L", "R", "C"].map((section) => {
-            const sectionKey = section as "F" | "L" | "R" | "C";
-            const reclinerData = configuration.recliner?.[sectionKey] || { required: "No", numberOfRecliners: 0 };
-            
-            // Only show L section for L/U/Combo shapes
-            if (section === "L" && !isLShape && !isUShape && !isCombo) return null;
-            // Only show R section for U/Combo shapes
-            if (section === "R" && !isUShape && !isCombo) return null;
-            // Only show C section for Combo shape
-            if (section === "C" && !isCombo) return null;
-            
+          {activeReclinerSections.map((sectionKey) => {
+            const reclinerData = reclinerConfig[sectionKey];
             return (
-              <Card key={section} className="bg-muted/30">
+              <Card key={sectionKey} className="bg-muted/30">
                 <CardContent className="p-4 space-y-3">
                   <Label className="font-semibold">
-                    {section === "F" ? "Front" : section === "L" ? "Left" : section === "R" ? "Right" : "Center"} Section
+                    {RECLINER_SECTION_LABELS[sectionKey]}
                   </Label>
                   <RadioGroup
-                    value={reclinerData.required || "No"}
+                    value={reclinerData.required}
                     onValueChange={(value) => {
-                      updateConfiguration({
-                        recliner: {
-                          ...configuration.recliner,
-                          [sectionKey]: {
-                            ...reclinerData,
-                            required: value,
-                            numberOfRecliners: value === "Yes" ? reclinerData.numberOfRecliners || 1 : 0,
-                          },
-                        },
+                      handleReclinerChange(sectionKey, {
+                        required: value as ReclinerSectionConfig["required"],
+                        numberOfRecliners: value === "Yes" ? reclinerData.numberOfRecliners || 1 : 0,
                       });
                     }}
                   >
                     <div className="flex items-center space-x-2">
-                      <RadioGroupItem value="Yes" id={`recliner-${section}-yes`} />
-                      <Label htmlFor={`recliner-${section}-yes`} className="font-normal cursor-pointer">Yes</Label>
+                      <RadioGroupItem value="Yes" id={`recliner-${sectionKey}-yes`} />
+                      <Label htmlFor={`recliner-${sectionKey}-yes`} className="font-normal cursor-pointer">
+                        Yes
+                      </Label>
                     </div>
                     <div className="flex items-center space-x-2">
-                      <RadioGroupItem value="No" id={`recliner-${section}-no`} />
-                      <Label htmlFor={`recliner-${section}-no`} className="font-normal cursor-pointer">No</Label>
+                      <RadioGroupItem value="No" id={`recliner-${sectionKey}-no`} />
+                      <Label htmlFor={`recliner-${sectionKey}-no`} className="font-normal cursor-pointer">
+                        No
+                      </Label>
                     </div>
                   </RadioGroup>
                   
                   {reclinerData.required === "Yes" && (
-                    <div className="space-y-2">
-                      <Label className="text-sm">Number of Recliners</Label>
-                      <Input
-                        type="number"
-                        min="1"
-                        value={reclinerData.numberOfRecliners || 1}
-                        onChange={(e) => {
-                          updateConfiguration({
-                            recliner: {
-                              ...configuration.recliner,
-                              [sectionKey]: {
-                                ...reclinerData,
-                                numberOfRecliners: Number(e.target.value),
-                              },
-                            },
-                          });
-                        }}
-                      />
+                    <div className="space-y-3">
+                      <div className="space-y-2">
+                        <Label className="text-sm">Number of Recliners</Label>
+                        <Input
+                          type="number"
+                          min="1"
+                          value={reclinerData.numberOfRecliners || 1}
+                          onChange={(e) =>
+                            handleReclinerChange(sectionKey, {
+                              numberOfRecliners: Math.max(1, Number(e.target.value)),
+                            })
+                          }
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="text-sm">Positioning</Label>
+                        <Select
+                          value={reclinerData.positioning}
+                          onValueChange={(value) =>
+                            handleReclinerChange(sectionKey, {
+                              positioning: value as LoungerPlacementValue,
+                            })
+                          }
+                        >
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {RECLINER_POSITION_OPTIONS.map((option) => (
+                              <SelectItem key={`${sectionKey}-${option.value}`} value={option.value}>
+                                {option.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
                     </div>
                   )}
                 </CardContent>
               </Card>
             );
           })}
+
+          <Card className="bg-muted/40">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-semibold">Recliner Summary</CardTitle>
+              <CardDescription>Only active sections contribute to recliner pricing.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-2 text-sm">
+              {reclinerSummaries.length > 0 ? (
+                <ul className="space-y-1">
+                  {reclinerSummaries.map((summary) => (
+                    <li key={`recliner-summary-${summary.section}`} className="flex items-center justify-between">
+                      <span>
+                        {summary.label}: {summary.quantity > 0 ? `${summary.quantity} × ${summary.positioning}` : summary.status}
+                      </span>
+                      <span className="text-muted-foreground">
+                        {summary.quantity > 0 ? formatCurrency(summary.price) : "₹0"}
+                      </span>
+                    </li>
+                  ))}
+                  {totalReclinerPrice > 0 && (
+                    <li className="flex items-center justify-between font-semibold pt-1">
+                      <span>Total Recliner Cost</span>
+                      <span>{formatCurrency(totalReclinerPrice)}</span>
+                    </li>
+                  )}
+                </ul>
+              ) : (
+                <p className="text-xs text-muted-foreground">No recliners selected for this configuration.</p>
+              )}
+            </CardContent>
+          </Card>
         </CardContent>
       </Card>
 
@@ -2016,8 +2655,8 @@ const SofaBedConfigurator = ({ product, configuration, onConfigurationChange }: 
                 {dimensions.label}
               </div>
               <div className="text-sm text-muted-foreground space-y-1 pt-4">
-                <p>Shape: {shape}</p>
-                <p>Total Seats: {getTotalSeats()}</p>
+                <p>Shape: {normalizedShape}</p>
+                <p>Total Seats: {totalSeatCount}</p>
                 {configuration.legs?.type && (
                   <p>Legs: {configuration.legs.type}</p>
                 )}

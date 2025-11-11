@@ -93,17 +93,25 @@ const Products = () => {
       if (category === "sofabed") {
         // For sofabed, bom_rs has been renamed to strike_price_2seater_rs
         selectFields = `id, title, images, ${columns.netPrice}, ${columns.strikePrice}, strike_price_2seater_rs, discount_percent, discount_rs`;
-      } else if (category === "recliner") {
-        // For recliner, bom_rs doesn't exist - use net_price_rs and strike_price_1seater_rs
+      } else if (category === "recliner" || category === "cinema_chairs") {
+        // For recliner and cinema chairs, bom_rs doesn't exist - use primary pricing columns only
         selectFields = `id, title, images, ${columns.netPrice}, ${columns.strikePrice}, discount_percent, discount_rs`;
+      } else if (category === "database_pouffes") {
+        // For pouffes, use image column (singular, not images)
+        selectFields = `id, title, image, ${columns.netPrice}, ${columns.strikePrice}, discount_percent, discount_rs`;
       }
       
       // Using dynamic table names with Supabase requires runtime querying
-      const { data, error } = await supabase
+      let query = supabase
         .from(getCategoryTableName(category) as any)
-        .select(selectFields)
-        .eq("is_active", true)
-        .order("title", { ascending: true }) as any;
+        .select(selectFields);
+      
+      // Only filter by is_active if the table has that column (exclude database_pouffes)
+      if (category !== "database_pouffes") {
+        query = query.eq("is_active", true);
+      }
+      
+      const { data, error } = await query.order("title", { ascending: true }) as any;
 
       if (error) throw error;
       
@@ -128,23 +136,30 @@ const Products = () => {
       const normalizedData = (data || []).map((item: any) => {
         // Handle images - use utility function for consistent parsing
         // Get first image for thumbnail, but store full image data for gallery
-        const imageUrl = getFirstImageUrl(item.images);
+        // For pouffes, use image column (singular), for others use images
+        const imageData = category === "database_pouffes" ? item.image : item.images;
+        const imageUrl = imageData ? getFirstImageUrl(imageData) : null;
         
         // Debug logging in development
         if (import.meta.env.DEV) {
-          if (item.images && !imageUrl) {
+          if (imageData && !imageUrl) {
             console.warn('⚠️ Image parsing failed for product:', {
               id: item.id,
               title: item.title,
-              rawImages: item.images,
-              imagesType: typeof item.images,
-              isArray: Array.isArray(item.images)
+              rawImages: imageData,
+              imagesType: typeof imageData,
+              isArray: Array.isArray(imageData)
             });
           } else if (imageUrl) {
             console.log('✅ Image parsed successfully:', {
               product: item.title,
-              original: item.images,
+              original: imageData,
               parsed: imageUrl
+            });
+          } else if (category === "database_pouffes" && !item.image) {
+            console.log('ℹ️ Pouffe product has no image:', {
+              product: item.title,
+              id: item.id
             });
           }
         }
@@ -166,12 +181,12 @@ const Products = () => {
           id: item.id,
           title: item.title,
           images: imageUrl, // First image URL for thumbnail
-          imagesData: item.images, // Full image data for gallery (can be string, array, etc.)
+          imagesData: imageData, // Full image data for gallery (can be string, array, etc.)
           netPrice: netPrice,
           strikePrice: strikePriceNum,
           discount_percent: item.discount_percent,
           discount_rs: item.discount_rs,
-          bom_rs: (category === "sofabed" || category === "recliner") ? undefined : item.bom_rs // bom_rs doesn't exist for sofabed (renamed) and recliner
+          bom_rs: (category === "sofabed" || category === "recliner" || category === "cinema_chairs" || category === "database_pouffes") ? undefined : item.bom_rs // bom_rs not present for these categories
         };
       });
       
