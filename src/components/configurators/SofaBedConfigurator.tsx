@@ -226,9 +226,10 @@ const normalizeLoungerConfig = (
 ): LoungerConfig => {
   // Normalize required field: handle both boolean and string values
   let normalizedRequired: "Yes" | "No" = "No";
-  if (loungerConfig?.required === true || loungerConfig?.required === "Yes") {
+  const requiredValue: any = loungerConfig?.required;
+  if (requiredValue === true || requiredValue === "Yes" || requiredValue === "yes") {
     normalizedRequired = "Yes";
-  } else if (loungerConfig?.required === false || loungerConfig?.required === "No") {
+  } else if (requiredValue === false || requiredValue === "No" || requiredValue === "no") {
     normalizedRequired = "No";
   }
 
@@ -469,7 +470,7 @@ const SofaBedConfigurator = ({ product, configuration, onConfigurationChange }: 
   const seatDepthsResult = useDropdownOptions("sofabed", "seat_depth");
   const seatWidthsResult = useDropdownOptions("sofabed", "seat_width");
   const consoleSizesResult = useDropdownOptions("common", "console_size");
-  const loungerSizesResult = useDropdownOptions("sofa", "lounger_size");
+  const loungerSizesResult = useDropdownOptions("sofabed", "lounger_size");
   const pillowTypesResult = useDropdownOptions("sofa", "pillow_type");
   const pillowSizesResult = useDropdownOptions("sofa", "pillow_size");
   const pillowFabricPlanResult = useDropdownOptions("sofa", "pillow_fabric_plan");
@@ -663,7 +664,7 @@ const SofaBedConfigurator = ({ product, configuration, onConfigurationChange }: 
 
   // Declare loungerConfig and reclinerConfig before handlers that use them
   const loungerConfig = useMemo(
-    () => normalizeLoungerConfig(normalizedShape, configuration.lounger),
+    () => normalizeLoungerConfig(configuration.lounger, normalizedShape),
     [normalizedShape, configuration.lounger]
   );
 
@@ -676,7 +677,7 @@ const SofaBedConfigurator = ({ product, configuration, onConfigurationChange }: 
     (changes: Partial<LoungerConfig>) => {
       // Merge current config with changes before normalizing
       const updatedConfig = { ...loungerConfig, ...changes };
-      const normalized = normalizeLoungerConfig(normalizedShape, updatedConfig);
+      const normalized = normalizeLoungerConfig(updatedConfig, normalizedShape);
       updateConfiguration({ lounger: normalized });
     },
     [loungerConfig, normalizedShape, updateConfiguration]

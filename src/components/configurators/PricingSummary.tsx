@@ -147,6 +147,16 @@ const PricingSummary = ({
                   <span className="font-semibold">₹{Math.round(pricing.breakdown.fabricCharges).toLocaleString()}</span>
                 </div>
               )}
+
+            {/* Fabric Requirement */}
+            {typeof pricing.breakdown.fabricMeters === "number" && pricing.breakdown.fabricMeters > 0 && (
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Fabric Required</span>
+                <span className="font-semibold">
+                  {pricing.breakdown.fabricMeters.toFixed(1)} m
+                </span>
+              </div>
+            )}
               
               {/* Dimension Upgrade */}
               {pricing.breakdown.dimensionUpgrade > 0 && (
