@@ -1767,7 +1767,6 @@ export type Database = {
           adjusted_bom_rs: number | null
           backrest: string | null
           backrest_depth: number | null
-          bom_rs: number | null
           comes_with_headrest: string | null
           created_at: string | null
           discount_percent: number | null
@@ -1789,6 +1788,7 @@ export type Database = {
           net_price_rs: number | null
           seat: string | null
           strike_price_1seater_rs: number | null
+          strike_price_2seater_rs: number | null
           structare: string | null
           title: string
           updated_at: string | null
@@ -1799,7 +1799,6 @@ export type Database = {
           adjusted_bom_rs?: number | null
           backrest?: string | null
           backrest_depth?: number | null
-          bom_rs?: number | null
           comes_with_headrest?: string | null
           created_at?: string | null
           discount_percent?: number | null
@@ -1821,6 +1820,7 @@ export type Database = {
           net_price_rs?: number | null
           seat?: string | null
           strike_price_1seater_rs?: number | null
+          strike_price_2seater_rs?: number | null
           structare?: string | null
           title: string
           updated_at?: string | null
@@ -1831,7 +1831,6 @@ export type Database = {
           adjusted_bom_rs?: number | null
           backrest?: string | null
           backrest_depth?: number | null
-          bom_rs?: number | null
           comes_with_headrest?: string | null
           created_at?: string | null
           discount_percent?: number | null
@@ -1853,6 +1852,7 @@ export type Database = {
           net_price_rs?: number | null
           seat?: string | null
           strike_price_1seater_rs?: number | null
+          strike_price_2seater_rs?: number | null
           structare?: string | null
           title?: string
           updated_at?: string | null
