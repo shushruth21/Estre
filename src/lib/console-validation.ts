@@ -82,7 +82,10 @@ export const isConsolePositionAvailable = (
   consoleNumber: number
 ): boolean => {
   // If console not required, return false
-  if (!consoleRequired || consoleRequired === "No" || consoleRequired === false) {
+  if (!consoleRequired || consoleRequired === "No") {
+    return false;
+  }
+  if (typeof consoleRequired === 'boolean' && !consoleRequired) {
     return false;
   }
 

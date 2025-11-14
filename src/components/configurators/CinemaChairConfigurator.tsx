@@ -200,13 +200,13 @@ const CinemaChairConfigurator = ({
 
   const seatCountOptions = useMemo(
     () =>
-      dedupeOptions(seatCountsResult.data as DropdownOption[], normalizeSeatCountLabel),
+      dedupeOptions((seatCountsResult.data || []) as any[], normalizeSeatCountLabel),
     [seatCountsResult.data]
   );
 
   const seatWidthOptions = useMemo(
     () =>
-      dedupeOptions(seatWidthsResult.data as DropdownOption[], (value) =>
+      dedupeOptions((seatWidthsResult.data || []) as any[], (value) =>
         normalizeInchesLabel(value, "In")
       ),
     [seatWidthsResult.data]
@@ -214,7 +214,7 @@ const CinemaChairConfigurator = ({
 
   const seatDepthOptions = useMemo(
     () =>
-      dedupeOptions(seatDepthsResult.data as DropdownOption[], (value) =>
+      dedupeOptions((seatDepthsResult.data || []) as any[], (value) =>
         normalizeInchesLabel(value, "in")
       ),
     [seatDepthsResult.data]
@@ -222,7 +222,7 @@ const CinemaChairConfigurator = ({
 
   const seatHeightOptions = useMemo(
     () =>
-      dedupeOptions(seatHeightsResult.data as DropdownOption[], (value) =>
+      dedupeOptions((seatHeightsResult.data || []) as any[], (value) =>
         normalizeInchesLabel(value, "in")
       ),
     [seatHeightsResult.data]

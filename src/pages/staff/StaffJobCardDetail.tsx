@@ -78,11 +78,11 @@ export default function StaffJobCardDetail() {
       setOrder(null);
     }
 
-    if (data.line_item_id) {
+    if (data.order_item_id) {
       const { data: lineItemData } = await supabase
         .from("order_items")
         .select("id, product_title, product_category, total_price_rs, configuration")
-        .eq("id", data.line_item_id)
+        .eq("id", data.order_item_id)
         .single();
       setLineItem(lineItemData);
     } else {
