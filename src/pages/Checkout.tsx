@@ -9,6 +9,8 @@ import { StepIndicator } from "@/components/checkout/StepIndicator";
 import { DeliveryStep } from "@/components/checkout/DeliveryStep";
 import { ReviewStep } from "@/components/checkout/ReviewStep";
 import { PaymentStep } from "@/components/checkout/PaymentStep";
+import { calculateDynamicPrice } from "@/lib/dynamic-pricing";
+import { generateSaleOrderData } from "@/lib/sale-order-generator";
 
 const STEPS = [
   { id: 1, name: "Delivery", description: "Shipping details" },
@@ -105,11 +107,104 @@ const Checkout = () => {
         quantity: item.quantity || 1,
       }));
 
-      const { error: itemsError } = await supabase
+      const { data: insertedItems, error: itemsError } = await supabase
         .from("order_items")
-        .insert(orderItems);
+        .insert(orderItems)
+        .select();
 
       if (itemsError) throw itemsError;
+
+      const saleOrderSnapshots: any[] = [];
+      const jobCardInserts: any[] = [];
+
+      if (insertedItems && insertedItems.length > 0) {
+        for (const item of insertedItems) {
+          const pricing = await calculateDynamicPrice(
+            item.product_category,
+            item.product_id,
+            item.configuration
+          );
+
+          const saleData = await generateSaleOrderData(
+            order,
+            item,
+            item.configuration,
+            pricing.breakdown
+          );
+
+          saleOrderSnapshots.push(saleData);
+
+          saleData.jobCards.forEach((jobCard) => {
+            jobCardInserts.push({
+              job_card_number: jobCard.jobCardNumber,
+              so_number: jobCard.soNumber,
+              line_item_id: jobCard.lineItemId,
+              order_id: order.id,
+              order_item_id: item.id,
+              order_number: jobCard.soNumber,
+              customer_name: jobCard.customer.name,
+              customer_phone: jobCard.customer.phone,
+              customer_email: jobCard.customer.email || order.customer_email,
+              delivery_address: jobCard.customer.address,
+              product_category: jobCard.category,
+              product_title: jobCard.modelName,
+              configuration: jobCard.configuration,
+              fabric_codes: jobCard.fabricPlan.fabricCodes,
+              fabric_meters: jobCard.fabricPlan,
+              accessories: {
+                console: jobCard.console,
+                dummySeats: jobCard.dummySeats,
+                sections: jobCard.sections,
+                pricing: jobCard.pricing,
+              },
+              dimensions: jobCard.dimensions,
+              status: "pending",
+              priority: "normal",
+            });
+          });
+        }
+      }
+
+      if (jobCardInserts.length > 0) {
+        const { data: createdJobCards, error: jobCardsError } = await supabase
+          .from("job_cards")
+          .insert(jobCardInserts)
+          .select("id");
+
+        if (jobCardsError) throw jobCardsError;
+
+        const defaultTasks = [
+          { task_name: "Fabric Cutting", task_type: "fabric_cutting", sort_order: 1 },
+          { task_name: "Frame Work", task_type: "frame_work", sort_order: 2 },
+          { task_name: "Upholstery", task_type: "upholstery", sort_order: 3 },
+          { task_name: "Assembly", task_type: "assembly", sort_order: 4 },
+          { task_name: "Finishing", task_type: "finishing", sort_order: 5 },
+          { task_name: "Quality Check", task_type: "quality_check", sort_order: 6 },
+        ];
+
+        const tasksToInsert =
+          createdJobCards?.flatMap((jobCard: any) =>
+            defaultTasks.map((task) => ({
+              job_card_id: jobCard.id,
+              ...task,
+            }))
+          ) ?? [];
+
+        if (tasksToInsert.length > 0) {
+          await supabase.from("job_card_tasks").insert(tasksToInsert);
+        }
+      }
+
+      await supabase
+        .from("orders")
+        .update({
+          status: "confirmed",
+          metadata: {
+            ...(order.metadata || {}),
+            sale_orders: saleOrderSnapshots,
+          },
+        })
+        .eq("id", order.id);
 
       // Create initial timeline entry
       await supabase.from("order_timeline").insert({
@@ -117,6 +212,14 @@ const Checkout = () => {
         status: "pending",
         title: "Order Placed",
         description: "Your order has been received and is pending approval",
+        created_by: user.id,
+      });
+
+      await supabase.from("order_timeline").insert({
+        order_id: order.id,
+        status: "confirmed",
+        title: "Order Confirmed",
+        description: "Order confirmed and sent for production",
         created_by: user.id,
       });
 
@@ -132,12 +235,11 @@ const Checkout = () => {
     },
     onSuccess: (order) => {
       toast({
-        title: "Order Placed Successfully!",
-        description: `Order ${order.order_number} has been created. Generating sale order...`,
+        title: "Order Confirmed!",
+        description: `Order ${order.order_number} is now in production. Track progress from your dashboard.`,
       });
       queryClient.invalidateQueries({ queryKey: ["cart"] });
-      // Navigate to sale order page
-      navigate(`/sale-order/${order.id}`);
+      navigate("/dashboard");
     },
     onError: (error: any) => {
       toast({

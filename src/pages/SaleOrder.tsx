@@ -3,7 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { SaleOrderDocument } from "@/components/orders/SaleOrderDocument";
-import { generateSaleOrderData } from "@/lib/sale-order-generator";
+import { generateSaleOrderData, SaleOrderGeneratedData } from "@/lib/sale-order-generator";
 import { calculateDynamicPrice } from "@/lib/dynamic-pricing";
 import { Loader2, ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button";
 const SaleOrder = () => {
   const { orderId, itemId } = useParams();
   const navigate = useNavigate();
-  const [saleOrderData, setSaleOrderData] = useState<any>(null);
+  const [saleOrderData, setSaleOrderData] = useState<SaleOrderGeneratedData | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
 
   // Fetch order

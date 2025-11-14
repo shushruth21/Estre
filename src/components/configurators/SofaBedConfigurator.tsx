@@ -459,10 +459,16 @@ const calculateSofaBedSectionSummary = (
 interface SofaBedConfiguratorProps {
   product: any;
   configuration: any;
+  pricing?: any;
   onConfigurationChange: (config: any) => void;
 }
 
-const SofaBedConfigurator = ({ product, configuration, onConfigurationChange }: SofaBedConfiguratorProps) => {
+const SofaBedConfigurator = ({
+  product,
+  configuration,
+  pricing,
+  onConfigurationChange,
+}: SofaBedConfiguratorProps) => {
   // Fetch all dropdown options from database
   const shapesResult = useDropdownOptions("sofabed", "base_shape");
   const seatTypesResult = useDropdownOptions("sofabed", "seat_type");
@@ -720,6 +726,87 @@ const SofaBedConfigurator = ({ product, configuration, onConfigurationChange }: 
     () => getLoungerPlacementOptions(normalizedShape, loungerConfig.numberOfLoungers),
     [normalizedShape, loungerConfig.numberOfLoungers]
   );
+
+  const loungerEnabled = loungerConfig.required === "Yes";
+
+  useEffect(() => {
+    if (!loungerEnabled && loungerConfig.required !== "No") {
+      updateConfiguration({ lounger: { ...LOUNGER_DEFAULT, required: "No" } });
+    }
+  }, [loungerEnabled, loungerConfig.required, updateConfiguration]);
+
+  const loungerPricing = useMemo(() => {
+    if (!loungerEnabled || !product) {
+      return {
+        basePrice: 0,
+        totalPrice: 0,
+        baseFabric: 0,
+        additionalFabric: 0,
+        totalFabric: 0,
+        width: Number(configuration.dimensions?.seatWidth || 24),
+      };
+    }
+
+    const base2Seater = Number(
+      product?.net_price_rs ??
+        product?.net_price ??
+        product?.strike_price_rs ??
+        product?.strike_price ??
+        0
+    );
+
+    const baseFabricMeters = Number(
+      product?.fabric_lounger_6ft_mtrs ??
+        product?.fabric_lounger_mtrs ??
+        0
+    );
+    const additionalFabricMeters = Number(
+      product?.fabric_lounger_additional_6_mtrs ??
+        product?.fabric_lounger_additional ??
+        0
+    );
+    const storagePrice = Number(product?.lounger_storage_price ?? 0);
+
+    const basePercentage =
+      Number(product?.lounger_base_percentage) || 0.4; // 40%
+    const additionalPercentage =
+      Number(product?.lounger_additional_percentage) || 0.04; // 4% per +6"
+
+    const parseSizeInches = (size: string): number => {
+      const match = size.match(/(\d+)\s*ft(?:\s*(\d+)\s*in)?/i);
+      if (!match) return 66; // default 5 ft 6 in
+      const feet = Number(match[1]) || 0;
+      const inches = Number(match[2] || 0);
+      return feet * 12 + inches;
+    };
+
+    const sizeInches = parseSizeInches(loungerConfig.size);
+    const baseInches = 66; // 5 ft 6 in baseline
+
+    const incrementsAbove = sizeInches > baseInches ? Math.floor((sizeInches - baseInches) / 6) : 0;
+    const baseLoungerPrice = base2Seater * basePercentage;
+    const sizeAdjustedPrice =
+      baseLoungerPrice + incrementsAbove * (base2Seater * additionalPercentage);
+
+    const effectiveBaseFabric =
+      sizeInches >= baseInches || additionalFabricMeters <= 0 || baseFabricMeters <= 0
+        ? baseFabricMeters + incrementsAbove * additionalFabricMeters
+        : baseFabricMeters * (sizeInches / baseInches);
+
+    const quantity = loungerConfig.numberOfLoungers === "2 Nos." ? 2 : 1;
+    const storageCost = loungerConfig.storage === "Yes" ? storagePrice : 0;
+
+    return {
+      basePrice: sizeAdjustedPrice,
+      totalPrice: sizeAdjustedPrice * quantity + storageCost * quantity,
+      baseFabric: baseFabricMeters,
+      additionalFabric: incrementsAbove * additionalFabricMeters,
+      totalFabric: effectiveBaseFabric * quantity,
+      width: loungerConfig.placement === "RHS" && loungerConfig.numberOfLoungers === "1 No."
+        ? 0
+        : Number(configuration.dimensions?.seatWidth || 24),
+    };
+  }, [loungerEnabled, product, loungerConfig, configuration.dimensions?.seatWidth]);
   const reclinerOriginalKey = useMemo(() => JSON.stringify(configuration.recliner || {}), [configuration.recliner]);
   const reclinerNormalizedKey = useMemo(() => JSON.stringify(reclinerConfig), [reclinerConfig]);
 
@@ -858,28 +945,8 @@ const SofaBedConfigurator = ({ product, configuration, onConfigurationChange }: 
   );
   const activeSectionSummaries = sectionSummaries.filter((summary) => summary.active);
   const totalSectionPrice = activeSectionSummaries.reduce((sum, item) => sum + item.price, 0);
-  const totalSectionFabric = activeSectionSummaries.reduce((sum, item) => sum + item.fabric, 0);
 
   const consolePlacements = useMemo(() => generateAllConsolePlacements(), [generateAllConsolePlacements]);
-  const activeConsolePlacements = useMemo(() => {
-    const placementMap = new Map<string, { label: string; width?: number }>();
-    consolePlacements.forEach((placement) => {
-      placementMap.set(placement.value, { label: placement.label, width: placement.width });
-    });
-
-    return (configuration.console?.placements || [])
-      .map((placement: any) => {
-        if (!placement || placement.position === "none" || !placement.section) return null;
-        const key = `${placement.section}_${placement.afterSeat || 1}`;
-        const meta = placementMap.get(key);
-        return {
-          ...placement,
-          label: meta?.label || `${placement.section.toUpperCase()} Console ${placement.afterSeat || 1}`,
-          width: meta?.width || 0,
-        };
-      })
-      .filter(Boolean) as Array<{ label: string; width: number }>;
-  }, [configuration.console?.placements, consolePlacements]);
 
   const reclinerSummaries = useMemo(
     () => calculateReclinerSummaries(normalizedShape, reclinerConfig),
@@ -932,6 +999,435 @@ const SofaBedConfigurator = ({ product, configuration, onConfigurationChange }: 
   };
 
   const dimensions = calculateDimensions();
+
+  const normalizeConsoleSection = useCallback((section?: string | null) => {
+    if (!section) return null;
+    const value = section.toString().trim().toLowerCase();
+    if (value === "front" || value === "f") return "front";
+    if (value === "left" || value === "l") return "left";
+    if (value === "right" || value === "r") return "right";
+    if (value === "combo" || value === "c") return "combo";
+    return null;
+  }, []);
+
+  const extractAfterSeat = useCallback((placement: any): number => {
+    if (!placement) return 0;
+    if (placement.afterSeat && Number.isFinite(Number(placement.afterSeat))) {
+      return Number(placement.afterSeat);
+    }
+    if (typeof placement.position === "string") {
+      const match = placement.position.match(/after_(\d+)/i);
+      if (match && match[1]) {
+        return Number(match[1]);
+      }
+    }
+    return 0;
+  }, []);
+
+  const trimConsoleLabel = useCallback((label: string) => {
+    if (!label) return "";
+    const parts = label.split(":");
+    return parts.length > 1 ? parts.slice(1).join(":").trim() : label;
+  }, []);
+
+  const consolePlacementMeta = useMemo(() => {
+    const allowedBySection = new Map<string, Map<number, string>>();
+    const labelByValue = new Map<string, string>();
+    const maxPerSection = new Map<string, number>();
+
+    consolePlacements.forEach((placement) => {
+      const normalizedSection = normalizeConsoleSection(placement.section);
+      if (!normalizedSection) return;
+
+      labelByValue.set(placement.value, trimConsoleLabel(placement.label));
+
+      if (!allowedBySection.has(normalizedSection)) {
+        allowedBySection.set(normalizedSection, new Map());
+      }
+
+      allowedBySection.get(normalizedSection)!.set(placement.consoleNumber, placement.value);
+
+      const currentMax = maxPerSection.get(normalizedSection) || 0;
+      maxPerSection.set(normalizedSection, Math.max(currentMax, placement.consoleNumber));
+    });
+
+    return {
+      allowedBySection,
+      labelByValue,
+      maxPerSection,
+    };
+  }, [consolePlacements, normalizeConsoleSection, trimConsoleLabel]);
+
+  useEffect(() => {
+    if (configuration.console?.required !== "Yes") return;
+
+    const placements = Array.isArray(configuration.console?.placements)
+      ? configuration.console.placements
+      : [];
+
+    if (placements.length === 0 && consolePlacements.length === 0) return;
+
+    const allowedBySection = consolePlacementMeta.allowedBySection;
+
+    const sanitizePlacement = (placement: any) => {
+      const normalizedSection = normalizeConsoleSection(placement?.section);
+      if (!normalizedSection) {
+        return {
+          section: null,
+          position: "none",
+          afterSeat: null,
+          accessoryId: null,
+        };
+      }
+
+      const allowedForSection = allowedBySection.get(normalizedSection);
+      if (!allowedForSection || allowedForSection.size === 0) {
+        return {
+          section: null,
+          position: "none",
+          afterSeat: null,
+          accessoryId: null,
+        };
+      }
+
+      const afterSeat = extractAfterSeat(placement);
+      const valueKey = allowedForSection.get(afterSeat);
+
+      if (!valueKey) {
+        return {
+          section: null,
+          position: "none",
+          afterSeat: null,
+          accessoryId: null,
+        };
+      }
+
+      return {
+        section: normalizedSection,
+        position: `after_${afterSeat}`,
+        afterSeat,
+        accessoryId: placement?.accessoryId ?? null,
+      };
+    };
+
+    const sanitized = placements.map(sanitizePlacement);
+
+    const seenBySection = new Map<string, Set<number>>();
+    let changed = false;
+
+    const deduped = sanitized.map((placement) => {
+      if (!placement || placement.position === "none") {
+        return placement;
+      }
+
+      const section = placement.section;
+      const afterSeat = placement.afterSeat || 0;
+      const allowedForSection = allowedBySection.get(section || "");
+
+      if (!section || !allowedForSection?.has(afterSeat)) {
+        changed = true;
+        return {
+          section: null,
+          position: "none",
+          afterSeat: null,
+          accessoryId: null,
+        };
+      }
+
+      const usedSlots = seenBySection.get(section) || new Set<number>();
+      if (usedSlots.has(afterSeat)) {
+        changed = true;
+        return {
+          section: null,
+          position: "none",
+          afterSeat: null,
+          accessoryId: null,
+        };
+      }
+
+      usedSlots.add(afterSeat);
+      seenBySection.set(section, usedSlots);
+      return placement;
+    });
+
+    const normalizedExisting = placements.map((placement) => ({
+      section: normalizeConsoleSection(placement?.section),
+      position: typeof placement?.position === "string" ? placement.position : "none",
+      afterSeat: extractAfterSeat(placement) || null,
+      accessoryId: placement?.accessoryId ?? null,
+    }));
+
+    const normalizedSanitized = deduped.map((placement) => ({
+      section: placement.section,
+      position: placement.position,
+      afterSeat: placement.afterSeat,
+      accessoryId: placement.accessoryId ?? null,
+    }));
+
+    const normalizedExistingString = JSON.stringify(normalizedExisting);
+    const normalizedSanitizedString = JSON.stringify(normalizedSanitized);
+
+    const activeCount = deduped.filter((placement) => placement.position !== "none").length;
+    const currentQuantity = configuration.console?.quantity || 0;
+
+    if (normalizedExistingString !== normalizedSanitizedString || currentQuantity !== activeCount || changed) {
+      updateConfiguration({
+        console: {
+          ...configuration.console,
+          placements: deduped,
+          quantity: activeCount,
+        },
+      });
+    }
+  }, [
+    configuration.console,
+    consolePlacementMeta.allowedBySection,
+    consolePlacements.length,
+    extractAfterSeat,
+    normalizeConsoleSection,
+    updateConfiguration,
+  ]);
+
+  const consoleValidationSummary = useMemo(() => {
+    const placements = Array.isArray(configuration.console?.placements)
+      ? configuration.console.placements
+      : [];
+
+    const allowedBySection = consolePlacementMeta.allowedBySection;
+    const perSectionCounts: Record<string, number> = {
+      front: 0,
+      left: 0,
+      right: 0,
+      combo: 0,
+    };
+
+    placements.forEach((placement: any) => {
+      const section = normalizeConsoleSection(placement?.section);
+      if (!section) return;
+      if (placement?.position === "none") return;
+      const afterSeat = extractAfterSeat(placement);
+      const allowedForSection = allowedBySection.get(section);
+      if (!allowedForSection?.has(afterSeat)) return;
+      perSectionCounts[section] = (perSectionCounts[section] || 0) + 1;
+    });
+
+    const globalCount = Object.values(perSectionCounts).reduce((sum, value) => sum + value, 0);
+    const totalSeats = totalSeatCount;
+    const theoreticalMax = Math.max(0, totalSeats - 1);
+
+    const warnings: string[] = [];
+    if (globalCount > theoreticalMax) {
+      warnings.push(
+        `Total consoles (${globalCount}) exceed theoretical maximum (${theoreticalMax}) based on total seats (${totalSeatCount}).`
+      );
+    }
+
+    return { perSectionCounts, globalCount, warnings };
+  }, [
+    configuration.console?.placements,
+    consolePlacementMeta.allowedBySection,
+    extractAfterSeat,
+    normalizeConsoleSection,
+    totalSeatCount,
+  ]);
+
+  const fabricBreakdown = useMemo(() => {
+    const base2SeaterFabric = Number(
+      product?.fabric_first_seat_mtrs ??
+        product?.fabric_2_seater_mtrs ??
+        product?.fabric_base_seat_mtrs ??
+        0
+    );
+    const additionalSeatFabric = Number(
+      product?.fabric_additional_seat_mtrs ??
+        product?.fabric_additional_mtrs ??
+        0
+    );
+    const cornerFabricPerUnit = Number(
+      product?.fabric_corner_seat_mtrs ?? product?.fabric_corner_mtrs ?? 0
+    );
+    const backrestFabricPerUnit = Number(
+      product?.fabric_backrest_mtrs ?? product?.backrest_fabric_mtrs ?? 0
+    );
+    const console6Fabric = Number(product?.fabric_console_6_mtrs ?? 0);
+    const console10Fabric = Number(product?.fabric_console_10_mtrs ?? 0);
+    const reclinerFabricPerUnit = Number(
+      product?.fabric_recliner_mtrs ?? product?.fabric_recliner ?? 0
+    );
+
+    const seaterSections: Array<keyof typeof sections> = ["F", "L2", "R2", "C2"];
+    let frontFabric = 0;
+    seaterSections.forEach((sectionId) => {
+      const section = sections[sectionId];
+      if (!section?.seater || section.seater === "none") return;
+      const seatCount = parseSeatCount(section.seater);
+      if (seatCount <= 0 || base2SeaterFabric <= 0) return;
+      const additionalSeats = Math.max(0, seatCount - 2);
+      const moduleFabric =
+        base2SeaterFabric + additionalSeats * additionalSeatFabric;
+      frontFabric += moduleFabric * (section.qty || 1);
+    });
+
+    const sideSections: Array<keyof typeof sections> = ["L1", "R1", "C1"];
+    let cornerFabric = 0;
+    let backrestFabric = 0;
+    sideSections.forEach((sectionId) => {
+      const section = sections[sectionId];
+      if (!section?.seater || section.seater === "none") return;
+      const lower = section.seater.toLowerCase();
+      if (lower.includes("corner") && cornerFabricPerUnit > 0) {
+        cornerFabric += cornerFabricPerUnit * (section.qty || 1);
+      }
+      if (lower.includes("backrest") && backrestFabricPerUnit > 0) {
+        backrestFabric += backrestFabricPerUnit * (section.qty || 1);
+      }
+    });
+
+    const loungerFabric = loungerEnabled ? loungerPricing.totalFabric : 0;
+    const reclinerFabric =
+      reclinerFabricPerUnit > 0
+        ? reclinerSummaries.reduce(
+            (sum, summary) => sum + summary.quantity * reclinerFabricPerUnit,
+            0
+          )
+        : 0;
+
+    const consoleSize = configuration.console?.size?.toLowerCase() || "";
+    const consoleFabricPer =
+      consoleSize.includes("10") || consoleSize.includes("ten")
+        ? console10Fabric
+        : console6Fabric;
+    const consoleFabric =
+      consoleValidationSummary.globalCount * consoleFabricPer;
+
+    const total =
+      frontFabric +
+      loungerFabric +
+      reclinerFabric +
+      consoleFabric +
+      backrestFabric +
+      cornerFabric;
+
+    return {
+      front: frontFabric,
+      lounger: loungerFabric,
+      recliner: reclinerFabric,
+      console: consoleFabric,
+      backrest: backrestFabric,
+      corner: cornerFabric,
+      total,
+    };
+  }, [
+    product,
+    sections,
+    parseSeatCount,
+    loungerEnabled,
+    loungerPricing.totalFabric,
+    reclinerSummaries,
+    configuration.console?.size,
+    consoleValidationSummary.globalCount,
+  ]);
+
+  const totalSectionFabric = fabricBreakdown.front;
+
+  const summaryData = useMemo(() => {
+    const basePriceValue =
+      typeof pricing?.breakdown?.basePrice === "number" && pricing.breakdown.basePrice > 0
+        ? pricing.breakdown.basePrice
+        : base2SeaterPrice;
+
+    const mechanismPrice =
+      typeof pricing?.breakdown?.mechanismUpgrade === "number"
+        ? pricing.breakdown.mechanismUpgrade
+        : totalReclinerPrice;
+
+    const consolePrice = pricing?.breakdown?.consolePrice || 0;
+    const armrestAccessories = pricing?.breakdown?.armrestUpgrade || 0;
+    const fabricUpgrade = pricing?.breakdown?.fabricCharges || 0;
+
+    const loungerPriceFromPricing = typeof pricing?.breakdown?.loungerPrice === "number"
+      ? pricing.breakdown.loungerPrice
+      : undefined;
+
+    const loungerFabricFromPricing = typeof pricing?.breakdown?.loungerFabricMeters === "number"
+      ? pricing.breakdown.loungerFabricMeters
+      : undefined;
+
+    const loungerPrice = loungerPriceFromPricing ?? loungerPricing.totalPrice;
+    const loungerFabric = loungerFabricFromPricing ?? loungerPricing.totalFabric;
+
+    const seatFabric =
+      typeof pricing?.breakdown?.fabricMeters === "number"
+        ? pricing.breakdown.fabricMeters
+        : fabricBreakdown.front + fabricBreakdown.backrest;
+
+    const totalFabricMeters =
+      fabricBreakdown.total > 0
+        ? fabricBreakdown.total
+        : seatFabric + loungerFabric;
+
+    const subtotal =
+      pricing?.breakdown?.subtotal ||
+      basePriceValue +
+        mechanismPrice +
+        consolePrice +
+        armrestAccessories +
+        fabricUpgrade +
+        loungerPrice;
+
+    const total = pricing?.total || subtotal;
+
+    return {
+      basePriceValue,
+      mechanismPrice,
+      consolePrice,
+      armrestAccessories,
+      fabricUpgrade,
+      loungerPrice,
+      fabricMeters: totalFabricMeters,
+      loungerFabric: loungerFabric > 0 ? loungerFabric : fabricBreakdown.lounger,
+      seatBackrestFabric:
+        fabricBreakdown.front + fabricBreakdown.backrest,
+      structureFabric: totalFabricMeters,
+      approxWidth: Math.max(dimensions.width, loungerPricing.width || dimensions.width),
+      netInvoice: total,
+      seatCount: totalSeatCount,
+      consoleCount: consoleValidationSummary.globalCount,
+    };
+  }, [
+    pricing?.breakdown?.basePrice,
+    pricing?.breakdown?.mechanismUpgrade,
+    pricing?.breakdown?.consolePrice,
+    pricing?.breakdown?.armrestUpgrade,
+    pricing?.breakdown?.fabricCharges,
+    pricing?.breakdown?.loungerPrice,
+    pricing?.breakdown?.loungerFabricMeters,
+    pricing?.breakdown?.fabricMeters,
+    pricing?.breakdown?.subtotal,
+    pricing?.total,
+    base2SeaterPrice,
+    totalReclinerPrice,
+    fabricBreakdown.front,
+    fabricBreakdown.backrest,
+    fabricBreakdown.total,
+    fabricBreakdown.lounger,
+    dimensions.width,
+    loungerPricing.totalPrice,
+    loungerPricing.totalFabric,
+    loungerPricing.width,
+    totalSeatCount,
+    consoleValidationSummary.globalCount,
+  ]);
+
+  const SummaryTile = useCallback(
+    ({ label, value }: { label: string; value: string }) => (
+      <div className="rounded-xl border border-muted bg-muted/40 p-4">
+        <p className="text-xs uppercase tracking-wide text-muted-foreground">{label}</p>
+        <p className="mt-1 text-base font-semibold text-foreground">{value}</p>
+      </div>
+    ),
+    []
+  );
 
   // Show loading state
   if (isLoadingDropdowns && (!shapes || shapes.length === 0)) {
@@ -1631,7 +2127,7 @@ const SofaBedConfigurator = ({ product, configuration, onConfigurationChange }: 
                               <SelectItem value="none">None</SelectItem>
                               {availablePlacements.map((placement) => (
                                 <SelectItem key={placement.value} value={placement.value}>
-                                  {placement.label}
+                                  {consolePlacementMeta.labelByValue.get(placement.value) || placement.label}
                                 </SelectItem>
                               ))}
                               {availablePlacements.length === 0 && (
@@ -1698,21 +2194,33 @@ const SofaBedConfigurator = ({ product, configuration, onConfigurationChange }: 
                     <CardDescription>Only consoles in active sections are counted for pricing.</CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-2 text-sm">
-                    {activeConsolePlacements.length > 0 ? (
-                      <ul className="space-y-1">
-                        {activeConsolePlacements.map((placement, index) => (
-                          <li key={`${placement.label}-${index}`} className="flex items-center justify-between">
-                            <span>{placement.label}</span>
-                            <span className="text-muted-foreground">
-                              Width: {placement.width ? `${placement.width} in` : "—"}
-                            </span>
-                          </li>
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between text-xs">
+                        <span>Front Section</span>
+                        <span>{consoleValidationSummary.perSectionCounts.front || 0}</span>
+                      </div>
+                      <div className="flex items-center justify-between text-xs">
+                        <span>Left Section</span>
+                        <span>{consoleValidationSummary.perSectionCounts.left || 0}</span>
+                      </div>
+                      <div className="flex items-center justify-between text-xs">
+                        <span>Right Section</span>
+                        <span>{consoleValidationSummary.perSectionCounts.right || 0}</span>
+                      </div>
+                      <div className="flex items-center justify-between text-xs">
+                        <span>Combo Section</span>
+                        <span>{consoleValidationSummary.perSectionCounts.combo || 0}</span>
+                      </div>
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      Total Consoles: <span className="font-semibold text-foreground">{consoleValidationSummary.globalCount}</span>
+                    </div>
+                    {consoleValidationSummary.warnings.length > 0 && (
+                      <ul className="mt-2 space-y-1 text-xs text-amber-600">
+                        {consoleValidationSummary.warnings.map((warning, index) => (
+                          <li key={`console-warning-${index}`}>• {warning}</li>
                         ))}
                       </ul>
-                    ) : (
-                      <p className="text-xs text-muted-foreground">
-                        Select a console placement above to activate pricing for that slot.
-                      </p>
                     )}
                   </CardContent>
                 </Card>
@@ -1743,7 +2251,7 @@ const SofaBedConfigurator = ({ product, configuration, onConfigurationChange }: 
                 </SelectContent>
               </Select>
             </div>
-            {loungerConfig?.required === "Yes" && (
+            {loungerEnabled && (
               <div className="space-y-4 pt-2 pl-4 border-l-2 border-muted">
                 <div className="space-y-2">
                   <Label>Number of Loungers</Label>
@@ -1832,6 +2340,46 @@ const SofaBedConfigurator = ({ product, configuration, onConfigurationChange }: 
                       Storage-related options are disabled when Storage is set to "No"
                     </p>
                   )}
+                </div>
+
+                <div className="rounded-lg border border-muted/60 bg-muted/40 p-4 space-y-2">
+                  <h4 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+                    Lounger Summary
+                  </h4>
+                  <div className="grid gap-2 text-sm md:grid-cols-2">
+                    <div>
+                      <p className="text-muted-foreground">Loungers</p>
+                      <p className="font-medium">
+                        {loungerConfig.numberOfLoungers} • {loungerConfig.size}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground">Placement</p>
+                      <p className="font-medium">{loungerConfig.placement}</p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground">Price</p>
+                      <p className="font-medium">{formatCurrency(loungerPricing.totalPrice)}</p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground">Fabric</p>
+                      <p className="font-medium">{loungerPricing.totalFabric.toFixed(1)} m</p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground">Base Calculation</p>
+                      <p className="text-xs text-muted-foreground leading-tight">
+                        40% of base 2-seater price + 4% per additional 6″ (size adjusted). Storage adds
+                        extra cost when selected.
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground">Fabric Logic</p>
+                      <p className="text-xs text-muted-foreground leading-tight">
+                        Uses model fabric for 5′6″ base; adds + additional 6″ fabric per increment or scales
+                        down proportionally for shorter loungers.
+                      </p>
+                    </div>
+                  </div>
                 </div>
               </div>
             )}
@@ -2561,6 +3109,53 @@ const SofaBedConfigurator = ({ product, configuration, onConfigurationChange }: 
         </CardContent>
       </Card>
 
+      {/* Live Pricing Summary */}
+      <Card className="border-2">
+        <CardHeader>
+          <CardTitle className="text-2xl font-serif">Summary</CardTitle>
+          <CardDescription>Live pricing snapshot based on current selections.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+            <SummaryTile label="Base Model" value={formatCurrency(summaryData.basePriceValue)} />
+            <SummaryTile label="Mechanism" value={formatCurrency(summaryData.mechanismPrice)} />
+            <SummaryTile label="Consoles" value={formatCurrency(summaryData.consolePrice)} />
+            <SummaryTile label="Armrest Accessories" value={formatCurrency(summaryData.armrestAccessories)} />
+            <SummaryTile label="Fabric Upgrade" value={formatCurrency(summaryData.fabricUpgrade)} />
+            <SummaryTile label="Lounger" value={formatCurrency(summaryData.loungerPrice)} />
+            <SummaryTile
+              label="Total Fabric (m)"
+              value={`${summaryData.fabricMeters > 0 ? summaryData.fabricMeters.toFixed(1) : "0.0"} m`}
+            />
+            <SummaryTile
+              label="Seat/Backrest Fabric"
+              value={`${summaryData.seatBackrestFabric > 0 ? summaryData.seatBackrestFabric.toFixed(1) : "0.0"} m`}
+            />
+            <SummaryTile
+              label="Lounger Fabric"
+              value={`${summaryData.loungerFabric > 0 ? summaryData.loungerFabric.toFixed(1) : "0.0"} m`}
+            />
+            <SummaryTile
+              label="Structure/Armrest Fabric"
+              value={`${summaryData.structureFabric > 0 ? summaryData.structureFabric.toFixed(1) : "0.0"} m`}
+            />
+            <SummaryTile label="Approx Width" value={`${summaryData.approxWidth.toFixed(0)}"`} />
+          </div>
+
+          <Separator />
+
+          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+            <div>
+              <p className="text-sm text-muted-foreground">Net Invoice Value</p>
+              <p className="text-2xl font-serif">{formatCurrency(summaryData.netInvoice)}</p>
+            </div>
+            <Badge variant="secondary" className="px-4 py-2 text-sm">
+              Seats: {summaryData.seatCount} • Consoles: {summaryData.consoleCount}
+            </Badge>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Customer Information */}
       <Card className="border-2">
         <CardHeader>
@@ -2660,6 +3255,17 @@ const SofaBedConfigurator = ({ product, configuration, onConfigurationChange }: 
                 <p>Total Seats: {totalSeatCount}</p>
                 {configuration.legs?.type && (
                   <p>Legs: {configuration.legs.type}</p>
+                )}
+                {loungerEnabled && (
+                  <>
+                    <p>
+                      Lounger: {loungerConfig.numberOfLoungers} • {loungerConfig.size} • {loungerConfig.placement}
+                    </p>
+                    <p>
+                      Lounger Price: {formatCurrency(loungerPricing.totalPrice)} • Fabric:{" "}
+                      {loungerPricing.totalFabric.toFixed(1)} m
+                    </p>
+                  </>
                 )}
               </div>
             </div>

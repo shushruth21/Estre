@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
-import { ArrowLeft, Loader2, Eye, EyeOff, Shield } from "lucide-react";
+import { ArrowLeft, Loader2, Eye, EyeOff, Shield, HardHat } from "lucide-react";
 
 const Login = () => {
   const [email, setEmail] = useState("");
@@ -16,6 +16,7 @@ const Login = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [adminMode, setAdminMode] = useState(false);
+  const [staffMode, setStaffMode] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
   const { user, loading: authLoading, isAdmin } = useAuth();
@@ -201,6 +202,12 @@ const Login = () => {
         window.location.href = "/admin/dashboard";
         return;
       }
+
+      if (staffMode) {
+        console.log("👷 Staff Mode: Bypassing role checks, redirecting to staff dashboard");
+        window.location.href = "/staff/job-cards";
+        return;
+      }
       
       // Always redirect immediately (use window.location for reliability)
       window.location.href = redirectPath;
@@ -303,7 +310,11 @@ const Login = () => {
                   <Checkbox
                     id="admin-mode"
                     checked={adminMode}
-                    onCheckedChange={(checked) => setAdminMode(checked as boolean)}
+                    onCheckedChange={(checked) => {
+                      const next = checked as boolean;
+                      setAdminMode(next);
+                      if (next) setStaffMode(false);
+                    }}
                   />
                   <Label
                     htmlFor="admin-mode"
@@ -311,6 +322,24 @@ const Login = () => {
                   >
                     <Shield className="h-4 w-4" />
                     Admin Mode (Bypass Role Check)
+                  </Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="staff-mode"
+                    checked={staffMode}
+                    onCheckedChange={(checked) => {
+                      const next = checked as boolean;
+                      setStaffMode(next);
+                      if (next) setAdminMode(false);
+                    }}
+                  />
+                  <Label
+                    htmlFor="staff-mode"
+                    className="text-sm font-normal cursor-pointer flex items-center gap-2"
+                  >
+                    <HardHat className="h-4 w-4" />
+                    Staff Mode (Bypass Role Check)
                   </Label>
                 </div>
                 <Button type="submit" className="w-full" disabled={isLoading || authLoading}>

@@ -37,6 +37,8 @@ import { useAuth } from "@/hooks/useAuth";
 import { Plus, Edit, Eye, Search, CheckCircle2, XCircle, UserPlus } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Link } from "react-router-dom";
+import { calculateDynamicPrice } from "@/lib/dynamic-pricing";
+import { generateJobCardData } from "@/lib/job-card-generator";
 
 const AdminJobCards = () => {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -126,8 +128,9 @@ const AdminJobCards = () => {
   // Create job card mutation
   const createJobCardMutation = useMutation({
     mutationFn: async (data: any) => {
-      // Generate job card number
-      const jobCardNumber = `JC-${Date.now()}-${Math.random().toString(36).substr(2, 4).toUpperCase()}`;
+      if (!data.order_id || !data.order_item_id) {
+        throw new Error("Order and order item are required to generate a job card");
+      }
 
       const { data: order } = await supabase
         .from("orders")
@@ -135,55 +138,95 @@ const AdminJobCards = () => {
         .eq("id", data.order_id)
         .single();
 
+      if (!order) {
+        throw new Error("Order not found");
+      }
+
       const { data: orderItem } = await supabase
         .from("order_items")
         .select("*")
         .eq("id", data.order_item_id)
         .single();
 
-      const jobCardData = {
-        job_card_number: jobCardNumber,
+      if (!orderItem) {
+        throw new Error("Order item not found");
+      }
+
+      const pricing = await calculateDynamicPrice(
+        orderItem.product_category,
+        orderItem.product_id,
+        orderItem.configuration
+      );
+
+      const generatedJobCard = await generateJobCardData({
+        soNumber: order.order_number,
+        lineItemId: orderItem.id,
+        orderId: data.order_id,
+        orderNumber: order.order_number,
+        productId: orderItem.product_id,
+        category: orderItem.product_category,
+        modelName: orderItem.product_title || orderItem.product_name || "Custom Product",
+        quantity: orderItem.quantity || 1,
+        configuration: orderItem.configuration,
+        pricingBreakdown: pricing.breakdown,
+        totalPrice: pricing.total,
+        customer: {
+          name: order.customer_name,
+          email: order.customer_email,
+          phone: order.customer_phone,
+          address: order.delivery_address,
+        },
+      });
+
+      const jobCardInsert = {
+        job_card_number: generatedJobCard.jobCardNumber,
+        so_number: generatedJobCard.soNumber,
+        line_item_id: generatedJobCard.lineItemId,
         order_id: data.order_id,
         order_item_id: data.order_item_id,
         order_number: order.order_number,
-        customer_name: order.customer_name,
-        customer_phone: order.customer_phone,
-        delivery_address: order.delivery_address,
-        product_category: orderItem.product_category,
-        product_title: orderItem.product_title,
-        configuration: orderItem.configuration,
-        fabric_codes: data.fabric_codes || {},
-        fabric_meters: data.fabric_meters || {},
-        accessories: data.accessories || {},
-        dimensions: data.dimensions || {},
+        customer_name: generatedJobCard.customer.name,
+        customer_phone: generatedJobCard.customer.phone,
+        customer_email: generatedJobCard.customer.email,
+        delivery_address: generatedJobCard.customer.address,
+        product_category: generatedJobCard.category,
+        product_title: generatedJobCard.modelName,
+        configuration: generatedJobCard.configuration,
+        fabric_codes: generatedJobCard.fabricPlan.fabricCodes,
+        fabric_meters: generatedJobCard.fabricPlan,
+        accessories: {
+          console: generatedJobCard.console,
+          dummySeats: generatedJobCard.dummySeats,
+          sections: generatedJobCard.sections,
+          pricing: generatedJobCard.pricing,
+        },
+        dimensions: generatedJobCard.dimensions,
         status: "pending",
         priority: data.priority || "normal",
         expected_completion_date: data.expected_completion_date || null,
         admin_notes: data.admin_notes || null,
       };
 
-      const { error } = await supabase.from("job_cards").insert(jobCardData);
+      const { error } = await supabase.from("job_cards").insert(jobCardInsert);
 
       if (error) throw error;
 
-      // Create default tasks
-      const defaultTasks = [
-        { task_name: "Fabric Cutting", task_type: "fabric_cutting", sort_order: 1 },
-        { task_name: "Frame Work", task_type: "frame_work", sort_order: 2 },
-        { task_name: "Upholstery", task_type: "upholstery", sort_order: 3 },
-        { task_name: "Assembly", task_type: "assembly", sort_order: 4 },
-        { task_name: "Finishing", task_type: "finishing", sort_order: 5 },
-        { task_name: "Quality Check", task_type: "quality_check", sort_order: 6 },
-      ];
-
-      // Get the created job card ID
       const { data: createdJobCard } = await supabase
         .from("job_cards")
         .select("id")
-        .eq("job_card_number", jobCardNumber)
+        .eq("job_card_number", generatedJobCard.jobCardNumber)
         .single();
 
       if (createdJobCard) {
+        const defaultTasks = [
+          { task_name: "Fabric Cutting", task_type: "fabric_cutting", sort_order: 1 },
+          { task_name: "Frame Work", task_type: "frame_work", sort_order: 2 },
+          { task_name: "Upholstery", task_type: "upholstery", sort_order: 3 },
+          { task_name: "Assembly", task_type: "assembly", sort_order: 4 },
+          { task_name: "Finishing", task_type: "finishing", sort_order: 5 },
+          { task_name: "Quality Check", task_type: "quality_check", sort_order: 6 },
+        ];
+
         const tasksToInsert = defaultTasks.map((task) => ({
           job_card_id: createdJobCard.id,
           ...task,

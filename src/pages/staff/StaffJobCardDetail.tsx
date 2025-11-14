@@ -9,16 +9,18 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
-import { 
-  ArrowLeft, 
-  Play, 
-  Pause, 
-  CheckCircle2, 
+import {
+  ArrowLeft,
+  Play,
+  Pause,
+  CheckCircle2,
   AlertCircle,
   Package,
   Ruler,
   Shirt,
-  Wrench
+  Wrench,
+  ClipboardList,
+  FileText,
 } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 
@@ -28,6 +30,8 @@ export default function StaffJobCardDetail() {
   const { user } = useAuth();
   const { toast } = useToast();
   const [jobCard, setJobCard] = useState<any>(null);
+  const [order, setOrder] = useState<any>(null);
+  const [lineItem, setLineItem] = useState<any>(null);
   const [tasks, setTasks] = useState<any[]>([]);
   const [staffNotes, setStaffNotes] = useState("");
   const [loading, setLoading] = useState(true);
@@ -60,6 +64,31 @@ export default function StaffJobCardDetail() {
 
     setJobCard(data);
     setStaffNotes(data.staff_notes || "");
+
+    if (data.order_id) {
+      const { data: orderData } = await supabase
+        .from("orders")
+        .select(
+          "id, order_number, status, expected_delivery_date, net_total_rs, advance_amount_rs, balance_amount_rs"
+        )
+        .eq("id", data.order_id)
+        .single();
+      setOrder(orderData);
+    } else {
+      setOrder(null);
+    }
+
+    if (data.line_item_id) {
+      const { data: lineItemData } = await supabase
+        .from("order_items")
+        .select("id, product_title, product_category, total_price_rs, configuration")
+        .eq("id", data.line_item_id)
+        .single();
+      setLineItem(lineItemData);
+    } else {
+      setLineItem(null);
+    }
+
     setLoading(false);
   };
 
@@ -234,107 +263,247 @@ export default function StaffJobCardDetail() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <Card className="md:col-span-2 space-y-6">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Package className="h-5 w-5" />
-                Product Specifications
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div>
-                <h3 className="font-medium mb-2">Category</h3>
-                <p className="text-muted-foreground">{jobCard.product_category}</p>
-              </div>
+        <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+          <div className="space-y-6 xl:col-span-2">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Package className="h-5 w-5" />
+                  Product Overview
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="grid md:grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-xs uppercase font-semibold text-muted-foreground">
+                      Product
+                    </p>
+                    <p className="text-sm font-medium">
+                      {lineItem?.product_title || jobCard.product_title}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {lineItem?.product_category || jobCard.product_category}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs uppercase font-semibold text-muted-foreground">
+                      Sale Order
+                    </p>
+                    <p className="text-sm font-medium">{order?.order_number || "—"}</p>
+                    <p className="text-xs text-muted-foreground">
+                      Status: {order?.status?.replace(/_/g, " ") || "Pending"}
+                    </p>
+                  </div>
+                </div>
 
-              <Separator />
+                <Separator />
 
-              <div>
-                <h3 className="font-medium mb-2 flex items-center gap-2">
-                  <Ruler className="h-4 w-4" />
-                  Dimensions
-                </h3>
-                <pre className="text-sm text-muted-foreground bg-muted p-3 rounded-md">
-                  {JSON.stringify(jobCard.dimensions, null, 2)}
-                </pre>
-              </div>
+                <div>
+                  <h3 className="font-medium mb-2 flex items-center gap-2">
+                    <Ruler className="h-4 w-4" />
+                    Dimensions
+                  </h3>
+                  <pre className="text-sm text-muted-foreground bg-muted p-3 rounded-md overflow-x-auto">
+                    {JSON.stringify(jobCard.dimensions, null, 2)}
+                  </pre>
+                </div>
 
-              <Separator />
-
-              <div>
-                <h3 className="font-medium mb-2 flex items-center gap-2">
-                  <Shirt className="h-4 w-4" />
-                  Fabric Requirements
-                </h3>
-                <div className="space-y-2">
-                  {Object.entries(jobCard.fabric_codes as Record<string, string>).map(([key, value]) => (
-                    <div key={key} className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">{key}:</span>
-                      <span className="font-medium">{value}</span>
+                {jobCard.accessories && Object.keys(jobCard.accessories).length > 0 && (
+                  <>
+                    <Separator />
+                    <div>
+                      <h3 className="font-medium mb-2 flex items-center gap-2">
+                        <Wrench className="h-4 w-4" />
+                        Accessories
+                      </h3>
+                      <pre className="text-sm text-muted-foreground bg-muted p-3 rounded-md overflow-x-auto">
+                        {JSON.stringify(jobCard.accessories, null, 2)}
+                      </pre>
                     </div>
-                  ))}
-                </div>
-                <div className="mt-3 p-3 bg-muted rounded-md">
-                  <p className="text-sm font-medium">Total Meters Required</p>
-                  {Object.entries(jobCard.fabric_meters as Record<string, number>).map(([key, value]) => (
-                    <p key={key} className="text-sm text-muted-foreground">
-                      {key}: {value}m
-                    </p>
-                  ))}
-                </div>
-              </div>
+                  </>
+                )}
 
-              {jobCard.accessories && Object.keys(jobCard.accessories).length > 0 && (
-                <>
-                  <Separator />
-                  <div>
-                    <h3 className="font-medium mb-2 flex items-center gap-2">
-                      <Wrench className="h-4 w-4" />
-                      Accessories
-                    </h3>
-                    <pre className="text-sm text-muted-foreground bg-muted p-3 rounded-md">
-                      {JSON.stringify(jobCard.accessories, null, 2)}
-                    </pre>
-                  </div>
-                </>
-              )}
+                {jobCard.admin_notes && (
+                  <>
+                    <Separator />
+                    <div>
+                      <h3 className="font-medium mb-2 flex items-center gap-2">
+                        <AlertCircle className="h-4 w-4" />
+                        Assembly Instructions
+                      </h3>
+                      <p className="text-sm text-muted-foreground whitespace-pre-wrap">
+                        {jobCard.admin_notes}
+                      </p>
+                    </div>
+                  </>
+                )}
+              </CardContent>
+            </Card>
 
-              {jobCard.admin_notes && (
-                <>
-                  <Separator />
-                  <div>
-                    <h3 className="font-medium mb-2 flex items-center gap-2">
-                      <AlertCircle className="h-4 w-4" />
-                      Assembly Instructions
-                    </h3>
-                    <p className="text-sm text-muted-foreground whitespace-pre-wrap">
-                      {jobCard.admin_notes}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <FileText className="h-5 w-5" />
+                  Fabric & Sections
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid md:grid-cols-3 gap-4">
+                  <div className="rounded-lg border border-dashed border-muted/60 p-3">
+                    <p className="text-xs uppercase font-semibold text-muted-foreground">
+                      Fabric Plan
+                    </p>
+                    <p className="text-sm font-medium">
+                      {(jobCard.fabric_meters as any)?.planType || "Not set"}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      Total:{" "}
+                      {(jobCard.fabric_meters as any)?.totalMeters
+                        ? `${(jobCard.fabric_meters as any).totalMeters.toFixed(2)} m`
+                        : "—"}
                     </p>
                   </div>
-                </>
-              )}
-            </CardContent>
-          </Card>
+                  <div className="rounded-lg border border-dashed border-muted/60 p-3">
+                    <p className="text-xs uppercase font-semibold text-muted-foreground">
+                      Structure / Seat
+                    </p>
+                    <p className="text-sm font-medium">
+                      {(jobCard.fabric_meters as any)?.structureMeters
+                        ? `${(jobCard.fabric_meters as any).structureMeters.toFixed(2)} m`
+                        : "—"}
+                    </p>
+                  </div>
+                  <div className="rounded-lg border border-dashed border-muted/60 p-3">
+                    <p className="text-xs uppercase font-semibold text-muted-foreground">
+                      Armrest
+                    </p>
+                    <p className="text-sm font-medium">
+                      {(jobCard.fabric_meters as any)?.armrestMeters
+                        ? `${(jobCard.fabric_meters as any).armrestMeters.toFixed(2)} m`
+                        : "—"}
+                    </p>
+                  </div>
+                </div>
+
+                <Separator />
+
+                <div>
+                  <h3 className="font-medium mb-2 flex items-center gap-2">
+                    <Shirt className="h-4 w-4" />
+                    Fabric Codes
+                  </h3>
+                  <div className="grid md:grid-cols-2 gap-2">
+                    {jobCard.fabric_codes &&
+                      Object.entries(jobCard.fabric_codes as Record<string, string>).map(
+                        ([key, value]) => (
+                          <div
+                            key={key}
+                            className="rounded-md border border-dashed border-muted/60 px-3 py-2 text-sm"
+                          >
+                            <p className="font-semibold">{key}</p>
+                            <p className="text-muted-foreground">{value || "—"}</p>
+                          </div>
+                        )
+                      )}
+                    {!jobCard.fabric_codes && (
+                      <p className="text-sm text-muted-foreground">No fabric codes recorded.</p>
+                    )}
+                  </div>
+                </div>
+
+                <Separator />
+
+                {jobCard.accessories?.sections?.length ? (
+                  <div className="space-y-2">
+                    <p className="text-xs uppercase font-semibold text-muted-foreground">
+                      Sections
+                    </p>
+                    <div className="grid md:grid-cols-2 gap-3">
+                      {jobCard.accessories.sections.map((section: any) => (
+                        <div
+                          key={`${jobCard.id}-${section.section}`}
+                          className="rounded-md border border-dashed border-muted/60 px-3 py-2"
+                        >
+                          <p className="text-sm font-semibold">
+                            {section.section}: {section.seater} × {section.quantity}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            Fabric: {section.fabricMeters?.toFixed(2) ?? "0.00"} m
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground">No section breakdown available.</p>
+                )}
+              </CardContent>
+            </Card>
+          </div>
 
           <div className="space-y-6">
             <Card>
               <CardHeader>
                 <CardTitle>Customer Info</CardTitle>
               </CardHeader>
-              <CardContent className="space-y-2">
+              <CardContent className="space-y-3 text-sm">
                 <div>
-                  <p className="text-sm font-medium">Name</p>
-                  <p className="text-sm text-muted-foreground">{jobCard.customer_name}</p>
+                  <p className="font-medium">Name</p>
+                  <p className="text-muted-foreground">{jobCard.customer_name}</p>
                 </div>
                 <div>
-                  <p className="text-sm font-medium">Phone</p>
-                  <p className="text-sm text-muted-foreground">{jobCard.customer_phone}</p>
+                  <p className="font-medium">Phone</p>
+                  <p className="text-muted-foreground">{jobCard.customer_phone || "—"}</p>
                 </div>
                 <div>
-                  <p className="text-sm font-medium">Order Number</p>
-                  <p className="text-sm text-muted-foreground">{jobCard.order_number}</p>
+                  <p className="font-medium">Email</p>
+                  <p className="text-muted-foreground">{jobCard.customer_email || "—"}</p>
                 </div>
+                <div>
+                  <p className="font-medium">Order Number</p>
+                  <p className="text-muted-foreground">{jobCard.order_number}</p>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <ClipboardList className="h-5 w-5" />
+                  Sale Order Snapshot
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3 text-sm">
+                {order ? (
+                  <>
+                    <div className="flex items-center justify-between">
+                      <span className="text-muted-foreground">Net Total</span>
+                      <span>
+                        ₹{Math.round(order.net_total_rs || 0).toLocaleString()}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-muted-foreground">Advance Paid</span>
+                      <span>
+                        ₹{Math.round(order.advance_amount_rs || 0).toLocaleString()}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-muted-foreground">Balance</span>
+                      <span>
+                        ₹{Math.round(order.balance_amount_rs || 0).toLocaleString()}
+                      </span>
+                    </div>
+                    {order.expected_delivery_date && (
+                      <p className="text-muted-foreground">
+                        Expected Delivery:{" "}
+                        {new Date(order.expected_delivery_date).toLocaleDateString()}
+                      </p>
+                    )}
+                  </>
+                ) : (
+                  <p className="text-muted-foreground">Order summary not available.</p>
+                )}
               </CardContent>
             </Card>
 
@@ -356,6 +525,14 @@ export default function StaffJobCardDetail() {
                     <p className="font-medium">Started</p>
                     <p className="text-muted-foreground">
                       {new Date(jobCard.actual_start_date).toLocaleDateString()}
+                    </p>
+                  </div>
+                )}
+                {jobCard.actual_completion_date && (
+                  <div>
+                    <p className="font-medium">Completed</p>
+                    <p className="text-muted-foreground">
+                      {new Date(jobCard.actual_completion_date).toLocaleDateString()}
                     </p>
                   </div>
                 )}

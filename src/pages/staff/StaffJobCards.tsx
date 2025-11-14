@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { StaffLayout } from "@/components/staff/StaffLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
@@ -7,6 +7,8 @@ import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Separator } from "@/components/ui/separator";
+import { ClipboardList, Package, FileText } from "lucide-react";
 
 export default function StaffJobCards() {
   const { user } = useAuth();
@@ -29,7 +31,50 @@ export default function StaffJobCards() {
     if (error) {
       console.error("Error fetching job cards:", error);
     } else {
-      setJobCards(data || []);
+      const fetchedCards = data || [];
+      const orderIds = Array.from(
+        new Set(fetchedCards.map((card) => card.order_id).filter(Boolean))
+      );
+      const lineItemIds = Array.from(
+        new Set(fetchedCards.map((card) => card.line_item_id).filter(Boolean))
+      );
+
+      let ordersById: Record<string, any> = {};
+      let lineItemsById: Record<string, any> = {};
+
+      if (orderIds.length > 0) {
+        const { data: orders } = await supabase
+          .from("orders")
+          .select(
+            "id, order_number, status, expected_delivery_date, net_total_rs, advance_amount_rs, balance_amount_rs"
+          )
+          .in("id", orderIds);
+        ordersById =
+          orders?.reduce((acc: Record<string, any>, order) => {
+            acc[order.id] = order;
+            return acc;
+          }, {}) ?? {};
+      }
+
+      if (lineItemIds.length > 0) {
+        const { data: items } = await supabase
+          .from("order_items")
+          .select("id, product_title, product_category, total_price_rs, configuration")
+          .in("id", lineItemIds);
+        lineItemsById =
+          items?.reduce((acc: Record<string, any>, item) => {
+            acc[item.id] = item;
+            return acc;
+          }, {}) ?? {};
+      }
+
+      const enriched = fetchedCards.map((card) => ({
+        ...card,
+        order: card.order_id ? ordersById[card.order_id] : null,
+        lineItem: card.line_item_id ? lineItemsById[card.line_item_id] : null,
+      }));
+
+      setJobCards(enriched);
     }
     setLoading(false);
   };
@@ -109,11 +154,62 @@ export default function StaffJobCards() {
                   <p className="text-sm font-medium">Order Number</p>
                   <p className="text-sm text-muted-foreground">{jobCard.order_number}</p>
                 </div>
-                {jobCard.expected_completion_date && (
+                {jobCard.order?.expected_delivery_date && (
                   <div>
-                    <p className="text-sm font-medium">Expected Completion</p>
+                    <p className="text-sm font-medium">Expected Delivery</p>
                     <p className="text-sm text-muted-foreground">
-                      {new Date(jobCard.expected_completion_date).toLocaleDateString()}
+                      {new Date(jobCard.order.expected_delivery_date).toLocaleDateString()}
+                    </p>
+                  </div>
+                )}
+              </div>
+              <Separator className="my-3" />
+              <div className="grid gap-3 md:grid-cols-3">
+                <div className="rounded-lg border border-dashed border-muted/60 p-3">
+                  <p className="text-xs uppercase font-semibold text-muted-foreground flex items-center gap-2">
+                    <FileText className="h-4 w-4" />
+                    Fabric Plan
+                  </p>
+                  <p className="text-sm font-medium">
+                    {jobCard.fabric_meters?.planType || "Not set"}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Total:{" "}
+                    {jobCard.fabric_meters?.totalMeters
+                      ? `${jobCard.fabric_meters.totalMeters.toFixed(2)} m`
+                      : "—"}
+                  </p>
+                </div>
+                <div className="rounded-lg border border-dashed border-muted/60 p-3">
+                  <p className="text-xs uppercase font-semibold text-muted-foreground flex items-center gap-2">
+                    <Package className="h-4 w-4" />
+                    Sections
+                  </p>
+                  {jobCard.accessories?.sections?.length ? (
+                    <ul className="text-xs text-muted-foreground space-y-1">
+                      {jobCard.accessories.sections.map((section: any) => (
+                        <li key={`${jobCard.id}-${section.section}`}>
+                          {section.section}: {section.seater} × {section.quantity} •{" "}
+                          {section.fabricMeters?.toFixed(2) ?? "0.00"}m
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="text-xs text-muted-foreground">No section data</p>
+                  )}
+                </div>
+                {jobCard.order && (
+                  <div className="rounded-lg border border-dashed border-muted/60 p-3">
+                    <p className="text-xs uppercase font-semibold text-muted-foreground flex items-center gap-2">
+                      <ClipboardList className="h-4 w-4" />
+                      Sale Order
+                    </p>
+                    <p className="text-sm font-medium">{jobCard.order.order_number}</p>
+                    <p className="text-xs text-muted-foreground">
+                      Status: {jobCard.order.status?.replace(/_/g, " ") || "PENDING"}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      Total: ₹{Math.round(jobCard.order.net_total_rs || 0).toLocaleString()}
                     </p>
                   </div>
                 )}

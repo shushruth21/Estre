@@ -264,6 +264,7 @@ const Configure = () => {
                   <SofaBedConfigurator
                     product={product}
                     configuration={configuration}
+                    pricing={pricing}
                     onConfigurationChange={setConfiguration}
                   />
                 )}
