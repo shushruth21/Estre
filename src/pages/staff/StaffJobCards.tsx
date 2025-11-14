@@ -36,7 +36,7 @@ export default function StaffJobCards() {
         new Set(fetchedCards.map((card) => card.order_id).filter(Boolean))
       );
       const lineItemIds = Array.from(
-        new Set(fetchedCards.map((card) => card.line_item_id).filter(Boolean))
+        new Set(fetchedCards.map((card) => card.order_item_id).filter(Boolean))
       );
 
       let ordersById: Record<string, any> = {};
@@ -71,7 +71,7 @@ export default function StaffJobCards() {
       const enriched = fetchedCards.map((card) => ({
         ...card,
         order: card.order_id ? ordersById[card.order_id] : null,
-        lineItem: card.line_item_id ? lineItemsById[card.line_item_id] : null,
+        lineItem: card.order_item_id ? lineItemsById[card.order_item_id] : null,
       }));
 
       setJobCards(enriched);

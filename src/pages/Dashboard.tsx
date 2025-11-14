@@ -95,7 +95,7 @@ const Dashboard = () => {
       const jobCardsPromise = supabase
         .from("job_cards")
         .select(
-          "id, order_id, line_item_id, job_card_number, status, priority, product_title, product_category, created_at, updated_at, fabric_meters, accessories, dimensions"
+          "id, order_id, order_item_id, job_card_number, status, priority, product_title, product_category, created_at, updated_at, fabric_meters, accessories, dimensions"
         )
         .in("order_id", orderIds);
 
@@ -112,7 +112,7 @@ const Dashboard = () => {
 
       jobCardsByOrder =
         jobCards?.reduce((acc: Record<string, any[]>, card) => {
-          const key = card.order_id;
+          const key = card.order_id || '';
           if (!acc[key]) acc[key] = [];
           acc[key].push(card);
           return acc;

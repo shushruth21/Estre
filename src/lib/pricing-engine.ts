@@ -110,6 +110,7 @@ export async function calculateSofaPrice(
   let totalPrice = 0;
 
   const breakdown: PricingBreakdown = {
+    basePrice: basePrice,
     baseSeatPrice: 0,
     additionalSeatsPrice: 0,
     cornerSeatsPrice: 0,
@@ -118,6 +119,10 @@ export async function calculateSofaPrice(
     consolePrice: 0,
     pillowsPrice: 0,
     fabricCharges: 0,
+    mechanismUpgrade: 0,
+    storagePrice: 0,
+    armrestUpgrade: 0,
+    stitchTypePrice: 0,
     foamUpgrade: 0,
     dimensionUpgrade: 0,
     accessoriesPrice: 0,

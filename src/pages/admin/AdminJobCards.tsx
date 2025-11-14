@@ -60,7 +60,7 @@ const AdminJobCards = () => {
         .order("created_at", { ascending: false });
 
       if (statusFilter !== "all") {
-        query = query.eq("status", statusFilter);
+        query = query.eq("status", statusFilter as any);
       }
 
       const { data, error } = await query;
@@ -165,7 +165,7 @@ const AdminJobCards = () => {
         orderNumber: order.order_number,
         productId: orderItem.product_id,
         category: orderItem.product_category,
-        modelName: orderItem.product_title || orderItem.product_name || "Custom Product",
+        modelName: orderItem.product_title || "Custom Product",
         quantity: orderItem.quantity || 1,
         configuration: orderItem.configuration,
         pricingBreakdown: pricing.breakdown,
@@ -181,33 +181,32 @@ const AdminJobCards = () => {
       const jobCardInsert = {
         job_card_number: generatedJobCard.jobCardNumber,
         so_number: generatedJobCard.soNumber,
-        line_item_id: generatedJobCard.lineItemId,
         order_id: data.order_id,
         order_item_id: data.order_item_id,
         order_number: order.order_number,
         customer_name: generatedJobCard.customer.name,
         customer_phone: generatedJobCard.customer.phone,
         customer_email: generatedJobCard.customer.email,
-        delivery_address: generatedJobCard.customer.address,
+        delivery_address: generatedJobCard.customer.address as any,
         product_category: generatedJobCard.category,
         product_title: generatedJobCard.modelName,
-        configuration: generatedJobCard.configuration,
-        fabric_codes: generatedJobCard.fabricPlan.fabricCodes,
-        fabric_meters: generatedJobCard.fabricPlan,
-        accessories: {
+        configuration: generatedJobCard.configuration as any,
+        fabric_codes: generatedJobCard.fabricPlan.fabricCodes as any,
+        fabric_meters: JSON.parse(JSON.stringify(generatedJobCard.fabricPlan)),
+        accessories: JSON.parse(JSON.stringify({
           console: generatedJobCard.console,
           dummySeats: generatedJobCard.dummySeats,
           sections: generatedJobCard.sections,
           pricing: generatedJobCard.pricing,
-        },
-        dimensions: generatedJobCard.dimensions,
-        status: "pending",
-        priority: data.priority || "normal",
+        })),
+        dimensions: JSON.parse(JSON.stringify(generatedJobCard.dimensions)),
+        status: "pending" as any,
+        priority: (data.priority || "normal") as any,
         expected_completion_date: data.expected_completion_date || null,
         admin_notes: data.admin_notes || null,
       };
 
-      const { error } = await supabase.from("job_cards").insert(jobCardInsert);
+      const { error } = await supabase.from("job_cards").insert([jobCardInsert]);
 
       if (error) throw error;
 
@@ -229,7 +228,9 @@ const AdminJobCards = () => {
 
         const tasksToInsert = defaultTasks.map((task) => ({
           job_card_id: createdJobCard.id,
-          ...task,
+          task_name: task.task_name,
+          task_type: task.task_type as "fabric_cutting" | "frame_work" | "upholstery" | "assembly" | "finishing" | "quality_check",
+          sort_order: task.sort_order,
         }));
 
         await supabase.from("job_card_tasks").insert(tasksToInsert);

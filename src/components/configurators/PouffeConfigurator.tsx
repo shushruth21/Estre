@@ -857,21 +857,21 @@ const PouffeConfigurator = ({
         <FabricLibrary
           open={!!openFabricPicker}
           onOpenChange={(open) => !open && setOpenFabricPicker(null)}
-          onSelect={(fabric) => {
+          onSelect={(fabricCode) => {
             if (openFabricPicker === "single") {
-              handleFabricSelection(fabric.estre_code, "single");
+              handleFabricSelection(fabricCode, "single");
             } else if (openFabricPicker === "structure") {
-              handleFabricSelection(fabric.estre_code, "structure");
+              handleFabricSelection(fabricCode, "structure");
             } else if (openFabricPicker === "seat") {
-              handleFabricSelection(fabric.estre_code, "seat");
+              handleFabricSelection(fabricCode, "seat");
             }
           }}
-          selectedCodes={
+          selectedCode={
             openFabricPicker === "single"
-              ? [fabricPlan?.singleColour?.fabricCode].filter(Boolean)
+              ? fabricPlan?.singleColour?.fabricCode || ""
               : openFabricPicker === "structure"
-              ? [fabricPlan?.dualColour?.structureFabricCode].filter(Boolean)
-              : [fabricPlan?.dualColour?.seatFabricCode].filter(Boolean)
+              ? fabricPlan?.dualColour?.structureFabricCode || ""
+              : fabricPlan?.dualColour?.seatFabricCode || ""
           }
         />
       )}

@@ -186,7 +186,9 @@ const Checkout = () => {
           createdJobCards?.flatMap((jobCard: any) =>
             defaultTasks.map((task) => ({
               job_card_id: jobCard.id,
-              ...task,
+              task_name: task.task_name,
+              task_type: task.task_type as "fabric_cutting" | "frame_work" | "upholstery" | "assembly" | "finishing" | "quality_check",
+              sort_order: task.sort_order,
             }))
           ) ?? [];
 
@@ -195,12 +197,13 @@ const Checkout = () => {
         }
       }
 
+      const orderMetadata = order.metadata as Record<string, any> | null;
       await supabase
         .from("orders")
         .update({
           status: "confirmed",
           metadata: {
-            ...(order.metadata || {}),
+            ...(orderMetadata || {}),
             sale_orders: saleOrderSnapshots,
           },
         })

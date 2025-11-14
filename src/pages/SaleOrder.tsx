@@ -148,7 +148,7 @@ const SaleOrder = () => {
             Back to Orders
           </Button>
         </div>
-        <SaleOrderDocument data={saleOrderData} orderNumber={order.order_number} />
+        <SaleOrderDocument data={saleOrderData} />
       </div>
     </div>
   );

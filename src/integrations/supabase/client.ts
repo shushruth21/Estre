@@ -45,8 +45,7 @@ if (typeof window !== 'undefined') {
       } else if (import.meta.env.DEV) {
         console.log('✅ Supabase connection successful');
       }
-    })
-    .catch(() => {
+    }, () => {
       // Silently fail - connection will be tested when needed
     });
 }

@@ -603,13 +603,13 @@ const deriveTotals = (
     balance_amount: balance,
     paid_amount: paidAmount,
     outstanding_amount: outstanding,
-    discount_percent: breakdown.discountPercent,
-    cgst_percent: breakdown.cgstPercent,
-    cgst_amount: breakdown.cgstAmount,
-    sgst_percent: breakdown.sgstPercent,
-    sgst_amount: breakdown.sgstAmount,
-    igst_percent: breakdown.igstPercent,
-    igst_amount: breakdown.igstAmount,
+    discount_percent: 0,
+    cgst_percent: 0,
+    cgst_amount: 0,
+    sgst_percent: 0,
+    sgst_amount: 0,
+    igst_percent: 0,
+    igst_amount: 0,
   };
 };
 
