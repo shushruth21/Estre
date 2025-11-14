@@ -7,51 +7,63 @@
  * Convert Google Drive sharing URL to direct image URL
  * Handles various Google Drive URL formats and converts them to direct image URLs
  */
-export const convertGoogleDriveUrl = (url: string): string | null => {
+export const extractGoogleDriveFileId = (url: string): string | null => {
+  if (!url || typeof url !== "string") return null;
+
+  if (!url.includes("drive.google.com")) return null;
+
+  const patterns = [
+    /[?&]id=([a-zA-Z0-9_-]{10,})/,
+    /\/file\/d\/([a-zA-Z0-9_-]{10,})/,
+    /\/d\/([a-zA-Z0-9_-]{10,})/,
+    /uc\?export=[^&]+&id=([a-zA-Z0-9_-]{10,})/,
+    /thumbnail\?[^=]*id=([a-zA-Z0-9_-]{10,})/,
+    /\/folders\/([a-zA-Z0-9_-]{10,})/,
+  ];
+
+  for (const pattern of patterns) {
+    const match = url.match(pattern);
+    if (match && match[1]) {
+      return match[1];
+    }
+  }
+
+  return null;
+};
+
+type GoogleDriveMode = "view" | "download" | "thumbnail" | "content";
+
+export const convertGoogleDriveUrl = (
+  url: string,
+  options?: { mode?: GoogleDriveMode; size?: number }
+): string | null => {
   if (!url || typeof url !== 'string') return null;
   
   // Only process Google Drive URLs
   if (!url.includes('drive.google.com')) return null;
   
-  // Extract file ID from various Google Drive URL formats
-  // Try multiple patterns to catch different URL formats
-  const patterns = [
-    // Format: https://drive.google.com/open?id=FILE_ID&usp=drive_copy (most common)
-    // Use a more specific pattern that requires at least 25 characters (typical Google Drive file IDs)
-    /[?&]id=([a-zA-Z0-9_-]{25,})/,
-    // Format: https://drive.google.com/file/d/FILE_ID/view
-    /\/file\/d\/([a-zA-Z0-9_-]{25,})/,
-    // Format: https://drive.google.com/d/FILE_ID
-    /\/d\/([a-zA-Z0-9_-]{25,})/,
-    // Fallback: any id= parameter (less strict, for shorter IDs)
-    /[?&]id=([a-zA-Z0-9_-]+)/,
-  ];
-  
-  for (const pattern of patterns) {
-    const match = url.match(pattern);
-    if (match && match[1]) {
-      const fileId = match[1];
-      // Convert to direct image URL that can be used in <img> tags
-      // Note: File must be shared with "Anyone with the link can view" for this to work
-      const directUrl = `https://drive.google.com/uc?export=view&id=${fileId}`;
-      
-      if (import.meta.env.DEV) {
-        console.log('[ImageUtils] Converted Google Drive URL:', {
-          original: url,
-          fileId: fileId,
-          directUrl: directUrl
-        });
-      }
-      
-      return directUrl;
+  const fileId = extractGoogleDriveFileId(url);
+  if (!fileId) {
+    if (import.meta.env.DEV) {
+      console.warn('[ImageUtils] Could not extract file ID from Google Drive URL:', url);
     }
+    return null;
   }
-  
-  if (import.meta.env.DEV) {
-    console.warn('[ImageUtils] Could not extract file ID from Google Drive URL:', url);
+
+  const mode: GoogleDriveMode = options?.mode ?? "view";
+  const size = options?.size ?? 800;
+
+  switch (mode) {
+    case "download":
+      return `https://drive.google.com/uc?export=download&id=${fileId}`;
+    case "thumbnail":
+      return `https://drive.google.com/thumbnail?id=${fileId}&sz=w${size}-h${size}`;
+    case "content":
+      return `https://lh3.googleusercontent.com/d/${fileId}=w${size}-h${size}`;
+    case "view":
+    default:
+      return `https://drive.google.com/uc?export=view&id=${fileId}`;
   }
-  
-  return null;
 };
 
 /**
@@ -73,7 +85,7 @@ export const normalizeImageUrl = (url: string | null | undefined): string | null
   
   // Check if it's a Google Drive URL and convert it first
   if (url.includes('drive.google.com')) {
-    const convertedUrl = convertGoogleDriveUrl(url);
+    const convertedUrl = convertGoogleDriveUrl(url, { mode: 'view' });
     if (convertedUrl) {
       return convertedUrl;
     }

@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback, SyntheticEvent } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Input } from "@/components/ui/input";
@@ -20,7 +20,13 @@ import {
   ExternalLink,
   Palette,
 } from "lucide-react";
-import { normalizeImageUrl, isValidImageUrl, getFirstImageUrl } from "@/lib/image-utils";
+import {
+  normalizeImageUrl,
+  getFirstImageUrl,
+  parseImageUrls,
+  convertGoogleDriveUrl,
+  extractGoogleDriveFileId,
+} from "@/lib/image-utils";
 
 interface FabricLibraryProps {
   open: boolean;
@@ -316,6 +322,62 @@ export const FabricLibrary = ({
     return fabric.estre_code;
   };
 
+  const getFabricImageSources = (fabric: Fabric): string[] => {
+    const result: string[] = [];
+    const pushUnique = (candidate?: string | null) => {
+      if (!candidate) return;
+      if (candidate === "/placeholder.svg") return;
+      if (!result.includes(candidate)) {
+        result.push(candidate);
+      }
+    };
+
+    const addCandidateValue = (value: any) => {
+      if (!value) return;
+      parseImageUrls(value).forEach((url) => pushUnique(url));
+    };
+
+    // Primary source from existing logic (ensures first item is best guess)
+    pushUnique(getFabricImageUrl(fabric));
+
+    addCandidateValue(fabric.colour_link);
+    addCandidateValue(fabric.colour);
+
+    result.slice(0).forEach((url) => {
+      const fileId = extractGoogleDriveFileId(url);
+      if (fileId) {
+        pushUnique(convertGoogleDriveUrl(url, { mode: "view" }));
+        pushUnique(convertGoogleDriveUrl(url, { mode: "download" }));
+        pushUnique(convertGoogleDriveUrl(url, { mode: "thumbnail", size: 1024 }));
+        pushUnique(convertGoogleDriveUrl(url, { mode: "content", size: 1024 }));
+      }
+    });
+
+    return result;
+  };
+
+  const handleImageError = useCallback((event: SyntheticEvent<HTMLImageElement>) => {
+    const target = event.target as HTMLImageElement;
+    const fallbackAttr = target.dataset.fallbacks || "";
+    const fallbacks = fallbackAttr
+      .split("|")
+      .map((url) => url.trim())
+      .filter(Boolean);
+
+    if (fallbacks.length > 0) {
+      const next = fallbacks.shift()!;
+      target.dataset.fallbacks = fallbacks.join("|");
+      target.src = next;
+      return;
+    }
+
+    target.style.display = "none";
+    const parent = target.parentElement;
+    if (parent) {
+      parent.classList.add("bg-muted");
+    }
+  }, []);
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-7xl max-h-[90vh] overflow-hidden flex flex-col p-0">
@@ -447,170 +509,164 @@ export const FabricLibrary = ({
             </div>
           ) : viewMode === "grid" ? (
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-              {displayedFabrics.map((fabric) => (
-                <Card
-                  key={fabric.id}
-                  className={`cursor-pointer hover:border-primary transition-all ${
-                    selectedCode === fabric.estre_code ? "border-primary border-2" : ""
-                  }`}
-                  onClick={() => handleSelect(fabric.estre_code)}
-                >
-                  <CardContent className="p-4 space-y-3">
-                    {/* Color Swatch / Image Preview */}
-                    <div className="flex justify-center">
-                      {(() => {
-                        const imageUrl = getFabricImageUrl(fabric);
-                        const fallbackColor = getFabricColor(fabric);
-                        return imageUrl ? (
-                          <div 
-                            className="w-20 h-20 rounded-full border-2 border-gray-200 shadow-sm overflow-hidden relative"
+              {displayedFabrics.map((fabric) => {
+                const imageSources = getFabricImageSources(fabric);
+                const [primaryImage, ...fallbackImages] = imageSources;
+                const fallbackColor = getFabricColor(fabric);
+
+                return (
+                  <Card
+                    key={fabric.id}
+                    className={`cursor-pointer hover:border-primary transition-all ${
+                      selectedCode === fabric.estre_code ? "border-primary border-2" : ""
+                    }`}
+                    onClick={() => handleSelect(fabric.estre_code)}
+                  >
+                    <CardContent className="p-4 space-y-3">
+                      <div className="flex justify-center">
+                        {primaryImage ? (
+                          <div
+                            className="relative w-full max-w-[180px] aspect-square overflow-hidden rounded-xl border border-muted/60 shadow-sm"
                             style={{ backgroundColor: fallbackColor }}
                           >
                             <img
-                              src={imageUrl}
+                              src={primaryImage}
+                              data-fallbacks={fallbackImages.join("|")}
                               alt={fabric.description || fabric.colour || fabric.estre_code}
                               className="w-full h-full object-cover"
-                              onError={(e) => {
-                                // Hide image and show color background on error
-                                const target = e.target as HTMLImageElement;
-                                target.style.display = 'none';
-                              }}
+                              loading="lazy"
+                              referrerPolicy="no-referrer"
+                              onError={handleImageError}
                             />
                           </div>
                         ) : (
                           <div
-                            className="w-20 h-20 rounded-full border-2 border-gray-200 shadow-sm"
+                            className="w-full max-w-[180px] aspect-square rounded-xl border border-muted/60 shadow-sm bg-muted"
                             style={{ backgroundColor: fallbackColor }}
                           />
-                        );
-                      })()}
-                    </div>
+                        )}
+                      </div>
 
-                    {/* Fabric Code */}
-                    <div className="flex items-center gap-1 justify-center">
-                      <Badge variant="outline" className="text-xs font-mono">
-                        {fabric.estre_code}
-                      </Badge>
-                      <ExternalLink className="h-3 w-3 text-muted-foreground" />
-                    </div>
+                      <div className="flex items-center gap-1 justify-center">
+                        <Badge variant="outline" className="text-xs font-mono">
+                          {fabric.estre_code}
+                        </Badge>
+                        <ExternalLink className="h-3 w-3 text-muted-foreground" />
+                      </div>
 
-                    {/* Vendor Code / Internal SKU */}
-                    <div className="text-center">
-                      <p className="text-xs text-muted-foreground">
-                        {getVendorCode(fabric)}
-                      </p>
-                    </div>
+                      <div className="text-center">
+                        <p className="text-xs text-muted-foreground">{getVendorCode(fabric)}</p>
+                      </div>
 
-                    {/* BOM Price */}
-                    <div className="text-center">
-                      <p className="font-semibold text-sm">
-                        ₹{fabric.bom_price?.toLocaleString() || fabric.price?.toLocaleString() || "0"}
-                      </p>
-                    </div>
+                      <div className="text-center">
+                        <p className="font-semibold text-sm">
+                          ₹{fabric.bom_price?.toLocaleString() || fabric.price?.toLocaleString() || "0"}
+                        </p>
+                      </div>
 
-                    {/* Upgrade Value */}
-                    <div className="text-center">
-                      <p className="text-xs text-muted-foreground">
-                        {fabric.upgrade?.toLocaleString() || "0"}
-                      </p>
-                    </div>
+                      <div className="text-center">
+                        <p className="text-xs text-muted-foreground">
+                          {fabric.upgrade?.toLocaleString() || "0"}
+                        </p>
+                      </div>
 
-                    {/* Select Button */}
-                    <Button
-                      variant={selectedCode === fabric.estre_code ? "default" : "outline"}
-                      className="w-full"
-                      size="sm"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleSelect(fabric.estre_code);
-                      }}
-                    >
-                      {selectedCode === fabric.estre_code ? "Selected" : "Select"}
-                    </Button>
-                  </CardContent>
-                </Card>
-              ))}
+                      <Button
+                        variant={selectedCode === fabric.estre_code ? "default" : "outline"}
+                        className="w-full"
+                        size="sm"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleSelect(fabric.estre_code);
+                        }}
+                      >
+                        {selectedCode === fabric.estre_code ? "Selected" : "Select"}
+                      </Button>
+                    </CardContent>
+                  </Card>
+                );
+              })}
             </div>
           ) : (
             <div className="space-y-2">
-              {displayedFabrics.map((fabric) => (
-                <Card
-                  key={fabric.id}
-                  className={`cursor-pointer hover:border-primary transition-all ${
-                    selectedCode === fabric.estre_code ? "border-primary border-2" : ""
-                  }`}
-                  onClick={() => handleSelect(fabric.estre_code)}
-                >
-                  <CardContent className="p-4">
-                    <div className="flex items-center gap-4">
-                      {(() => {
-                        const imageUrl = getFabricImageUrl(fabric);
-                        const fallbackColor = getFabricColor(fabric);
-                        return imageUrl ? (
-                          <div 
-                            className="w-16 h-16 rounded border-2 border-gray-200 flex-shrink-0 overflow-hidden relative"
+              {displayedFabrics.map((fabric) => {
+                const imageSources = getFabricImageSources(fabric);
+                const [primaryImage, ...fallbackImages] = imageSources;
+                const fallbackColor = getFabricColor(fabric);
+
+                return (
+                  <Card
+                    key={fabric.id}
+                    className={`cursor-pointer hover:border-primary transition-all ${
+                      selectedCode === fabric.estre_code ? "border-primary border-2" : ""
+                    }`}
+                    onClick={() => handleSelect(fabric.estre_code)}
+                  >
+                    <CardContent className="p-4">
+                      <div className="flex items-center gap-4">
+                        {primaryImage ? (
+                          <div
+                            className="w-32 h-32 rounded-xl border border-muted/60 flex-shrink-0 overflow-hidden relative"
                             style={{ backgroundColor: fallbackColor }}
                           >
                             <img
-                              src={imageUrl}
+                              src={primaryImage}
+                              data-fallbacks={fallbackImages.join("|")}
                               alt={fabric.description || fabric.colour || fabric.estre_code}
                               className="w-full h-full object-cover"
-                              onError={(e) => {
-                                // Hide image and show color background on error
-                                const target = e.target as HTMLImageElement;
-                                target.style.display = 'none';
-                              }}
+                              loading="lazy"
+                              referrerPolicy="no-referrer"
+                              onError={handleImageError}
                             />
                           </div>
                         ) : (
                           <div
-                            className="w-16 h-16 rounded border-2 border-gray-200 flex-shrink-0"
+                            className="w-32 h-32 rounded-xl border border-muted/60 flex-shrink-0 bg-muted"
                             style={{ backgroundColor: fallbackColor }}
                           />
-                        );
-                      })()}
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-1">
-                          <Badge variant="outline" className="text-xs font-mono">
-                            {fabric.estre_code}
-                          </Badge>
-                          <ExternalLink className="h-3 w-3 text-muted-foreground" />
-                          <span className="text-xs text-muted-foreground">
-                            {getVendorCode(fabric)}
-                          </span>
-                        </div>
-                        <p className="text-sm font-medium truncate">
-                          {fabric.description || fabric.colour || fabric.estre_code}
-                        </p>
-                        {fabric.collection && fabric.brand && (
-                          <p className="text-xs text-muted-foreground">
-                            {fabric.collection} - {fabric.brand}
-                          </p>
                         )}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1">
+                            <Badge variant="outline" className="text-xs font-mono">
+                              {fabric.estre_code}
+                            </Badge>
+                            <ExternalLink className="h-3 w-3 text-muted-foreground" />
+                            <span className="text-xs text-muted-foreground">
+                              {getVendorCode(fabric)}
+                            </span>
+                          </div>
+                          <p className="text-sm font-medium truncate">
+                            {fabric.description || fabric.colour || fabric.estre_code}
+                          </p>
+                          {fabric.collection && fabric.brand && (
+                            <p className="text-xs text-muted-foreground">
+                              {fabric.collection} - {fabric.brand}
+                            </p>
+                          )}
+                        </div>
+                        <div className="text-right">
+                          <p className="font-semibold">
+                            ₹{fabric.bom_price?.toLocaleString() || fabric.price?.toLocaleString() || "0"}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            Upgrade: {fabric.upgrade?.toLocaleString() || "0"}
+                          </p>
+                          <Button
+                            variant={selectedCode === fabric.estre_code ? "default" : "outline"}
+                            size="sm"
+                            className="mt-2"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleSelect(fabric.estre_code);
+                            }}
+                          >
+                            {selectedCode === fabric.estre_code ? "Selected" : "Select"}
+                          </Button>
+                        </div>
                       </div>
-                      <div className="text-right">
-                        <p className="font-semibold">
-                          ₹{fabric.bom_price?.toLocaleString() || fabric.price?.toLocaleString() || "0"}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          Upgrade: {fabric.upgrade?.toLocaleString() || "0"}
-                        </p>
-                        <Button
-                          variant={selectedCode === fabric.estre_code ? "default" : "outline"}
-                          size="sm"
-                          className="mt-2"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleSelect(fabric.estre_code);
-                          }}
-                        >
-                          {selectedCode === fabric.estre_code ? "Selected" : "Select"}
-                        </Button>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
+                    </CardContent>
+                  </Card>
+                );
+              })}
             </div>
           )}
 
