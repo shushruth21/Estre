@@ -34,6 +34,14 @@ import { AdminLayout } from "@/components/admin/AdminLayout";
 
 type AppRole = 'admin' | 'store_manager' | 'production_manager' | 'sales_executive' | 'factory_staff' | 'customer';
 
+interface User {
+  id: string;
+  email: string;
+  created_at: string;
+  email_confirmed_at: string | null;
+  roles: AppRole[];
+}
+
 const AdminUsers = () => {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [newUserEmail, setNewUserEmail] = useState("");
@@ -43,83 +51,34 @@ const AdminUsers = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  // Fetch all users with their roles
+  // Fetch all users with their roles using edge function
   const { data: users, isLoading } = useQuery({
     queryKey: ["admin-users"],
     queryFn: async () => {
-      // Get all users from auth.users (via a function or direct query if RLS allows)
-      // Note: This requires admin access to auth.users
-      const { data: usersData, error: usersError } = await supabase.auth.admin.listUsers();
+      const { data, error } = await supabase.functions.invoke('admin-list-users');
       
-      if (usersError) {
-        console.error("Error fetching users:", usersError);
-        throw usersError;
+      if (error) {
+        console.error("Error fetching users:", error);
+        throw error;
       }
 
-      // Get roles for all users
-      const { data: rolesData, error: rolesError } = await supabase
-        .from("user_roles")
-        .select("user_id, role");
-
-      if (rolesError) {
-        console.error("Error fetching roles:", rolesError);
-      }
-
-      // Map roles to users
-      const usersWithRoles = (usersData?.users || []).map((user) => {
-        const userRoles = (rolesData || [])
-          .filter((r) => r.user_id === user.id)
-          .map((r) => r.role as AppRole);
-        
-        return {
-          id: user.id,
-          email: user.email,
-          created_at: user.created_at,
-          email_confirmed_at: user.email_confirmed_at,
-          roles: userRoles,
-        };
-      });
-
-      return usersWithRoles;
+      return data.users as User[];
     },
   });
 
-  // Create new user mutation
+  // Create new user mutation using edge function
   const createUserMutation = useMutation({
-    mutationFn: async (data: { email: string; password: string; role: AppRole }) => {
-      // Create user via Supabase Auth Admin API
-      const { data: newUser, error: createError } = await supabase.auth.admin.createUser({
-        email: data.email,
-        password: data.password,
-        email_confirm: true, // Auto-confirm email
+    mutationFn: async (userData: { email: string; password: string; role: AppRole }) => {
+      const { data, error } = await supabase.functions.invoke('admin-create-user', {
+        body: userData,
       });
 
-      if (createError) {
-        console.error("Error creating user:", createError);
-        throw createError;
-      }
-      if (!newUser?.user) throw new Error("User creation failed");
-
-      // Assign role
-      if (data.role !== 'customer') {
-        const { error: roleError } = await supabase
-          .from("user_roles")
-          .insert({
-            user_id: newUser.user.id,
-            role: data.role,
-          });
-
-        if (roleError) {
-          console.error("Error assigning role:", roleError);
-          // Try to delete the user if role assignment fails
-          if (newUser?.user?.id) {
-            await supabase.auth.admin.deleteUser(newUser.user.id);
-          }
-          throw roleError;
-        }
+      if (error) {
+        console.error("Error creating user:", error);
+        throw new Error(error.message || "Failed to create user");
       }
 
-      return newUser.user;
+      return data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin-users"] });
@@ -141,15 +100,18 @@ const AdminUsers = () => {
     },
   });
 
-  // Delete user mutation
+  // Delete user mutation using edge function
   const deleteUserMutation = useMutation({
     mutationFn: async (userId: string) => {
-      try {
-        const { error } = await supabase.auth.admin.deleteUser(userId);
-        if (error) throw error;
-      } catch (err: any) {
-        throw new Error("Admin API requires service role key. Please configure VITE_SUPABASE_SERVICE_ROLE_KEY");
+      const { data, error } = await supabase.functions.invoke('admin-delete-user', {
+        body: { userId },
+      });
+
+      if (error) {
+        throw new Error(error.message || "Failed to delete user");
       }
+
+      return data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin-users"] });
@@ -167,34 +129,18 @@ const AdminUsers = () => {
     },
   });
 
-  // Assign role mutation
+  // Assign role mutation using edge function
   const assignRoleMutation = useMutation({
     mutationFn: async ({ userId, role }: { userId: string; role: AppRole }) => {
-      if (role === 'customer') {
-        // Remove all roles (customer is default, no role needed)
-        const { error } = await supabase
-          .from("user_roles")
-          .delete()
-          .eq("user_id", userId);
-        if (error) throw error;
-      } else {
-        // Remove existing roles and add new one
-        const { error: deleteError } = await supabase
-          .from("user_roles")
-          .delete()
-          .eq("user_id", userId);
+      const { data, error } = await supabase.functions.invoke('admin-update-user-role', {
+        body: { userId, role },
+      });
 
-        if (deleteError) throw deleteError;
-
-        const { error: insertError } = await supabase
-          .from("user_roles")
-          .insert({
-            user_id: userId,
-            role: role,
-          });
-
-        if (insertError) throw insertError;
+      if (error) {
+        throw new Error(error.message || "Failed to update role");
       }
+
+      return data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin-users"] });

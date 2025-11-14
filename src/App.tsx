@@ -5,6 +5,7 @@ import { ThemeProvider } from "next-themes";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import ErrorBoundary from "@/components/ErrorBoundary";
+import { ProtectedRoute } from "@/components/ProtectedRoute";
 import Index from "./pages/Index";
 import Products from "./pages/Products";
 import Configure from "./pages/Configure";
@@ -63,18 +64,54 @@ const App = () => (
           <Route path="/signup" element={<Signup />} />
           <Route path="/dashboard" element={<Dashboard />} />
           
-          {/* Admin Routes */}
-          <Route path="/admin/dashboard" element={<AdminDashboard />} />
-          <Route path="/admin/products" element={<AdminProducts />} />
-          <Route path="/admin/dropdowns" element={<AdminDropdowns />} />
-          <Route path="/admin/job-cards" element={<AdminJobCards />} />
-          <Route path="/admin/orders" element={<AdminOrders />} />
-          <Route path="/admin/users" element={<AdminUsers />} />
+          {/* Admin Routes - Protected */}
+          <Route path="/admin/dashboard" element={
+            <ProtectedRoute requiredRole="admin">
+              <AdminDashboard />
+            </ProtectedRoute>
+          } />
+          <Route path="/admin/products" element={
+            <ProtectedRoute requiredRole="admin">
+              <AdminProducts />
+            </ProtectedRoute>
+          } />
+          <Route path="/admin/dropdowns" element={
+            <ProtectedRoute requiredRole="admin">
+              <AdminDropdowns />
+            </ProtectedRoute>
+          } />
+          <Route path="/admin/job-cards" element={
+            <ProtectedRoute requiredRole="admin">
+              <AdminJobCards />
+            </ProtectedRoute>
+          } />
+          <Route path="/admin/orders" element={
+            <ProtectedRoute requiredRole="admin">
+              <AdminOrders />
+            </ProtectedRoute>
+          } />
+          <Route path="/admin/users" element={
+            <ProtectedRoute requiredRole="admin">
+              <AdminUsers />
+            </ProtectedRoute>
+          } />
           
-          {/* Staff Routes */}
-          <Route path="/staff/dashboard" element={<StaffDashboard />} />
-          <Route path="/staff/job-cards" element={<StaffJobCards />} />
-          <Route path="/staff/job-cards/:id" element={<StaffJobCardDetail />} />
+          {/* Staff Routes - Protected */}
+          <Route path="/staff/dashboard" element={
+            <ProtectedRoute requiredRole="factory_staff">
+              <StaffDashboard />
+            </ProtectedRoute>
+          } />
+          <Route path="/staff/job-cards" element={
+            <ProtectedRoute requiredRole="factory_staff">
+              <StaffJobCards />
+            </ProtectedRoute>
+          } />
+          <Route path="/staff/job-cards/:id" element={
+            <ProtectedRoute requiredRole="factory_staff">
+              <StaffJobCardDetail />
+            </ProtectedRoute>
+          } />
           
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
