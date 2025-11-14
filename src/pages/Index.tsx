@@ -25,20 +25,28 @@ const Index = () => {
           .select("role")
           .eq("user_id", user.id);
         
-        console.log("🔍 Index.tsx: User roles:", rolesData);
+        if (import.meta.env.DEV) {
+          console.log("🔍 Index.tsx: User roles:", rolesData);
+        }
         
         if (rolesData && rolesData.length > 0) {
           const userRole = rolesData[0].role;
-          console.log("🎯 Index.tsx: User role detected:", userRole);
+          if (import.meta.env.DEV) {
+            console.log("🎯 Index.tsx: User role detected:", userRole);
+          }
           
           if (userRole === 'admin' || userRole === 'store_manager' || userRole === 'production_manager') {
-            console.log("🚀 Index.tsx: Redirecting admin/manager to dashboard");
+            if (import.meta.env.DEV) {
+              console.log("🚀 Index.tsx: Redirecting admin/manager to dashboard");
+            }
             window.location.href = "/admin/dashboard";
             return;
           }
           
           if (userRole === 'factory_staff') {
-            console.log("🚀 Index.tsx: Redirecting staff to job cards");
+            if (import.meta.env.DEV) {
+              console.log("🚀 Index.tsx: Redirecting staff to job cards");
+            }
             window.location.href = "/staff/job-cards";
             return;
           }

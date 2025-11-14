@@ -28,7 +28,9 @@ const Login = () => {
         .eq("user_id", user.id)
         .then(({ data: roles, error }) => {
           if (error) {
-            console.error("❌ Error fetching roles in useEffect:", error);
+            if (import.meta.env.DEV) {
+              console.error("❌ Error fetching roles in useEffect:", error);
+            }
           }
           if (roles && roles.length > 0) {
             const userRole = roles[0].role;
@@ -80,7 +82,9 @@ const Login = () => {
         .eq("user_id", data.user.id);
 
       if (rolesError) {
-        console.warn("Error fetching roles:", rolesError);
+        if (import.meta.env.DEV) {
+          console.warn("Error fetching roles:", rolesError);
+        }
       }
 
       toast({
@@ -112,7 +116,9 @@ const Login = () => {
           }
         }
       } catch (error) {
-        console.error("Error checking roles:", error);
+        if (import.meta.env.DEV) {
+          console.error("Error checking roles:", error);
+        }
       }
 
       // Determine redirect path based on roles

@@ -48,13 +48,15 @@ export function useAuth() {
         .eq("user_id", userId);
 
       if (error) {
-        console.error("❌ Error fetching user roles:", error);
-        console.error("Error details:", {
-          message: error.message,
-          details: error.details,
-          hint: error.hint,
-          code: error.code
-        });
+        if (import.meta.env.DEV) {
+          console.error("❌ Error fetching user roles:", error);
+          console.error("Error details:", {
+            message: error.message,
+            details: error.details,
+            hint: error.hint,
+            code: error.code
+          });
+        }
         
         // Try fallback using security definer function
         try {
@@ -62,7 +64,9 @@ export function useAuth() {
             .rpc('is_admin_or_manager', { _user_id: userId });
           
           if (adminCheck) {
-            console.log("✅ Admin role confirmed via security definer function");
+            if (import.meta.env.DEV) {
+              console.log("✅ Admin role confirmed via security definer function");
+            }
             setUserRoles(['admin']);
             setLoading(false);
             return;
@@ -75,13 +79,17 @@ export function useAuth() {
             });
           
           if (staffCheck) {
-            console.log("✅ Staff role confirmed via security definer function");
+            if (import.meta.env.DEV) {
+              console.log("✅ Staff role confirmed via security definer function");
+            }
             setUserRoles(['factory_staff']);
             setLoading(false);
             return;
           }
         } catch (functionError) {
-          console.error("❌ Security definer function also failed:", functionError);
+          if (import.meta.env.DEV) {
+            console.error("❌ Security definer function also failed:", functionError);
+          }
         }
         
         return;
@@ -90,12 +98,18 @@ export function useAuth() {
       if (data) {
         const roles = data.map((r: any) => r.role);
         setUserRoles(roles);
-        console.log("✅ User roles loaded:", roles);
+        if (import.meta.env.DEV) {
+          console.log("✅ User roles loaded:", roles);
+        }
       } else {
-        console.warn("⚠️ No roles data returned for user:", userId);
+        if (import.meta.env.DEV) {
+          console.warn("⚠️ No roles data returned for user:", userId);
+        }
       }
     } catch (error) {
-      console.error("❌ Error in fetchUserRoles:", error);
+      if (import.meta.env.DEV) {
+        console.error("❌ Error in fetchUserRoles:", error);
+      }
     } finally {
       setLoading(false);
     }
