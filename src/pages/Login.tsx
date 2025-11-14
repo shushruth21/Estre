@@ -5,18 +5,15 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
-import { ArrowLeft, Loader2, Eye, EyeOff, Shield, HardHat } from "lucide-react";
+import { ArrowLeft, Loader2, Eye, EyeOff } from "lucide-react";
 
 const Login = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [adminMode, setAdminMode] = useState(false);
-  const [staffMode, setStaffMode] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
   const { user, loading: authLoading, isAdmin } = useAuth();
@@ -86,130 +83,58 @@ const Login = () => {
         console.warn("Error fetching roles:", rolesError);
       }
 
-      // Log roles for debugging
-      if (import.meta.env.DEV) {
-        console.log("🔐 Login successful - User roles:", roles);
-      }
-
       toast({
         title: "Welcome back!",
         description: "Logged in successfully",
       });
 
       // Wait for session to be fully established
-      await new Promise(resolve => setTimeout(resolve, 500));
+      await new Promise(resolve => setTimeout(resolve, 300));
 
-      // Re-fetch roles to ensure they're loaded
+      // Fetch roles using the security definer function for reliability
       let rolesData = null;
-      let rolesFetchError = null;
 
-      // Try direct query first
-      const directQuery = await supabase
-        .from("user_roles")
-        .select("role")
-        .eq("user_id", data.user.id);
-
-      rolesData = directQuery.data;
-      rolesFetchError = directQuery.error;
-
-      // Log for debugging
-      console.log("🔍 User ID:", data.user.id);
-      console.log("🔍 Roles fetched:", rolesData);
-      console.log("🔍 Roles fetch error:", rolesFetchError);
-
-      // If direct query fails or returns empty, try alternative methods
-      if (rolesFetchError || !rolesData || rolesData.length === 0) {
-        console.log("⚠️ Direct query failed or empty, trying alternative methods...");
+      try {
+        const { data: adminCheck } = await supabase
+          .rpc('is_admin_or_manager', { _user_id: data.user.id });
         
-        // Method 1: Try using the security definer function
-        try {
-          const { data: adminCheck, error: adminError } = await supabase
-            .rpc('is_admin_or_manager', { _user_id: data.user.id });
+        if (adminCheck) {
+          rolesData = [{ role: 'admin' }];
+        } else {
+          const { data: staffCheck } = await supabase
+            .rpc('has_role', { 
+              _user_id: data.user.id,
+              _role: 'factory_staff'
+            });
           
-          if (!adminError && adminCheck) {
-            console.log("✅ Admin role confirmed via security definer function");
-            rolesData = [{ role: 'admin' }];
-            rolesFetchError = null;
-          } else {
-            // Method 2: Try checking for staff role
-            const { data: staffCheck, error: staffError } = await supabase
-              .rpc('has_role', { 
-                _user_id: data.user.id,
-                _role: 'factory_staff'
-              });
-            
-            if (!staffError && staffCheck) {
-              console.log("✅ Staff role confirmed via security definer function");
-              rolesData = [{ role: 'factory_staff' }];
-              rolesFetchError = null;
-            }
+          if (staffCheck) {
+            rolesData = [{ role: 'factory_staff' }];
           }
-        } catch (functionError) {
-          console.error("❌ Security definer function error:", functionError);
         }
-
-        // If still no roles, show detailed error
-        if (rolesFetchError) {
-          console.error("❌ RLS Policy Error Details:", {
-            message: rolesFetchError.message,
-            details: rolesFetchError.details,
-            hint: rolesFetchError.hint,
-            code: rolesFetchError.code
-          });
-          
-          toast({
-            title: "Role Query Error",
-            description: `Error: ${rolesFetchError.message}. Please check RLS policies or contact administrator.`,
-            variant: "destructive",
-          });
-        }
+      } catch (error) {
+        console.error("Error checking roles:", error);
       }
 
       // Determine redirect path based on roles
-      let redirectPath = "/"; // Default to home
+      let redirectPath = "/";
       
       if (rolesData && rolesData.length > 0) {
         const userRole = rolesData[0].role;
         
-        console.log("🎯 User role found:", userRole);
-        console.log("🎯 All roles:", rolesData.map(r => r.role));
-        
         if (userRole === 'admin' || userRole === 'store_manager' || userRole === 'production_manager') {
           redirectPath = "/admin/dashboard";
-          console.log("✅ Admin role detected, redirecting to:", redirectPath);
         } else if (userRole === 'factory_staff') {
           redirectPath = "/staff/job-cards";
-          console.log("✅ Staff role detected, redirecting to:", redirectPath);
-        } else {
-          console.log("ℹ️ Customer role, staying on homepage");
         }
-      } else if (!rolesFetchError) {
-        // Only show "no role" message if there's no error (error already shown above)
-        console.warn("⚠️ No roles found for user:", data.user.email);
+      } else {
         toast({
           title: "No Role Assigned",
           description: "Your account doesn't have a role assigned. Please contact an administrator.",
           variant: "destructive",
         });
       }
-
-      // Force navigation with replace to prevent back button issues
-      console.log("🚀 Final redirect path:", redirectPath);
       
-      // If admin mode is enabled, bypass role checks and go directly to admin
-      if (adminMode) {
-        console.log("🔓 Admin Mode: Bypassing role checks, redirecting to admin dashboard");
-        window.location.href = "/admin/dashboard";
-        return;
-      }
-
-      if (staffMode) {
-        console.log("👷 Staff Mode: Bypassing role checks, redirecting to staff dashboard");
-        window.location.href = "/staff/job-cards";
-        return;
-      }
-      
-      // Always redirect immediately (use window.location for reliability)
+      // Redirect to appropriate dashboard
       window.location.href = redirectPath;
     } catch (error: any) {
       console.error("Login error:", error);
@@ -305,42 +230,6 @@ const Login = () => {
                       )}
                     </Button>
                   </div>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <Checkbox
-                    id="admin-mode"
-                    checked={adminMode}
-                    onCheckedChange={(checked) => {
-                      const next = checked as boolean;
-                      setAdminMode(next);
-                      if (next) setStaffMode(false);
-                    }}
-                  />
-                  <Label
-                    htmlFor="admin-mode"
-                    className="text-sm font-normal cursor-pointer flex items-center gap-2"
-                  >
-                    <Shield className="h-4 w-4" />
-                    Admin Mode (Bypass Role Check)
-                  </Label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <Checkbox
-                    id="staff-mode"
-                    checked={staffMode}
-                    onCheckedChange={(checked) => {
-                      const next = checked as boolean;
-                      setStaffMode(next);
-                      if (next) setAdminMode(false);
-                    }}
-                  />
-                  <Label
-                    htmlFor="staff-mode"
-                    className="text-sm font-normal cursor-pointer flex items-center gap-2"
-                  >
-                    <HardHat className="h-4 w-4" />
-                    Staff Mode (Bypass Role Check)
-                  </Label>
                 </div>
                 <Button type="submit" className="w-full" disabled={isLoading || authLoading}>
                   {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
