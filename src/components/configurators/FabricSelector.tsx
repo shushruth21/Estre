@@ -12,6 +12,8 @@ import {
 } from "@/components/ui/select";
 import { FabricLibrary } from "@/components/ui/FabricLibrary";
 import { Badge } from "@/components/ui/badge";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { AlertCircle } from "lucide-react";
 
 interface FabricSelectorProps {
   configuration: any;
@@ -89,58 +91,94 @@ const FabricSelector = ({
   });
 
   const selectFabric = useCallback((fabricCode: string, part: string) => {
-    const fabricUpdates: any = { ...configuration.fabric };
+    try {
+      const currentFabric = configuration.fabric || {};
+      const fabricUpdates: any = {
+        ...currentFabric,
+        // Preserve claddingPlan if it exists
+        claddingPlan: currentFabric.claddingPlan || "Single Colour",
+      };
 
-    if (part === "structure") {
-      fabricUpdates.structureCode = fabricCode;
-    } else if (part === "backrest") {
-      fabricUpdates.backrestCode = fabricCode;
-    } else if (part === "seat") {
-      fabricUpdates.seatCode = fabricCode;
-    } else if (part === "headrest") {
-      // For beds, support both headrestCode and headboardCode
-      if (effectiveCategory === "bed" || effectiveCategory === "kids_bed") {
-        fabricUpdates.headrestCode = fabricCode;
-        fabricUpdates.headboardCode = fabricCode; // Set both for compatibility
-      } else {
-        fabricUpdates.headrestCode = fabricCode;
+      if (part === "structure") {
+        fabricUpdates.structureCode = fabricCode;
+      } else if (part === "backrest") {
+        fabricUpdates.backrestCode = fabricCode;
+      } else if (part === "seat") {
+        fabricUpdates.seatCode = fabricCode;
+      } else if (part === "headrest") {
+        // For beds, support both headrestCode and headboardCode
+        if (effectiveCategory === "bed" || effectiveCategory === "kids_bed") {
+          fabricUpdates.headrestCode = fabricCode;
+          fabricUpdates.headboardCode = fabricCode; // Set both for compatibility
+        } else {
+          fabricUpdates.headrestCode = fabricCode;
+        }
+      }
+
+      // Merge with existing configuration to preserve other fields
+      onConfigurationChange({ 
+        ...configuration,
+        fabric: fabricUpdates 
+      });
+      setOpenLibrary(null);
+    } catch (error) {
+      console.error("Error selecting fabric:", error);
+      if (import.meta.env.DEV) {
+        console.error("Fabric selection error details:", {
+          part,
+          fabricCode,
+          configuration: configuration.fabric,
+          effectiveCategory,
+        });
       }
     }
-
-    onConfigurationChange({ fabric: fabricUpdates });
-    setOpenLibrary(null);
-  }, [configuration.fabric, effectiveCategory, onConfigurationChange]);
+  }, [configuration, effectiveCategory, onConfigurationChange]);
 
   const handleCladdingPlanChange = useCallback((value: string) => {
-    const currentFabric = configuration.fabric || {};
-    const updatedFabric: any = {
-      ...currentFabric,
-      claddingPlan: value,
-    };
-    
-    // When switching to Multi Colour, ensure structureCode is preserved
-    // When switching to Single Colour, clear multi-colour specific codes
-    if (value === "Single Colour") {
-      // Keep only structureCode for single colour
-      updatedFabric.structureCode = currentFabric.structureCode;
-      // Clear multi-colour specific codes by removing them from the object
-      if (effectiveCategory === "bed" || effectiveCategory === "kids_bed") {
-        delete updatedFabric.headrestCode;
-        delete updatedFabric.headboardCode;
-      } else {
-        delete updatedFabric.backrestCode;
-        delete updatedFabric.seatCode;
-        delete updatedFabric.headrestCode;
+    try {
+      const currentFabric = configuration.fabric || {};
+      const updatedFabric: any = {
+        ...currentFabric,
+        claddingPlan: value,
+      };
+      
+      // When switching to Multi Colour, ensure structureCode is preserved
+      // When switching to Single Colour, clear multi-colour specific codes
+      if (value === "Single Colour") {
+        // Keep only structureCode for single colour
+        updatedFabric.structureCode = currentFabric.structureCode;
+        // Clear multi-colour specific codes by removing them from the object
+        if (effectiveCategory === "bed" || effectiveCategory === "kids_bed") {
+          delete updatedFabric.headrestCode;
+          delete updatedFabric.headboardCode;
+        } else {
+          delete updatedFabric.backrestCode;
+          delete updatedFabric.seatCode;
+          delete updatedFabric.headrestCode;
+        }
+      } else if (value === "Multi Colour") {
+        // Preserve structureCode when switching to multi-colour
+        updatedFabric.structureCode = currentFabric.structureCode;
+        // For beds, ensure headrestCode/headboardCode fields exist (even if undefined)
+        // This helps with the UI showing the selector
       }
-    } else if (value === "Multi Colour") {
-      // Preserve structureCode when switching to multi-colour
-      updatedFabric.structureCode = currentFabric.structureCode;
-      // For beds, ensure headrestCode/headboardCode fields exist (even if undefined)
-      // This helps with the UI showing the selector
+      
+      // Merge with existing configuration to preserve other fields
+      onConfigurationChange({ 
+        ...configuration,
+        fabric: updatedFabric 
+      });
+    } catch (error) {
+      console.error("Error changing cladding plan:", error);
+      if (import.meta.env.DEV) {
+        console.error("Cladding plan change error details:", {
+          value,
+          configuration: configuration.fabric,
+          effectiveCategory,
+        });
+      }
     }
-    
-    onConfigurationChange({ fabric: updatedFabric });
-  }, [configuration.fabric, effectiveCategory, onConfigurationChange]);
+  }, [configuration, effectiveCategory, onConfigurationChange]);
 
   return (
     <div className="space-y-6">
@@ -169,6 +207,41 @@ const FabricSelector = ({
           onOpenLibrary={() => setOpenLibrary("structure")}
         />
 
+        {/* Validation Warnings */}
+        {configuration.fabric?.claddingPlan === "Single Colour" && !configuration.fabric?.structureCode && (
+          <Alert variant="destructive">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>
+              Please select a Structure fabric for Single Colour plan.
+            </AlertDescription>
+          </Alert>
+        )}
+
+        {configuration.fabric?.claddingPlan === "Multi Colour" && (
+          <>
+            {/* Bed category validation */}
+            {(effectiveCategory === "bed" || effectiveCategory === "kids_bed") && 
+             (!configuration.fabric?.structureCode || (!configuration.fabric?.headrestCode && !configuration.fabric?.headboardCode)) && (
+              <Alert variant="destructive">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>
+                  Multi Colour plan requires both Structure and Headrest fabrics to be selected.
+                </AlertDescription>
+              </Alert>
+            )}
+            {/* Sofa/Sofabed category validation */}
+            {(effectiveCategory !== "bed" && effectiveCategory !== "kids_bed") && 
+             (!configuration.fabric?.structureCode || !configuration.fabric?.backrestCode || !configuration.fabric?.seatCode || !configuration.fabric?.headrestCode) && (
+              <Alert variant="destructive">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>
+                  Multi Colour plan requires Structure, Backrest, Seat, and Headrest fabrics to be selected.
+                </AlertDescription>
+              </Alert>
+            )}
+          </>
+        )}
+
         {configuration.fabric?.claddingPlan === "Multi Colour" && (
           <>
             {/* Bed category: Only Structure and Headrest */}
@@ -195,22 +268,22 @@ const FabricSelector = ({
                 {/* Sofa/Sofabed: All parts */}
                 <FabricPartSelector
                   label="Backrest Fabric"
-                  selectedCode={configuration.fabric?.backrestCode}
-                  selectedFabric={selectedFabrics?.[configuration.fabric?.backrestCode || ""]}
+                  selectedCode={configuration.fabric?.backrestCode || undefined}
+                  selectedFabric={configuration.fabric?.backrestCode ? selectedFabrics?.[configuration.fabric.backrestCode] : undefined}
                   onOpenLibrary={() => setOpenLibrary("backrest")}
                 />
 
                 <FabricPartSelector
                   label="Seat Fabric"
-                  selectedCode={configuration.fabric?.seatCode}
-                  selectedFabric={selectedFabrics?.[configuration.fabric?.seatCode || ""]}
+                  selectedCode={configuration.fabric?.seatCode || undefined}
+                  selectedFabric={configuration.fabric?.seatCode ? selectedFabrics?.[configuration.fabric.seatCode] : undefined}
                   onOpenLibrary={() => setOpenLibrary("seat")}
                 />
 
                 <FabricPartSelector
                   label="Headrest Fabric"
-                  selectedCode={configuration.fabric?.headrestCode}
-                  selectedFabric={selectedFabrics?.[configuration.fabric?.headrestCode || ""]}
+                  selectedCode={configuration.fabric?.headrestCode || undefined}
+                  selectedFabric={configuration.fabric?.headrestCode ? selectedFabrics?.[configuration.fabric.headrestCode] : undefined}
                   onOpenLibrary={() => setOpenLibrary("headrest")}
                 />
               </>
@@ -224,7 +297,7 @@ const FabricSelector = ({
         open={openLibrary === "structure"}
         onOpenChange={(open) => setOpenLibrary(open ? "structure" : null)}
         onSelect={(code) => selectFabric(code, "structure")}
-        selectedCode={configuration.fabric?.structureCode}
+        selectedCode={configuration.fabric?.structureCode || undefined}
         title="Select Structure Fabric"
       />
       <FabricLibrary

@@ -42,7 +42,6 @@ const BedConfigurator = ({ product, configuration, onConfigurationChange }: BedC
   // Fetch dropdown options
   const { data: bedSizes, isLoading: loadingSizes } = useDropdownOptions("bed", "bed_size");
   const { data: storageTypes, isLoading: loadingStorage } = useDropdownOptions("bed", "storage_type");
-  const { data: mattressSupports, isLoading: loadingSupport } = useDropdownOptions("bed", "mattress_support");
   const { data: legOptions, isLoading: loadingLegs } = useDropdownOptions("bed", "leg_type");
   
   // Fetch default dimensions from DB metadata
@@ -103,10 +102,8 @@ const BedConfigurator = ({ product, configuration, onConfigurationChange }: BedC
         bedSize: bedSize,
         storage: "No",
         storageType: "None",
-        mattressSupport: "Slat",
         fabric: {
           claddingPlan: "Single Colour",
-          structureCode: undefined,
         },
         dimensions: {
           length: defaultDimensions.length,
@@ -234,27 +231,6 @@ const BedConfigurator = ({ product, configuration, onConfigurationChange }: BedC
                     )}
                   </div>
                 )}
-
-                <Separator />
-
-                {/* Mattress Support */}
-                <div className="space-y-3">
-                  <Label className="text-base font-semibold">Mattress Support</Label>
-                  <RadioGroup
-                    value={configuration.mattressSupport || "Slat"}
-                    onValueChange={(value) => updateConfiguration({ mattressSupport: value })}
-                    className="flex gap-6"
-                  >
-                    <div className="flex items-center space-x-2">
-                      <RadioGroupItem value="Slat" id="slat" />
-                      <Label htmlFor="slat" className="font-normal cursor-pointer">Slat Base</Label>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <RadioGroupItem value="Solid" id="solid" />
-                      <Label htmlFor="solid" className="font-normal cursor-pointer">Solid Base</Label>
-                    </div>
-                  </RadioGroup>
-                </div>
               </AccordionContent>
             </AccordionItem>
 

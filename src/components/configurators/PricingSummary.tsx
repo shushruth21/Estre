@@ -70,93 +70,122 @@ const PricingSummary = ({
         ) : pricing ? (
           <>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-              {/* Base Model */}
-              {(() => {
-                const baseProductCost = pricing.breakdown.baseSeatPrice > 0 
-                  ? pricing.breakdown.baseSeatPrice 
-                  : (pricing.breakdown.basePrice || 0);
-                return (
+              {/* Bed-specific pricing summary */}
+              {(configuration.category === "bed" || configuration.category === "kids_bed") ? (
+                <>
+                  {/* Base Model */}
                   <SummaryTile 
                     label="Base Model" 
-                    value={`₹${Math.round(baseProductCost).toLocaleString()}`} 
+                    value={`₹${Math.round(pricing.breakdown.basePrice || 0).toLocaleString()}`} 
                   />
-                );
-              })()}
-              
-              {/* Mechanism */}
-              <SummaryTile 
-                label="Mechanism" 
-                value={`₹${Math.round(pricing.breakdown.mechanismUpgrade || 0).toLocaleString()}`} 
-              />
-              
-              {/* Consoles */}
-              <SummaryTile 
-                label="Consoles" 
-                value={`₹${Math.round(pricing.breakdown.consolePrice || 0).toLocaleString()}`} 
-              />
-              
-              {/* Armrest Accessories */}
-              <SummaryTile 
-                label="Armrest Accessories" 
-                value={`₹${Math.round(pricing.breakdown.armrestUpgrade || pricing.breakdown.accessoriesPrice || 0).toLocaleString()}`} 
-              />
-              
-              {/* Fabric Upgrade */}
-              <SummaryTile 
-                label="Fabric Upgrade" 
-                value={`₹${Math.round(pricing.breakdown.fabricCharges || 0).toLocaleString()}`} 
-              />
-              
-              {/* Lounger */}
-              <SummaryTile 
-                label="Lounger" 
-                value={`₹${Math.round(pricing.breakdown.loungerPrice || 0).toLocaleString()}`} 
-              />
-              
-              {/* Total Fabric */}
-              <SummaryTile 
-                label="Total Fabric (m)" 
-                value={`${(pricing.breakdown.fabricMeters || 0) > 0 ? (pricing.breakdown.fabricMeters || 0).toFixed(1) : "0.0"} m`} 
-              />
-              
-              {/* Seat/Backrest Fabric - if available */}
-              {typeof pricing.breakdown.seatBackrestFabric === "number" && (
-                <SummaryTile 
-                  label="Seat/Backrest Fabric" 
-                  value={`${pricing.breakdown.seatBackrestFabric > 0 ? pricing.breakdown.seatBackrestFabric.toFixed(1) : "0.0"} m`} 
-                />
-              )}
-              
-              {/* Structure/Armrest Fabric - if available */}
-              {typeof pricing.breakdown.structureFabric === "number" && (
-                <SummaryTile 
-                  label="Structure/Armrest Fabric" 
-                  value={`${pricing.breakdown.structureFabric > 0 ? pricing.breakdown.structureFabric.toFixed(1) : "0.0"} m`} 
-                />
-              )}
-              
-              {/* Approx Width - if available */}
-              {typeof pricing.breakdown.approxWidth === "number" && (
-                <SummaryTile 
-                  label="Approx Width" 
-                  value={`${Math.round(pricing.breakdown.approxWidth)}"`} 
-                />
-              )}
-              
-              {/* Storage Price - for bed category */}
-              {(configuration.category === "bed" || configuration.category === "kids_bed") && (
-                <SummaryTile 
-                  label="Storage Price" 
-                  value={`₹${Math.round(pricing.breakdown.storagePrice || 0).toLocaleString()}`} 
-                />
-              )}
-              
-              {/* Dimension Upgrade - for bed category */}
-              {(configuration.category === "bed" || configuration.category === "kids_bed") && (
-                <SummaryTile 
-                  label="Dimension Upgrade" 
-                  value={`₹${Math.round(pricing.breakdown.dimensionUpgrade || 0).toLocaleString()}`} 
-                />
+                  
+                  {/* Dimension Upgrade */}
+                  <SummaryTile 
+                    label="Dimension Upgrade" 
+                    value={`₹${Math.round(pricing.breakdown.dimensionUpgrade || 0).toLocaleString()}`} 
+                  />
+                  
+                  {/* Storage Price */}
+                  <SummaryTile 
+                    label="Storage Price" 
+                    value={`₹${Math.round(pricing.breakdown.storagePrice || 0).toLocaleString()}`} 
+                  />
+                  
+                  {/* Fabric Cost */}
+                  <SummaryTile 
+                    label="Fabric Cost" 
+                    value={`₹${Math.round(pricing.breakdown.fabricCharges || 0).toLocaleString()}`} 
+                  />
+                  
+                  {/* Total Fabric Meters */}
+                  <SummaryTile 
+                    label="Total Fabric (m)" 
+                    value={`${(pricing.breakdown.fabricMeters || 0) > 0 ? (pricing.breakdown.fabricMeters || 0).toFixed(1) : "0.0"} m`} 
+                  />
+                  
+                  {/* Legs Price */}
+                  {(pricing.breakdown.accessoriesPrice || 0) > 0 && (
+                    <SummaryTile 
+                      label="Legs & Accessories" 
+                      value={`₹${Math.round(pricing.breakdown.accessoriesPrice || 0).toLocaleString()}`} 
+                    />
+                  )}
+                </>
+              ) : (
+                <>
+                  {/* Base Model */}
+                  {(() => {
+                    const baseProductCost = pricing.breakdown.baseSeatPrice > 0 
+                      ? pricing.breakdown.baseSeatPrice 
+                      : (pricing.breakdown.basePrice || 0);
+                    return (
+                      <SummaryTile 
+                        label="Base Model" 
+                        value={`₹${Math.round(baseProductCost).toLocaleString()}`} 
+                      />
+                    );
+                  })()}
+                  
+                  {/* Mechanism */}
+                  <SummaryTile 
+                    label="Mechanism" 
+                    value={`₹${Math.round(pricing.breakdown.mechanismUpgrade || 0).toLocaleString()}`} 
+                  />
+                  
+                  {/* Consoles */}
+                  <SummaryTile 
+                    label="Consoles" 
+                    value={`₹${Math.round(pricing.breakdown.consolePrice || 0).toLocaleString()}`} 
+                  />
+                  
+                  {/* Armrest Accessories */}
+                  <SummaryTile 
+                    label="Armrest Accessories" 
+                    value={`₹${Math.round(pricing.breakdown.armrestUpgrade || pricing.breakdown.accessoriesPrice || 0).toLocaleString()}`} 
+                  />
+                  
+                  {/* Fabric Upgrade */}
+                  <SummaryTile 
+                    label="Fabric Upgrade" 
+                    value={`₹${Math.round(pricing.breakdown.fabricCharges || 0).toLocaleString()}`} 
+                  />
+                  
+                  {/* Lounger */}
+                  <SummaryTile 
+                    label="Lounger" 
+                    value={`₹${Math.round(pricing.breakdown.loungerPrice || 0).toLocaleString()}`} 
+                  />
+                  
+                  {/* Total Fabric */}
+                  <SummaryTile 
+                    label="Total Fabric (m)" 
+                    value={`${(pricing.breakdown.fabricMeters || 0) > 0 ? (pricing.breakdown.fabricMeters || 0).toFixed(1) : "0.0"} m`} 
+                  />
+                  
+                  {/* Seat/Backrest Fabric - if available */}
+                  {typeof pricing.breakdown.seatBackrestFabric === "number" && (
+                    <SummaryTile 
+                      label="Seat/Backrest Fabric" 
+                      value={`${pricing.breakdown.seatBackrestFabric > 0 ? pricing.breakdown.seatBackrestFabric.toFixed(1) : "0.0"} m`} 
+                    />
+                  )}
+                  
+                  {/* Structure/Armrest Fabric - if available */}
+                  {typeof pricing.breakdown.structureFabric === "number" && (
+                    <SummaryTile 
+                      label="Structure/Armrest Fabric" 
+                      value={`${pricing.breakdown.structureFabric > 0 ? pricing.breakdown.structureFabric.toFixed(1) : "0.0"} m`} 
+                    />
+                  )}
+                  
+                  {/* Approx Width - if available */}
+                  {typeof pricing.breakdown.approxWidth === "number" && (
+                    <SummaryTile 
+                      label="Approx Width" 
+                      value={`${Math.round(pricing.breakdown.approxWidth)}"`} 
+                    />
+                  )}
+                </>
               )}
             </div>
 
