@@ -210,7 +210,7 @@ const Products = () => {
       </header>
 
       <div className="container mx-auto px-4 py-12">
-        <h1 className="text-4xl font-bold mb-8">Product Catalog</h1>
+        <h1 className="text-4xl lg:text-5xl font-serif font-bold mb-8 tracking-tight">Product Catalog</h1>
 
         {/* Category Tabs */}
         <Tabs value={category} onValueChange={handleCategoryChange} className="mb-8">
@@ -237,13 +237,24 @@ const Products = () => {
         )}
         
         {isLoading ? (
-          <div className="flex items-center justify-center py-20">
-            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+            {[...Array(6)].map((_, i) => (
+              <Card key={i} className="overflow-hidden luxury-card border-muted/50 animate-pulse">
+                <div className="aspect-[4/3] bg-gradient-to-br from-muted to-muted/50"></div>
+                <CardContent className="p-6 space-y-3">
+                  <div className="h-6 bg-muted rounded w-3/4"></div>
+                  <div className="h-8 bg-muted rounded w-1/2"></div>
+                </CardContent>
+                <CardFooter className="p-6 pt-0">
+                  <div className="w-full h-10 bg-muted rounded"></div>
+                </CardFooter>
+              </Card>
+            ))}
           </div>
         ) : !error && (
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
             {products?.map((product) => (
-              <Card key={product.id} className="group overflow-hidden luxury-card border-muted/50">
+              <Card key={product.id} className="group overflow-hidden luxury-card border-muted/50 hover:border-gold transition-premium">
                 <div className="aspect-[4/3] bg-gradient-to-br from-muted to-muted/50 overflow-hidden relative">
                   <img
                     src={product.images || '/placeholder.svg'}
@@ -282,7 +293,7 @@ const Products = () => {
                   />
                 </div>
                 <CardContent className="p-6 space-y-3">
-                  <h3 className="text-2xl font-serif font-semibold tracking-tight group-hover:text-primary transition-colors">
+                  <h3 className="text-2xl font-serif font-semibold tracking-tight group-hover:text-gold transition-colors">
                     {product.title}
                   </h3>
                   
@@ -306,7 +317,7 @@ const Products = () => {
                     </div>
 
                     {product.discount_percent && product.discount_percent > 0 && (
-                      <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-primary/10 text-primary rounded-full text-sm font-semibold">
+                      <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-gold/10 text-gold rounded-full text-sm font-semibold border border-gold/20">
                         Save {product.discount_percent}%
                       </div>
                     )}
@@ -314,7 +325,7 @@ const Products = () => {
                 </CardContent>
                 <CardFooter className="p-6 pt-0">
                   <Link to={`/configure/${category}/${product.id}`} className="w-full">
-                    <Button className="w-full luxury-button font-semibold">
+                    <Button className="w-full luxury-button font-semibold border-gold/30 hover:border-gold hover:bg-gold/10 hover:text-gold transition-premium">
                       Configure Now
                     </Button>
                   </Link>

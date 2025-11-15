@@ -58,17 +58,20 @@ const Cart = () => {
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <div className="flex flex-col items-center gap-4">
+          <Loader2 className="h-8 w-8 animate-spin text-gold" />
+          <p className="text-muted-foreground">Loading your cart...</p>
+        </div>
       </div>
     );
   }
 
   return (
     <div className="min-h-screen bg-background">
-      <header className="border-b">
+      <header className="border-b border-gold/20 bg-background/95 backdrop-blur-sm">
         <div className="container mx-auto px-4 py-4">
           <Link to="/products">
-            <Button variant="ghost" size="sm">
+            <Button variant="ghost" size="sm" className="hover:text-gold transition-colors">
               <ArrowLeft className="mr-2 h-4 w-4" />
               Continue Shopping
             </Button>
@@ -77,18 +80,20 @@ const Cart = () => {
       </header>
 
       <div className="container mx-auto px-4 py-12">
-        <h1 className="text-3xl font-bold mb-8">Shopping Cart</h1>
+        <h1 className="text-4xl lg:text-5xl font-serif font-bold mb-8 tracking-tight">Shopping Cart</h1>
 
         {cartItems.length === 0 && savedItems.length === 0 ? (
-          <Card>
-            <CardContent className="py-12 text-center">
-              <ShoppingBag className="h-16 w-16 mx-auto mb-4 text-muted-foreground" />
-              <h2 className="text-2xl font-bold mb-2">Your cart is empty</h2>
-              <p className="text-muted-foreground mb-6">
+          <Card className="luxury-card-glass border-gold/20">
+            <CardContent className="py-16 text-center">
+              <ShoppingBag className="h-20 w-20 mx-auto mb-6 text-gold/60" />
+              <h2 className="text-3xl font-serif font-bold mb-3">Your cart is empty</h2>
+              <p className="text-muted-foreground mb-8 text-lg">
                 Start configuring products to add them to your cart
               </p>
               <Link to="/products">
-                <Button>Browse Products</Button>
+                <Button className="bg-gradient-gold text-white border-gold hover:shadow-gold-glow transition-premium" size="lg">
+                  Browse Products
+                </Button>
               </Link>
             </CardContent>
           </Card>

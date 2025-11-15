@@ -410,12 +410,73 @@ export const calculateFabricMeters = async (
 
     case "bed":
     case "kids_bed": {
-      const bedSize = configuration.bedSize || "single";
+      const bedSize = configuration.bedSize || "Double";
+      const width = configuration.dimensions?.width || 54;
+      const length = configuration.dimensions?.length || 78;
       
-      if (["single", "Single", "double", "Double", "double_xl", "Double XL"].includes(bedSize)) {
-        totalMeters = getSettingValue(settings, "fabric_bed_up_to_double_xl_mtrs", 8.0);
+      // Fetch default dimensions from DB
+      let defaultDimensions = { width: 54, length: 75 };
+      try {
+        const { data: bedSizeOption } = await supabase
+          .from("dropdown_options")
+          .select("metadata")
+          .eq("category", "bed")
+          .eq("field_name", "bed_size")
+          .eq("option_value", bedSize)
+          .eq("is_active", true)
+          .single();
+
+        if (bedSizeOption?.metadata) {
+          const metadata = parseOptionMetadata(bedSizeOption.metadata);
+          defaultDimensions = {
+            width: metadata.width_inches || defaultDimensions.width,
+            length: metadata.length_inches || defaultDimensions.length,
+          };
+        } else {
+          // Fallback
+          const fallback: Record<string, { width: number; length: number }> = {
+            Single: { width: 36, length: 72 },
+            Double: { width: 54, length: 75 },
+            Queen: { width: 60, length: 78 },
+            King: { width: 72, length: 80 },
+          };
+          defaultDimensions = fallback[bedSize] || fallback.Double;
+        }
+      } catch (error) {
+        console.warn("Error fetching bed size metadata:", error);
+        const fallback: Record<string, { width: number; length: number }> = {
+          Single: { width: 36, length: 72 },
+          Double: { width: 54, length: 75 },
+          Queen: { width: 60, length: 78 },
+          King: { width: 72, length: 80 },
+        };
+        defaultDimensions = fallback[bedSize] || fallback.Double;
+      }
+      
+      // Calculate area ratio
+      const areaRatio = (width * length) / (defaultDimensions.width * defaultDimensions.length);
+      
+      // Get base fabric meterage from product or settings
+      const isQueenOrAbove = bedSize === "Queen" || bedSize === "King";
+      let baseFabric = 0;
+      
+      if (productData) {
+        baseFabric = isQueenOrAbove
+          ? (productData.fabric_bed_queen_above_mtrs || getSettingValue(settings, "fabric_bed_queen_above_mtrs", 10.0))
+          : (productData.fabric_bed_up_to_double_xl_mtrs || getSettingValue(settings, "fabric_bed_up_to_double_xl_mtrs", 8.0));
       } else {
-        totalMeters = getSettingValue(settings, "fabric_bed_queen_above_mtrs", 10.0);
+        baseFabric = isQueenOrAbove
+          ? getSettingValue(settings, "fabric_bed_queen_above_mtrs", 10.0)
+          : getSettingValue(settings, "fabric_bed_up_to_double_xl_mtrs", 8.0);
+      }
+      
+      // Apply area ratio to base fabric
+      totalMeters = baseFabric * areaRatio;
+      
+      // Add extra fabric if specified
+      const extraFabric = Number(configuration.fabric?.extraFabricCharges || 0);
+      if (!Number.isNaN(extraFabric) && extraFabric > 0) {
+        totalMeters += extraFabric;
       }
 
       break;
@@ -797,6 +858,14 @@ export const calculateDynamicPrice = async (
                   productData.net_markup_1seater_manual ||
                   productData.strike_price_1seater_rs ||
                   productData.adjusted_bom_rs || 0;
+    } else if (category === "bed" || category === "kids_bed") {
+      // Bed category: prioritize net_price_rs (base product cost ~46k)
+      // Do NOT use bom_rs as it's for BOM calculations, not base price
+      basePrice = productData.net_price_rs || 
+                  productData.net_price || 
+                  productData.strike_price_rs ||
+                  productData.adjusted_bom_rs || 
+                  productData.bom_rs || 0;
     } else if (category === "database_pouffes") {
       // Pouffes uses net_price (not net_price_rs) as primary column
       basePrice = productData.net_price ||
@@ -1355,7 +1424,7 @@ async function calculateBedPricing(
   basePrice: number
 ): Promise<{ breakdown: PricingBreakdown; total: number }> {
   const breakdown: PricingBreakdown = {
-    basePrice: basePrice,
+    basePrice: 0,
     baseSeatPrice: 0,
     additionalSeatsPrice: 0,
     cornerSeatsPrice: 0,
@@ -1377,57 +1446,162 @@ async function calculateBedPricing(
     total: 0,
   };
 
-  let totalPrice = basePrice;
-
-  // Bed size adjustments
+  // 1. Get bed size and dimensions
   const bedSize = configuration.bedSize || "Double";
-  const sizeMultiplier = getFormulaValue(formulas, `bed_size_${bedSize.toLowerCase()}_multiplier`, 1);
-  if (sizeMultiplier !== 1) {
-    const sizeAdjustment = basePrice * (sizeMultiplier - 1);
-    breakdown.baseSeatPrice = basePrice;
-    totalPrice += sizeAdjustment;
-  } else {
-    breakdown.baseSeatPrice = basePrice;
+  const width = configuration.dimensions?.width || 54;
+  const length = configuration.dimensions?.length || 78;
+
+  // 2. Fetch default dimensions from DB metadata
+  let defaultDimensions = { width: 54, length: 75 }; // Fallback
+  try {
+    const { data: bedSizeOption } = await supabase
+      .from("dropdown_options")
+      .select("metadata")
+      .eq("category", "bed")
+      .eq("field_name", "bed_size")
+      .eq("option_value", bedSize)
+      .eq("is_active", true)
+      .single();
+
+    if (bedSizeOption?.metadata) {
+      const metadata = parseOptionMetadata(bedSizeOption.metadata);
+      defaultDimensions = {
+        width: metadata.width_inches || defaultDimensions.width,
+        length: metadata.length_inches || defaultDimensions.length,
+      };
+    } else {
+      // Fallback to hardcoded defaults
+      const fallbackDimensions: Record<string, { width: number; length: number }> = {
+        Single: { width: 36, length: 72 },
+        Double: { width: 54, length: 75 },
+        Queen: { width: 60, length: 78 },
+        King: { width: 72, length: 80 }, // Fixed: 80 not 78
+      };
+      defaultDimensions = fallbackDimensions[bedSize] || fallbackDimensions.Double;
+    }
+  } catch (error) {
+    console.warn("Error fetching bed size metadata, using fallback:", error);
+    const fallbackDimensions: Record<string, { width: number; length: number }> = {
+      Single: { width: 36, length: 72 },
+      Double: { width: 54, length: 75 },
+      Queen: { width: 60, length: 78 },
+      King: { width: 72, length: 80 },
+    };
+    defaultDimensions = fallbackDimensions[bedSize] || fallbackDimensions.Double;
   }
 
-  // Storage pricing
-  if (configuration.storage === "Yes" || configuration.storage === true) {
-    const storageCost = getFormulaValue(formulas, "storage_cost", 3000);
-    breakdown.storagePrice = storageCost;
-    totalPrice += breakdown.storagePrice;
+  // 3. Calculate area ratio
+  const areaRatio = (width * length) / (defaultDimensions.width * defaultDimensions.length);
 
-    // Storage type upgrade
-    if (configuration.storageType === "hydraulic" || configuration.storageType === "Hydraulic") {
-      const hydraulicCost = getFormulaValue(formulas, "hydraulic_storage_cost", 2000);
-      breakdown.storagePrice += hydraulicCost;
-      totalPrice += hydraulicCost;
+  // 4. Get base price (use net_price_single_no_storage_rs as reference)
+  const baseSinglePrice = productData.net_price_single_no_storage_rs || basePrice;
+  
+  // 5. Adjust base price by area ratio (not by size multipliers)
+  breakdown.basePrice = baseSinglePrice * areaRatio;
+  let totalPrice = breakdown.basePrice;
+
+  // 6. Storage pricing and fabric
+  if (configuration.storage === "Yes" || configuration.storage === true) {
+    const storageType = configuration.storageType || "Hydraulic";
+    
+    try {
+      const { data: storageOption } = await supabase
+        .from("dropdown_options")
+        .select("metadata")
+        .eq("category", "bed")
+        .eq("field_name", "storage_type")
+        .eq("option_value", storageType)
+        .eq("is_active", true)
+        .single();
+
+      if (storageOption?.metadata) {
+        const metadata = parseOptionMetadata(storageOption.metadata);
+        const storagePrice = Number(metadata.price_adjustment || metadata.price_rs || 0);
+        breakdown.storagePrice = storagePrice;
+        totalPrice += breakdown.storagePrice;
+
+        // Add storage fabric if available
+        const storageFabric = Number(metadata.fabric_mtrs || metadata.fabric || 0);
+        if (storageFabric > 0) {
+          breakdown.fabricMeters = (breakdown.fabricMeters || 0) + storageFabric;
+        }
+      } else {
+        // Fallback pricing
+        const fallbackPrices: Record<string, number> = {
+          Hydraulic: 2000,
+          Box: 1500,
+          Drawer: 2500,
+        };
+        breakdown.storagePrice = fallbackPrices[storageType] || 2000;
+        totalPrice += breakdown.storagePrice;
+      }
+    } catch (error) {
+      console.warn("Error fetching storage metadata:", error);
+      breakdown.storagePrice = 2000; // Fallback
+      totalPrice += breakdown.storagePrice;
     }
   }
 
-  // Fabric charges
+  // 7. Fabric calculation with area ratio
   const fabricMeters = await calculateFabricMeters("bed", configuration, settings, productData);
-  const fabricCode = configuration.fabric?.structureCode || configuration.fabric?.claddingPlan;
-  
-  if (fabricCode) {
-    const fabricPricePerMeter = await getFabricPrice(fabricCode);
-    breakdown.fabricCharges = fabricMeters * fabricPricePerMeter;
-    totalPrice += breakdown.fabricCharges;
+  breakdown.fabricMeters = (breakdown.fabricMeters || 0) + fabricMeters;
+
+  // Get base fabric price for upgrade calculation
+  const baseFabricPrice = getSettingValue(settings, "base_fabric_price_per_meter", 1000);
+
+  // 8. Fabric cost calculation
+  // For beds: Full fabric cost = meterage × price per meter (not upgrade charges)
+  if (configuration.fabric?.claddingPlan === "Multi Colour") {
+    // Multi-colour plan breakdown (60% Structure, 40% Headrest)
+    const structureMeters = fabricMeters * 0.60;
+    const headrestMeters = fabricMeters * 0.40;
+    
+    const structureCode = configuration.fabric?.structureCode;
+    const headrestCode = configuration.fabric?.headrestCode || configuration.fabric?.headboardCode; // Support both field names
+    
+    if (structureCode && headrestCode) {
+      const structurePrice = await getFabricPrice(structureCode);
+      const headrestPrice = await getFabricPrice(headrestCode);
+      
+      // Full fabric cost = meterage × price per meter
+      const structureCost = structureMeters * structurePrice;
+      const headrestCost = headrestMeters * headrestPrice;
+      
+      breakdown.fabricCharges = structureCost + headrestCost;
+      totalPrice += breakdown.fabricCharges;
+    }
+  } else if (configuration.fabric?.claddingPlan === "Dual Colour") {
+    // Dual colour: structure and headrest (60% structure, 40% headrest)
+    const structureMeters = fabricMeters * 0.60;
+    const headrestMeters = fabricMeters * 0.40;
+    
+    const structureCode = configuration.fabric?.structureCode;
+    const headrestCode = configuration.fabric?.headrestCode || configuration.fabric?.headboardCode;
+    
+    if (structureCode && headrestCode) {
+      const structurePrice = await getFabricPrice(structureCode);
+      const headrestPrice = await getFabricPrice(headrestCode);
+      
+      // Full fabric cost = meterage × price per meter
+      const structureCost = structureMeters * structurePrice;
+      const headrestCost = headrestMeters * headrestPrice;
+      
+      breakdown.fabricCharges = structureCost + headrestCost;
+      totalPrice += breakdown.fabricCharges;
+    }
+  } else {
+    // Single color: use structure fabric
+    const fabricCode = configuration.fabric?.structureCode;
+    if (fabricCode) {
+      const fabricPricePerMeter = await getFabricPrice(fabricCode);
+      // Full fabric cost = meterage × price per meter
+      breakdown.fabricCharges = fabricMeters * fabricPricePerMeter;
+      totalPrice += breakdown.fabricCharges;
+    }
   }
 
-  breakdown.fabricMeters = fabricMeters;
-
-  breakdown.fabricMeters = fabricMeters;
-
-  breakdown.fabricMeters = fabricMeters;
-
-  breakdown.fabricMeters = fabricMeters;
-
-  breakdown.fabricMeters = fabricMeters;
-
-  breakdown.fabricMeters = fabricMeters;
-
-  // Accessories (legs)
-  if (configuration.legType || configuration.legsCode) {
+  // 9. Legs pricing
+  if (configuration.legsCode || configuration.legType) {
     const legCode = configuration.legsCode || configuration.legType;
     const { data: leg } = await supabase
       .from("legs_prices")
@@ -1435,20 +1609,33 @@ async function calculateBedPricing(
       .eq("description", legCode)
       .eq("is_active", true)
       .single();
-
-    if (leg && leg.price_per_unit) {
-      breakdown.accessoriesPrice = leg.price_per_unit || 0;
+    
+    if (leg?.price_per_unit) {
+      breakdown.accessoriesPrice = leg.price_per_unit;
       totalPrice += breakdown.accessoriesPrice;
     }
   }
 
+  // 10. Apply wastage/delivery/GST (if available in productData)
+  const wastagePercent = productData.wastage_delivery_gst_percent || 0;
+  if (wastagePercent > 0) {
+    const wastageAmount = totalPrice * (wastagePercent / 100);
+    totalPrice += wastageAmount;
+  }
+
+  // 11. Apply markup (if available in productData)
+  const markupPercent = productData.markup_percent || 0;
+  if (markupPercent > 0) {
+    const markupAmount = totalPrice * (markupPercent / 100);
+    totalPrice += markupAmount;
+  }
+
   breakdown.subtotal = totalPrice;
 
-  // Discount
+  // 12. Apply discount
   if (configuration.discount?.code) {
-    const discountKey = `discount_${configuration.discount.code.toLowerCase()}`;
-    const discountPercent = getFormulaValue(formulas, discountKey, 0);
-    breakdown.discountAmount = (totalPrice * discountPercent) / 100;
+    const discountPercent = productData.discount_percent || getFormulaValue(formulas, `discount_${configuration.discount.code.toLowerCase()}`, 0);
+    breakdown.discountAmount = totalPrice * (discountPercent / 100);
     totalPrice -= breakdown.discountAmount;
   }
 

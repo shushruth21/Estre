@@ -69,6 +69,19 @@ export default {
           DEFAULT: "hsl(var(--info))",
           foreground: "hsl(var(--info-foreground))",
         },
+        gold: {
+          DEFAULT: "hsl(var(--gold-primary))",
+          light: "hsl(var(--gold-light))",
+          dark: "hsl(var(--gold-dark))",
+        },
+      },
+      spacing: {
+        "luxury-1": "0.25rem", /* 4px */
+        "luxury-2": "0.5rem", /* 8px */
+        "luxury-3": "0.75rem", /* 12px */
+        "luxury-5": "1.25rem", /* 20px */
+        "luxury-7": "1.75rem", /* 28px */
+        "luxury-10": "2.5rem", /* 40px */
       },
       borderRadius: {
         lg: "var(--radius)",
@@ -92,10 +105,39 @@ export default {
             height: "0",
           },
         },
+        "fade-in": {
+          from: {
+            opacity: "0",
+          },
+          to: {
+            opacity: "1",
+          },
+        },
+        "slide-up": {
+          from: {
+            opacity: "0",
+            transform: "translateY(20px)",
+          },
+          to: {
+            opacity: "1",
+            transform: "translateY(0)",
+          },
+        },
+        "gold-glow": {
+          "0%, 100%": {
+            boxShadow: "0 0 10px hsl(var(--gold-primary) / 0.3)",
+          },
+          "50%": {
+            boxShadow: "0 0 20px hsl(var(--gold-primary) / 0.6)",
+          },
+        },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
+        "fade-in": "fade-in 0.6s ease-out",
+        "slide-up": "slide-up 0.5s ease-out",
+        "gold-glow": "gold-glow 2s ease-in-out infinite",
       },
     },
   },

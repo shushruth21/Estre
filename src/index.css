@@ -60,10 +60,18 @@ All colors MUST be HSL.
     --info: 200 85% 50%;
     --info-foreground: 0 0% 100%;
     
-    /* Gradients - Emerald Essence */
+    /* Gold Color Palette - Luxury Accents */
+    --gold-primary: 45 85% 55%; /* #D4AF37 - Brushed Gold */
+    --gold-light: 45 60% 75%; /* #E8D5A3 - Light Gold */
+    --gold-dark: 45 75% 40%; /* #B8941F - Dark Gold */
+    --gold-gradient: linear-gradient(135deg, hsl(45 85% 55%) 0%, hsl(45 75% 40%) 100%);
+    
+    /* Gradients - Emerald Essence with Gold */
     --gradient-primary: linear-gradient(135deg, hsl(150 60% 8%) 0%, hsl(140 25% 25%) 100%);
     --gradient-accent: linear-gradient(135deg, hsl(90 40% 90%) 0%, hsl(140 25% 25%) 100%);
     --gradient-hero: linear-gradient(135deg, hsl(150 60% 8%) 0%, hsl(140 25% 25%) 50%, hsl(90 40% 90%) 100%);
+    --gradient-gold: linear-gradient(135deg, hsl(45 85% 55%) 0%, hsl(45 75% 40%) 100%);
+    --gradient-luxury: linear-gradient(135deg, hsl(150 60% 8%) 0%, hsl(45 85% 55%) 100%);
     
     /* Shadows - Premium Luxury */
     --shadow-sm: 0 1px 2px 0 rgb(13 43 29 / 0.05);
@@ -128,11 +136,21 @@ All colors MUST be HSL.
   body {
     @apply bg-background text-foreground antialiased;
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    letter-spacing: 0.01em;
+    line-height: 1.6;
   }
   
   h1, h2, h3, h4, h5, h6 {
     @apply font-bold tracking-tight;
     font-family: 'Playfair Display', 'Georgia', serif;
+    letter-spacing: -0.02em;
+    line-height: 1.2;
+  }
+  
+  /* Luxury Typography */
+  .font-luxury {
+    font-family: 'Cormorant Garamond', 'Playfair Display', 'Georgia', serif;
+    letter-spacing: 0.05em;
   }
   
   h1 {
@@ -159,6 +177,43 @@ All colors MUST be HSL.
   
   .gradient-hero {
     background: var(--gradient-hero);
+  }
+  
+  .gradient-gold {
+    background: var(--gradient-gold);
+  }
+  
+  .gradient-luxury {
+    background: var(--gradient-luxury);
+  }
+  
+  /* Gold Accent Utilities */
+  .text-gold {
+    color: hsl(var(--gold-primary));
+  }
+  
+  .bg-gold {
+    background-color: hsl(var(--gold-primary));
+  }
+  
+  .border-gold {
+    border-color: hsl(var(--gold-primary));
+  }
+  
+  .text-gold-light {
+    color: hsl(var(--gold-light));
+  }
+  
+  .bg-gold-light {
+    background-color: hsl(var(--gold-light));
+  }
+  
+  .text-gold-dark {
+    color: hsl(var(--gold-dark));
+  }
+  
+  .bg-gold-dark {
+    background-color: hsl(var(--gold-dark));
   }
   
   .shadow-premium {

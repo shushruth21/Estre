@@ -13,6 +13,7 @@ import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { FabricLibrary } from "@/components/ui/FabricLibrary";
+import { SummaryTile } from "@/components/ui/SummaryTile";
 
 interface DiningChairConfiguratorProps {
   product: any;
@@ -568,18 +569,25 @@ const DiningChairConfigurator = ({
         <TabsContent value="summary" className="space-y-6">
           <Card className="border-2">
             <CardHeader>
-              <CardTitle className="text-2xl font-serif">Pricing Summary</CardTitle>
-              <CardDescription>Review totals, discounts, and invoice amount.</CardDescription>
+              <CardTitle className="text-2xl font-serif">Summary</CardTitle>
+              <CardDescription>Live pricing snapshot based on current selections.</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="grid gap-3 sm:grid-cols-2">
-                <SummaryRow label="Base Price" value={basePrice} />
-                <SummaryRow label="Fabric Upgrade" value={fabricUpgradeCharges} />
-                <SummaryRow label="Extra Fabric Cost" value={extraFabricCost} />
-                <SummaryRow label="Total Invoice Value" value={totalInvoiceValue} highlight />
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                <SummaryTile label="Base Price" value={formatCurrency(basePrice)} />
+                <SummaryTile label="Fabric Upgrade" value={formatCurrency(fabricUpgradeCharges)} />
+                <SummaryTile label="Extra Fabric Cost" value={formatCurrency(extraFabricCost)} />
+                <SummaryTile label="Total Invoice Value" value={formatCurrency(totalInvoiceValue)} />
               </div>
 
               <Separator />
+
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-muted-foreground">Net Invoice Value</p>
+                  <p className="text-2xl font-serif">{formatCurrency(totalInvoiceValue)}</p>
+                </div>
+              </div>
 
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="space-y-2">
@@ -683,11 +691,6 @@ const DiningChairConfigurator = ({
   );
 };
 
-const SummaryRow = ({ label, value, highlight }: { label: string; value: number; highlight?: boolean }) => (
-  <div className="rounded-md border bg-background p-3">
-    <p className="text-xs text-muted-foreground">{label}</p>
-    <p className={`text-sm font-semibold ${highlight ? "text-primary" : ""}`}>₹{value.toFixed(2)}</p>
-  </div>
-);
+const formatCurrency = (value: number) => `₹${Math.round(value).toLocaleString()}`;
 
 export default DiningChairConfigurator;

@@ -22,36 +22,36 @@ export const CartSummary = ({
   const balanceAmount = total - advanceAmount;
 
   return (
-    <Card className="sticky top-4">
+    <Card className="sticky top-4 luxury-card-glass border-gold/20">
       <CardHeader>
-        <CardTitle>Order Summary</CardTitle>
+        <CardTitle className="text-2xl font-serif font-bold">Order Summary</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="space-y-3">
           <div className="flex justify-between text-sm">
             <span className="text-muted-foreground">Subtotal</span>
-            <span>₹{Math.round(subtotal).toLocaleString()}</span>
+            <span className="font-medium">₹{Math.round(subtotal).toLocaleString()}</span>
           </div>
           
           {discount > 0 && (
             <div className="flex justify-between text-sm">
               <span className="text-muted-foreground">Discount</span>
-              <span className="text-success">-₹{Math.round(discount).toLocaleString()}</span>
+              <span className="text-gold font-semibold">-₹{Math.round(discount).toLocaleString()}</span>
             </div>
           )}
           
-          <Separator />
+          <Separator className="border-gold/20" />
           
           <div className="flex justify-between font-semibold text-lg">
-            <span>Total</span>
-            <span className="text-primary">₹{Math.round(total).toLocaleString()}</span>
+            <span className="font-serif">Total</span>
+            <span className="text-gold font-serif text-xl">₹{Math.round(total).toLocaleString()}</span>
           </div>
         </div>
         
-        <div className="bg-muted rounded-lg p-4 space-y-2">
+        <div className="bg-gold/5 border border-gold/20 rounded-lg p-4 space-y-2">
           <div className="flex justify-between text-sm">
             <span className="text-muted-foreground">Advance ({advancePercent}%)</span>
-            <span className="font-medium">₹{Math.round(advanceAmount).toLocaleString()}</span>
+            <span className="font-medium text-gold">₹{Math.round(advanceAmount).toLocaleString()}</span>
           </div>
           <div className="flex justify-between text-sm">
             <span className="text-muted-foreground">Balance on delivery</span>
@@ -61,7 +61,7 @@ export const CartSummary = ({
 
         <Button 
           onClick={onCheckout} 
-          className="w-full" 
+          className="w-full luxury-button bg-gradient-gold text-white border-gold hover:shadow-gold-glow transition-premium" 
           size="lg"
           disabled={checkoutDisabled}
         >

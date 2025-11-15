@@ -30,6 +30,7 @@ const Configure = () => {
   const [configuration, setConfiguration] = useState<any>({});
   const [pricing, setPricing] = useState<any>(null);
   const [isCalculating, setIsCalculating] = useState(false);
+  const [isAddingToCart, setIsAddingToCart] = useState(false);
 
   const { data: product, isLoading: loadingProduct } = useQuery({
     queryKey: ["product", productId],
@@ -103,6 +104,8 @@ const Configure = () => {
       return;
     }
 
+    setIsAddingToCart(true);
+
     // Save to customer_orders table
     try {
       const { error } = await supabase.from("customer_orders").insert({
@@ -125,11 +128,14 @@ const Configure = () => {
 
       navigate("/cart");
     } catch (error: any) {
+      console.error("Add to cart error:", error);
       toast({
         title: "Error",
-        description: error.message,
+        description: error.message || "Failed to add item to cart. Please try again.",
         variant: "destructive",
       });
+    } finally {
+      setIsAddingToCart(false);
     }
   };
 
@@ -295,6 +301,7 @@ const Configure = () => {
                   isCalculating={isCalculating}
                   onAddToCart={handleAddToCart}
                   configuration={configuration}
+                  isAddingToCart={isAddingToCart}
                 />
               </div>
             </div>

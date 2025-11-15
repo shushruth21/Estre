@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/ui/separator";
 import FabricSelector from "./FabricSelector";
+import { SummaryTile } from "@/components/ui/SummaryTile";
 
 interface CinemaChairConfiguratorProps {
   product: any;
@@ -1083,31 +1084,26 @@ const CinemaChairConfigurator = ({
           <CardDescription>Live pricing snapshot based on current selections.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
-          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-            <SummaryRow label="Base Model" value={formatCurrency(baseModelPrice)} />
-            <SummaryRow label="Mechanism" value={formatCurrency(mechanismCost)} />
-            <SummaryRow label="Consoles" value={formatCurrency(consoleBasePrice + consoleAccessoryPrice)} />
-            <SummaryRow label="Armrest Accessories" value={formatCurrency(armrestAccessoriesTotal)} />
-            <SummaryRow label="Fabric Upgrade" value={formatCurrency(fabricUpgradeCharges)} />
-            <SummaryRow label="Total Fabric (m)" value={`${totalFabricMeters.toFixed(1)} m`} />
-            <SummaryRow label="Seat/Backrest Fabric" value={`${seatBackrestMeters.toFixed(1)} m`} />
-            <SummaryRow label="Structure/Armrest Fabric" value={`${structureMeters.toFixed(1)} m`} />
-            <SummaryRow label="Approx Width" value={`${approxOverallWidth}"`} />
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            <SummaryTile label="Base Model" value={formatCurrency(baseModelPrice)} />
+            <SummaryTile label="Mechanism" value={formatCurrency(mechanismCost)} />
+            <SummaryTile label="Consoles" value={formatCurrency(consoleBasePrice + consoleAccessoryPrice)} />
+            <SummaryTile label="Armrest Accessories" value={formatCurrency(armrestAccessoriesTotal)} />
+            <SummaryTile label="Fabric Upgrade" value={formatCurrency(fabricUpgradeCharges)} />
+            <SummaryTile label="Total Fabric (m)" value={`${totalFabricMeters.toFixed(1)} m`} />
+            <SummaryTile label="Seat/Backrest Fabric" value={`${seatBackrestMeters.toFixed(1)} m`} />
+            <SummaryTile label="Structure/Armrest Fabric" value={`${structureMeters.toFixed(1)} m`} />
+            <SummaryTile label="Approx Width" value={`${approxOverallWidth}"`} />
           </div>
 
-          <Separator className="my-3" />
+          <Separator />
 
-          <div className="flex flex-wrap items-center justify-between gap-4">
-            <div className="space-y-1">
+          <div className="flex items-center justify-between">
+            <div>
               <p className="text-sm text-muted-foreground">Net Invoice Value</p>
-              <p className="text-2xl font-semibold">{formatCurrency(netInvoiceValue)}</p>
+              <p className="text-2xl font-serif">{formatCurrency(netInvoiceValue)}</p>
             </div>
-            {discountAmount > 0 && (
-              <Badge variant="destructive" className="text-sm">
-                Discount Applied: {formatCurrency(discountAmount)}
-              </Badge>
-            )}
-            <Badge variant="secondary" className="text-sm">
+            <Badge variant="secondary" className="px-4 py-2 text-sm">
               Seats: {seatCount} • Consoles: {activeConsolePlacements.length}
             </Badge>
           </div>
@@ -1117,11 +1113,5 @@ const CinemaChairConfigurator = ({
   );
 };
 
-const SummaryRow = ({ label, value }: { label: string; value: string }) => (
-  <div className="rounded-md border bg-background p-3">
-    <p className="text-xs text-muted-foreground">{label}</p>
-    <p className="text-sm font-semibold">{value}</p>
-  </div>
-);
 
 export default CinemaChairConfigurator;

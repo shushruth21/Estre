@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/ui/separator";
 import { FabricLibrary } from "@/components/ui/FabricLibrary";
+import { SummaryTile } from "@/components/ui/SummaryTile";
 
 interface PouffeConfiguratorProps {
   product: any;
@@ -802,52 +803,33 @@ const PouffeConfigurator = ({
       </Card>
 
       {/* Summary */}
-      <Card>
+      <Card className="border-2">
         <CardHeader>
-          <CardTitle>Summary</CardTitle>
+          <CardTitle className="text-2xl font-serif">Summary</CardTitle>
+          <CardDescription>Live pricing snapshot based on current selections.</CardDescription>
         </CardHeader>
-        <CardContent>
-          <div className="space-y-2 text-sm">
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Base Price:</span>
-              <span className="font-medium">{formatCurrency(basePrice)}</span>
-            </div>
-            {depthUpgradeCharge > 0 && (
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Depth Upgrade:</span>
-                <span className="font-medium">{formatCurrency(depthUpgradeCharge)}</span>
-              </div>
-            )}
-            {widthUpgradeCharge > 0 && (
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Width Upgrade:</span>
-                <span className="font-medium">{formatCurrency(widthUpgradeCharge)}</span>
-              </div>
-            )}
-            {fabricUpgradeCharges > 0 && (
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Fabric Upgrade:</span>
-                <span className="font-medium">{formatCurrency(fabricUpgradeCharges)}</span>
-              </div>
-            )}
-            <Separator />
-            <div className="flex justify-between font-semibold">
-              <span>Total Invoice:</span>
-              <span>{formatCurrency(totalInvoiceValue)}</span>
-            </div>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            <SummaryTile label="Base Price" value={formatCurrency(basePrice)} />
+            <SummaryTile label="Depth Upgrade" value={formatCurrency(depthUpgradeCharge)} />
+            <SummaryTile label="Width Upgrade" value={formatCurrency(widthUpgradeCharge)} />
+            <SummaryTile label="Fabric Upgrade" value={formatCurrency(fabricUpgradeCharges)} />
+            <SummaryTile label="Total Invoice" value={formatCurrency(totalInvoiceValue)} />
             {discountAmount > 0 && (
-              <>
-                <div className="flex justify-between text-green-600">
-                  <span>Discount:</span>
-                  <span>-{formatCurrency(discountAmount)}</span>
-                </div>
-                <Separator />
-                <div className="flex justify-between font-semibold text-lg">
-                  <span>Net Invoice:</span>
-                  <span>{formatCurrency(netInvoiceValue)}</span>
-                </div>
-              </>
+              <SummaryTile label="Discount" value={`-${formatCurrency(discountAmount)}`} />
             )}
+          </div>
+
+          <Separator />
+
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-muted-foreground">Net Invoice Value</p>
+              <p className="text-2xl font-serif">{formatCurrency(netInvoiceValue)}</p>
+            </div>
+            <Badge variant="secondary" className="px-4 py-2 text-sm">
+              Width: {getBaseWidth(configuration.seatWidth || "22 in")}"
+            </Badge>
           </div>
         </CardContent>
       </Card>

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { supabaseAdmin, isServiceRoleConfigured } from "@/integrations/supabase/adminClient";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -29,8 +30,9 @@ import {
 } from "@/components/ui/select";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Trash2, Shield, UserPlus, Loader2 } from "lucide-react";
+import { Trash2, Shield, UserPlus, Loader2, AlertCircle } from "lucide-react";
 import { AdminLayout } from "@/components/admin/AdminLayout";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 type AppRole = 'admin' | 'store_manager' | 'production_manager' | 'sales_executive' | 'factory_staff' | 'customer';
 
@@ -64,6 +66,8 @@ const AdminUsers = () => {
 
       return data.users as User[];
     },
+    enabled: isServiceRoleConfigured,
+    retry: false,
   });
 
   // Create new user mutation using edge function
@@ -189,9 +193,21 @@ const AdminUsers = () => {
     await assignRoleMutation.mutateAsync({ userId, role: newRole });
   };
 
+  const adminApiAvailable = isServiceRoleConfigured;
+
   return (
     <AdminLayout>
       <div className="space-y-6">
+        {!adminApiAvailable && (
+          <Alert variant="destructive">
+            <AlertCircle className="h-4 w-4" />
+            <AlertTitle>Service role key required</AlertTitle>
+            <AlertDescription>
+              Creating or deleting users requires configuring <code>VITE_SUPABASE_SERVICE_ROLE_KEY</code> with your Supabase service role key.
+              This key should only be used in trusted admin environments.
+            </AlertDescription>
+          </Alert>
+        )}
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold">User Management</h1>
@@ -201,7 +217,7 @@ const AdminUsers = () => {
           </div>
           <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
             <DialogTrigger asChild>
-              <Button>
+              <Button disabled={!adminApiAvailable}>
                 <UserPlus className="mr-2 h-4 w-4" />
                 Add New User
               </Button>
@@ -282,7 +298,11 @@ const AdminUsers = () => {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            {isLoading ? (
+            {!adminApiAvailable ? (
+              <div className="flex flex-col items-center justify-center py-12 text-center text-muted-foreground">
+                <p>Configure the Supabase service role key to view and manage users from the admin portal.</p>
+              </div>
+            ) : isLoading ? (
               <div className="flex items-center justify-center py-8">
                 <Loader2 className="h-6 w-6 animate-spin text-primary" />
               </div>

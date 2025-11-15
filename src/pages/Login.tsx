@@ -39,10 +39,12 @@ const Login = () => {
             } else if (userRole === 'factory_staff') {
               navigate("/staff/job-cards", { replace: true });
             } else {
-              navigate("/", { replace: true });
+              // Customer role - redirect to customer dashboard
+              navigate("/dashboard", { replace: true });
             }
           } else {
-            navigate("/", { replace: true });
+            // No role found - treat as customer and redirect to customer dashboard
+            navigate("/dashboard", { replace: true });
           }
         });
     }
@@ -122,7 +124,7 @@ const Login = () => {
       }
 
       // Determine redirect path based on roles
-      let redirectPath = "/";
+      let redirectPath = "/dashboard"; // Default to customer dashboard
       
       if (rolesData && rolesData.length > 0) {
         const userRole = rolesData[0].role;
@@ -131,16 +133,19 @@ const Login = () => {
           redirectPath = "/admin/dashboard";
         } else if (userRole === 'factory_staff') {
           redirectPath = "/staff/job-cards";
+          console.log("✅ Staff role detected, redirecting to:", redirectPath);
+        } else {
+          // Customer role - redirect to customer dashboard
+          redirectPath = "/dashboard";
+          console.log("✅ Customer role detected, redirecting to customer dashboard");
         }
       } else {
-        toast({
-          title: "No Role Assigned",
-          description: "Your account doesn't have a role assigned. Please contact an administrator.",
-          variant: "destructive",
-        });
+        // No role found - treat as customer and redirect to customer dashboard
+        console.log("ℹ️ No role found, treating as customer and redirecting to customer dashboard");
+        redirectPath = "/dashboard";
       }
       
-      // Redirect to appropriate dashboard
+      // Always redirect immediately (use window.location for reliability)
       window.location.href = redirectPath;
     } catch (error: any) {
       console.error("Login error:", error);

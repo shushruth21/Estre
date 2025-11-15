@@ -19,6 +19,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Download, Info, Loader2, Square, LayoutGrid } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { generateAllConsolePlacements as generateConsolePlacementsUtil, calculateMaxConsoles } from "@/lib/console-validation";
+import { SummaryTile } from "@/components/ui/SummaryTile";
 
 const SECTION_ACTIVATION: Record<"STANDARD" | "L SHAPE" | "U SHAPE" | "COMBO", Record<string, boolean>> = {
   STANDARD: { F: true, L1: false, L2: false, R1: false, R2: false, C1: false, C2: false },
@@ -1069,8 +1070,10 @@ const SofaBedConfigurator = ({
 
     const allowedBySection = consolePlacementMeta.allowedBySection;
 
-    const sanitizePlacement = (placement: any) => {
+    const sanitized = placements.map((placement: any) => {
       const normalizedSection = normalizeConsoleSection(placement?.section);
+      const afterSeat = extractAfterSeat(placement);
+
       if (!normalizedSection) {
         return {
           section: null,
@@ -1081,19 +1084,7 @@ const SofaBedConfigurator = ({
       }
 
       const allowedForSection = allowedBySection.get(normalizedSection);
-      if (!allowedForSection || allowedForSection.size === 0) {
-        return {
-          section: null,
-          position: "none",
-          afterSeat: null,
-          accessoryId: null,
-        };
-      }
-
-      const afterSeat = extractAfterSeat(placement);
-      const valueKey = allowedForSection.get(afterSeat);
-
-      if (!valueKey) {
+      if (!allowedForSection || !allowedForSection.has(afterSeat)) {
         return {
           section: null,
           position: "none",
@@ -1108,35 +1099,19 @@ const SofaBedConfigurator = ({
         afterSeat,
         accessoryId: placement?.accessoryId ?? null,
       };
-    };
-
-    const sanitized = placements.map(sanitizePlacement);
+    });
 
     const seenBySection = new Map<string, Set<number>>();
-    let changed = false;
-
     const deduped = sanitized.map((placement) => {
       if (!placement || placement.position === "none") {
         return placement;
       }
 
-      const section = placement.section;
-      const afterSeat = placement.afterSeat || 0;
-      const allowedForSection = allowedBySection.get(section || "");
-
-      if (!section || !allowedForSection?.has(afterSeat)) {
-        changed = true;
-        return {
-          section: null,
-          position: "none",
-          afterSeat: null,
-          accessoryId: null,
-        };
-      }
-
+      const section = placement.section!;
+      const afterSeat = placement.afterSeat!;
       const usedSlots = seenBySection.get(section) || new Set<number>();
+
       if (usedSlots.has(afterSeat)) {
-        changed = true;
         return {
           section: null,
           position: "none",
@@ -1150,39 +1125,38 @@ const SofaBedConfigurator = ({
       return placement;
     });
 
-    const normalizedExisting = placements.map((placement) => ({
-      section: normalizeConsoleSection(placement?.section),
-      position: typeof placement?.position === "string" ? placement.position : "none",
-      afterSeat: extractAfterSeat(placement) || null,
-      accessoryId: placement?.accessoryId ?? null,
-    }));
+    const placementsChanged =
+      placements.length !== deduped.length ||
+      placements.some((placement, index) => {
+        const current = deduped[index];
+        if (!current) return true;
 
-    const normalizedSanitized = deduped.map((placement) => ({
-      section: placement.section,
-      position: placement.position,
-      afterSeat: placement.afterSeat,
-      accessoryId: placement.accessoryId ?? null,
-    }));
+        const normalizedSection = normalizeConsoleSection(placement?.section);
+        const afterSeat = extractAfterSeat(placement);
+        const normalizedPosition =
+          typeof placement?.position === "string" ? placement.position : "none";
+        const accessoryId = placement?.accessoryId ?? null;
 
-    const normalizedExistingString = JSON.stringify(normalizedExisting);
-    const normalizedSanitizedString = JSON.stringify(normalizedSanitized);
-
-    const activeCount = deduped.filter((placement) => placement.position !== "none").length;
-    const currentQuantity = configuration.console?.quantity || 0;
-
-    if (normalizedExistingString !== normalizedSanitizedString || currentQuantity !== activeCount || changed) {
-      updateConfiguration({
-        console: {
-          ...configuration.console,
-          placements: deduped,
-          quantity: activeCount,
-        },
+        return (
+          normalizedSection !== current.section ||
+          afterSeat !== current.afterSeat ||
+          normalizedPosition !== current.position ||
+          accessoryId !== current.accessoryId
+        );
       });
-    }
+
+    if (!placementsChanged) return;
+
+    updateConfiguration({
+      console: {
+        ...configuration.console,
+        placements: deduped,
+      },
+    });
   }, [
-    configuration.console,
+    configuration.console?.required,
+    configuration.console?.placements,
     consolePlacementMeta.allowedBySection,
-    consolePlacements.length,
     extractAfterSeat,
     normalizeConsoleSection,
     updateConfiguration,
@@ -1419,15 +1393,7 @@ const SofaBedConfigurator = ({
     consoleValidationSummary.globalCount,
   ]);
 
-  const SummaryTile = useCallback(
-    ({ label, value }: { label: string; value: string }) => (
-      <div className="rounded-xl border border-muted bg-muted/40 p-4">
-        <p className="text-xs uppercase tracking-wide text-muted-foreground">{label}</p>
-        <p className="mt-1 text-base font-semibold text-foreground">{value}</p>
-      </div>
-    ),
-    []
-  );
+  // SummaryTile is now imported from @/components/ui/SummaryTile
 
   // Show loading state
   if (isLoadingDropdowns && (!shapes || shapes.length === 0)) {
@@ -1477,21 +1443,37 @@ const SofaBedConfigurator = ({
                       const shapeLower = shapeValue.toLowerCase();
                       if (shapeLower.includes("l-shape") || shapeLower.includes("l shape")) {
                         return (
-                          <div className="relative w-12 h-12">
-                            <Square className="w-8 h-8 absolute top-0 left-0" />
-                            <Square className="w-6 h-6 absolute bottom-0 right-0" />
-                          </div>
+                          <img 
+                            src="/shape-icons/l-sectionals.svg" 
+                            alt="L-Sectionals" 
+                            className="w-16 h-16 object-contain"
+                            onError={(e) => {
+                              e.currentTarget.style.display = 'none';
+                            }}
+                          />
                         );
                       } else if (shapeLower.includes("u-shape") || shapeLower.includes("u shape")) {
                         return (
-                          <div className="relative w-12 h-12">
-                            <Square className="w-6 h-6 absolute top-0 left-0" />
-                            <Square className="w-8 h-8 absolute top-0 right-0" />
-                            <Square className="w-6 h-6 absolute bottom-0 right-0" />
-                          </div>
+                          <img 
+                            src="/shape-icons/u-sectionals.svg" 
+                            alt="U-Sectionals" 
+                            className="w-16 h-16 object-contain"
+                            onError={(e) => {
+                              e.currentTarget.style.display = 'none';
+                            }}
+                          />
                         );
                       } else if (shapeLower.includes("combo")) {
-                        return <LayoutGrid className="w-12 h-12" />;
+                        return (
+                          <img 
+                            src="/shape-icons/u-sectionals.svg" 
+                            alt="Combo Modules" 
+                            className="w-16 h-16 object-contain"
+                            onError={(e) => {
+                              e.currentTarget.style.display = 'none';
+                            }}
+                          />
+                        );
                       } else {
                         return <Square className="w-12 h-12" />;
                       }
@@ -3116,7 +3098,7 @@ const SofaBedConfigurator = ({
           <CardDescription>Live pricing snapshot based on current selections.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             <SummaryTile label="Base Model" value={formatCurrency(summaryData.basePriceValue)} />
             <SummaryTile label="Mechanism" value={formatCurrency(summaryData.mechanismPrice)} />
             <SummaryTile label="Consoles" value={formatCurrency(summaryData.consolePrice)} />
@@ -3132,10 +3114,6 @@ const SofaBedConfigurator = ({
               value={`${summaryData.seatBackrestFabric > 0 ? summaryData.seatBackrestFabric.toFixed(1) : "0.0"} m`}
             />
             <SummaryTile
-              label="Lounger Fabric"
-              value={`${summaryData.loungerFabric > 0 ? summaryData.loungerFabric.toFixed(1) : "0.0"} m`}
-            />
-            <SummaryTile
               label="Structure/Armrest Fabric"
               value={`${summaryData.structureFabric > 0 ? summaryData.structureFabric.toFixed(1) : "0.0"} m`}
             />
@@ -3144,7 +3122,7 @@ const SofaBedConfigurator = ({
 
           <Separator />
 
-          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-muted-foreground">Net Invoice Value</p>
               <p className="text-2xl font-serif">{formatCurrency(summaryData.netInvoice)}</p>

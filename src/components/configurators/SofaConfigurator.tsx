@@ -530,26 +530,42 @@ const SofaConfigurator = ({
                     const currentNormalizedShape = normalizeShape(configuration.shape || '');
                     const isSelected = currentNormalizedShape === normalizedShapeValue;
                     
-                    // Icon based on shape type
+                    // Icon based on shape type - using provided shape icons
                     const getShapeIcon = () => {
                       const shapeLower = shapeValue.toLowerCase();
                       if (shapeLower.includes("l-shape") || shapeLower.includes("l shape")) {
                         return (
-                          <div className="relative w-12 h-12">
-                            <Square className="w-8 h-8 absolute top-0 left-0" />
-                            <Square className="w-6 h-6 absolute bottom-0 right-0" />
-                          </div>
+                          <img 
+                            src="/shape-icons/l-sectionals.svg" 
+                            alt="L-Sectionals" 
+                            className="w-16 h-16 object-contain"
+                            onError={(e) => {
+                              e.currentTarget.style.display = 'none';
+                            }}
+                          />
                         );
                       } else if (shapeLower.includes("u-shape") || shapeLower.includes("u shape")) {
                         return (
-                          <div className="relative w-12 h-12">
-                            <Square className="w-6 h-6 absolute top-0 left-0" />
-                            <Square className="w-8 h-8 absolute top-0 right-0" />
-                            <Square className="w-6 h-6 absolute bottom-0 right-0" />
-                          </div>
+                          <img 
+                            src="/shape-icons/u-sectionals.svg" 
+                            alt="U-Sectionals" 
+                            className="w-16 h-16 object-contain"
+                            onError={(e) => {
+                              e.currentTarget.style.display = 'none';
+                            }}
+                          />
                         );
                       } else if (shapeLower.includes("combo")) {
-                        return <LayoutGrid className="w-12 h-12" />;
+                        return (
+                          <img 
+                            src="/shape-icons/u-sectionals.svg" 
+                            alt="Combo Modules" 
+                            className="w-16 h-16 object-contain"
+                            onError={(e) => {
+                              e.currentTarget.style.display = 'none';
+                            }}
+                          />
+                        );
                       } else {
                         return <Square className="w-12 h-12" />;
                       }

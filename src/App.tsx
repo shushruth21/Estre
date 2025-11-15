@@ -26,6 +26,7 @@ import StaffJobCards from "./pages/staff/StaffJobCards";
 import StaffJobCardDetail from "./pages/staff/StaffJobCardDetail";
 import SaleOrder from "./pages/SaleOrder";
 import NotFound from "./pages/NotFound";
+import { FloatingCTA } from "@/components/ui/FloatingCTA";
 
 // Configure QueryClient with better error handling
 const queryClient = new QueryClient({
@@ -116,6 +117,8 @@ const App = () => (
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
+        {/* Floating CTA - only on customer-facing pages */}
+        <FloatingCTA />
           </ErrorBoundary>
       </BrowserRouter>
     </TooltipProvider>

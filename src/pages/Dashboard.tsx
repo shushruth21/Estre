@@ -156,19 +156,19 @@ const Dashboard = () => {
     return (
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
-          <h2 className="text-3xl font-bold">
+          <h2 className="text-3xl lg:text-4xl font-serif font-bold tracking-tight">
             Welcome back, {user.user_metadata?.full_name || user.email}!
           </h2>
-          <p className="text-muted-foreground">
+          <p className="text-muted-foreground text-lg mt-2">
             Track your orders and monitor production updates in real time.
           </p>
         </div>
         <div className="flex gap-3">
-          <Button variant="outline" onClick={() => navigate("/products")}>
+          <Button variant="outline" onClick={() => navigate("/products")} className="border-gold/30 hover:border-gold hover:text-gold transition-colors">
             <Package className="mr-2 h-4 w-4" />
             Browse Products
           </Button>
-          <Button onClick={handleLogout} variant="outline">
+          <Button onClick={handleLogout} variant="outline" className="border-gold/30 hover:border-gold hover:text-gold transition-colors">
             <LogOut className="mr-2 h-4 w-4" />
             Logout
           </Button>
@@ -180,18 +180,21 @@ const Dashboard = () => {
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <div className="flex flex-col items-center gap-4">
+          <Loader2 className="h-8 w-8 animate-spin text-gold" />
+          <p className="text-muted-foreground">Loading your dashboard...</p>
+        </div>
       </div>
     );
   }
 
   return (
     <div className="min-h-screen bg-background">
-      <header className="border-b">
+      <header className="border-b border-gold/20 bg-background/95 backdrop-blur-sm">
         <div className="container mx-auto px-4 py-6">
           <div className="flex items-center justify-between">
-            <h1 className="text-2xl font-bold">Customer Dashboard</h1>
-            <Button variant="ghost" onClick={() => navigate("/orders")}>
+            <h1 className="text-3xl lg:text-4xl font-serif font-bold tracking-tight">Customer Dashboard</h1>
+            <Button variant="ghost" onClick={() => navigate("/orders")} className="hover:text-gold transition-colors">
               <ShoppingCart className="mr-2 h-4 w-4" />
               View All Orders
             </Button>
@@ -203,19 +206,23 @@ const Dashboard = () => {
         {dashboardHeader}
 
         {ordersState.orders.length === 0 ? (
-          <Card>
+          <Card className="luxury-card-glass border-gold/20">
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <ClipboardList className="h-5 w-5" />
+              <CardTitle className="flex items-center gap-2 text-2xl font-serif">
+                <ClipboardList className="h-6 w-6 text-gold" />
                 No orders yet
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <p className="text-muted-foreground">
+            <CardContent className="space-y-6 py-6">
+              <p className="text-muted-foreground text-lg">
                 Configure your first product to see live production updates and
                 delivery timelines here.
               </p>
-              <Button onClick={() => navigate("/products")}>
+              <Button 
+                onClick={() => navigate("/products")}
+                className="bg-gradient-gold text-white border-gold hover:shadow-gold-glow transition-premium"
+                size="lg"
+              >
                 Start Configuring
               </Button>
             </CardContent>
@@ -223,14 +230,14 @@ const Dashboard = () => {
         ) : (
           <div className="space-y-6">
             {ordersState.orders.map((order) => (
-              <Card key={order.id} className="border-muted/60 shadow-sm">
+              <Card key={order.id} className="luxury-card-glass border-gold/20 hover:border-gold/40 transition-premium">
                 <CardHeader>
                   <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                     <div>
-                      <CardTitle className="text-xl">
+                      <CardTitle className="text-2xl font-serif">
                         Order {order.order_number}
                       </CardTitle>
-                      <p className="text-sm text-muted-foreground">
+                      <p className="text-sm text-muted-foreground mt-1">
                         Placed on{" "}
                         {order.created_at
                           ? new Date(order.created_at).toLocaleDateString()
@@ -238,10 +245,10 @@ const Dashboard = () => {
                       </p>
                     </div>
                     <div className="flex flex-col items-start md:items-end gap-2">
-                      <Badge className="uppercase tracking-wide">
+                      <Badge className="uppercase tracking-wide border-gold/30 bg-gold/10 text-gold">
                         {order.status?.replace(/_/g, " ") || "PENDING"}
                       </Badge>
-                      <p className="text-sm text-muted-foreground">
+                      <p className="text-sm font-semibold text-gold">
                         Total: {formatCurrency(order.net_total_rs)}
                       </p>
                     </div>
