@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Package, MapPin, Calendar, Edit } from "lucide-react";
 import { format } from "date-fns";
+import { DiscountCodeSelector } from "@/components/DiscountCodeSelector";
 
 interface ReviewStepProps {
   cartItems: any[];
@@ -13,11 +14,13 @@ interface ReviewStepProps {
   specialInstructions?: string;
   subtotal: number;
   discount: number;
+  discountCode?: string;
   total: number;
   advanceAmount: number;
   termsAccepted: boolean;
   onTermsChange: (accepted: boolean) => void;
   onEditDelivery: () => void;
+  onApplyDiscount?: (code: string) => void;
 }
 
 export const ReviewStep = ({
@@ -27,11 +30,13 @@ export const ReviewStep = ({
   specialInstructions,
   subtotal,
   discount,
+  discountCode,
   total,
   advanceAmount,
   termsAccepted,
   onTermsChange,
   onEditDelivery,
+  onApplyDiscount,
 }: ReviewStepProps) => {
   return (
     <div className="space-y-6">
@@ -96,6 +101,21 @@ export const ReviewStep = ({
         </CardContent>
       </Card>
 
+      {/* Discount Code Section */}
+      {!discountCode && onApplyDiscount && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Apply Discount Code</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <DiscountCodeSelector
+              onApply={onApplyDiscount}
+              showLabel={false}
+            />
+          </CardContent>
+        </Card>
+      )}
+
       <Card>
         <CardHeader>
           <CardTitle>Payment Summary</CardTitle>
@@ -107,10 +127,10 @@ export const ReviewStep = ({
               <span>₹{Math.round(subtotal).toLocaleString()}</span>
             </div>
             
-            {discount > 0 && (
+            {discountCode && discount > 0 && (
               <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Discount</span>
-                <span className="text-success">-₹{Math.round(discount).toLocaleString()}</span>
+                <span className="text-muted-foreground">Discount ({discountCode})</span>
+                <span className="text-green-600 font-semibold">-₹{Math.round(discount).toLocaleString()}</span>
               </div>
             )}
             

@@ -53,7 +53,7 @@ const Signup = () => {
     setIsLoading(true);
 
     try {
-      const { error } = await supabase.auth.signUp({
+      const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: {
@@ -65,6 +65,27 @@ const Signup = () => {
       });
 
       if (error) throw error;
+
+      // Create profile with customer role (trigger will also handle this, but explicit is better)
+      if (data.user) {
+        try {
+          const { error: profileError } = await supabase
+            .from("profiles")
+            .insert({
+              user_id: data.user.id,
+              full_name: fullName.trim(),
+              role: "customer",
+            });
+
+          if (profileError && profileError.code !== "23505") {
+            // Ignore duplicate key errors (trigger might have already created it)
+            console.error("Error creating profile:", profileError);
+          }
+        } catch (profileErr) {
+          console.error("Error creating profile:", profileErr);
+          // Continue anyway - trigger should handle it
+        }
+      }
 
       toast({
         title: "Success",

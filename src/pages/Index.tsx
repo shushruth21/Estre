@@ -39,31 +39,32 @@ const Index = () => {
         // Wait for roles to load
         await new Promise(resolve => setTimeout(resolve, 800));
         
-        // Re-fetch roles to ensure they're loaded
-        const { data: rolesData } = await supabase
-          .from("user_roles")
+        // Fetch role from profiles table
+        const { data: profile } = await supabase
+          .from("profiles")
           .select("role")
-          .eq("user_id", user.id);
+          .eq("user_id", user.id)
+          .single();
         
         if (import.meta.env.DEV) {
-          console.log("🔍 Index.tsx: User roles:", rolesData);
+          console.log("🔍 Index.tsx: User profile:", profile);
         }
         
-        if (rolesData && rolesData.length > 0) {
-          const userRole = rolesData[0].role;
+        if (profile) {
+          const userRole = profile.role;
           if (import.meta.env.DEV) {
             console.log("🎯 Index.tsx: User role detected:", userRole);
           }
           
-          if (userRole === 'admin' || userRole === 'store_manager' || userRole === 'production_manager') {
+          if (isAdmin() || userRole === 'admin') {
             if (import.meta.env.DEV) {
-              console.log("🚀 Index.tsx: Redirecting admin/manager to dashboard");
+              console.log("🚀 Index.tsx: Redirecting admin to dashboard");
             }
             window.location.href = "/admin/dashboard";
             return;
           }
           
-          if (userRole === 'factory_staff') {
+          if (userRole === 'staff') {
             if (import.meta.env.DEV) {
               console.log("🚀 Index.tsx: Redirecting staff to job cards");
             }
@@ -75,7 +76,7 @@ const Index = () => {
 
       checkAndRedirect();
     }
-  }, [user, loading]);
+  }, [user, loading, isAdmin]);
   const categories = [
     {
       icon: Sofa,

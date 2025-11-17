@@ -1,11 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/useAuth";
+import { useRealtimeOrders } from "@/hooks/useRealtimeOrders";
 import {
   Loader2,
   LogOut,
@@ -14,6 +16,8 @@ import {
   ClipboardList,
   Clock,
   Truck,
+  Tag,
+  Eye,
 } from "lucide-react";
 
 const formatCurrency = (value: number | null | undefined) => {
@@ -27,43 +31,29 @@ const emptyOrderState = {
 };
 
 const Dashboard = () => {
-  const [user, setUser] = useState<any>(null);
+  const { user, profile, loading: authLoading } = useAuth();
   const [ordersState, setOrdersState] = useState(emptyOrderState);
-  const [isAuthenticating, setIsAuthenticating] = useState(true);
   const navigate = useNavigate();
   const { toast } = useToast();
 
+  // Get order IDs for realtime subscriptions
+  const orderIds = useMemo(() => {
+    return ordersState.orders.map((order) => order.id);
+  }, [ordersState.orders]);
+
+  // Set up realtime subscriptions
+  useRealtimeOrders({ orderIds, enabled: orderIds.length > 0 });
+
   useEffect(() => {
-    const checkUser = async () => {
-      const {
-        data: { user },
-        error,
-      } = await supabase.auth.getUser();
-
-      if (error) {
-        console.error("Error fetching user:", error);
-        toast({
-          title: "Authentication Error",
-          description: "We could not verify your session. Please log in again.",
-          variant: "destructive",
-        });
-        navigate("/login");
-        return;
-      }
-
+    if (!authLoading) {
       if (!user) {
         navigate("/login");
         return;
       }
-
-      setUser(user);
-      setIsAuthenticating(false);
-      await fetchOrders(user);
-    };
-
-    checkUser();
+      fetchOrders(user);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [navigate]);
+  }, [user, authLoading, navigate]);
 
   const fetchOrders = async (currentUser: any) => {
     setOrdersState((prev) => ({ ...prev, isLoading: true }));
@@ -71,7 +61,7 @@ const Dashboard = () => {
     const { data: orders, error } = await supabase
       .from("orders")
       .select(
-        "id, order_number, status, expected_delivery_date, net_total_rs, advance_amount_rs, balance_amount_rs, created_at, metadata"
+        "id, order_number, status, expected_delivery_date, net_total_rs, advance_amount_rs, balance_amount_rs, discount_code, discount_amount_rs, subtotal_rs, created_at, metadata, delivery_method, delivery_date"
       )
       .eq("customer_id", currentUser.id)
       .order("created_at", { ascending: false });
@@ -149,15 +139,15 @@ const Dashboard = () => {
     navigate("/");
   };
 
-  const isLoading = isAuthenticating || ordersState.isLoading;
+  const isLoading = authLoading || ordersState.isLoading;
 
   const dashboardHeader = useMemo(() => {
-    if (!user) return null;
+    if (!user || !profile) return null;
     return (
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
           <h2 className="text-3xl lg:text-4xl font-serif font-bold tracking-tight">
-            Welcome back, {user.user_metadata?.full_name || user.email}!
+            Welcome back, {profile.full_name || user.email}!
           </h2>
           <p className="text-muted-foreground text-lg mt-2">
             Track your orders and monitor production updates in real time.
@@ -175,7 +165,7 @@ const Dashboard = () => {
         </div>
       </div>
     );
-  }, [navigate, user]);
+  }, [navigate, user, profile]);
 
   if (isLoading) {
     return (
@@ -245,16 +235,60 @@ const Dashboard = () => {
                       </p>
                     </div>
                     <div className="flex flex-col items-start md:items-end gap-2">
-                      <Badge className="uppercase tracking-wide border-gold/30 bg-gold/10 text-gold">
+                      <Badge 
+                        className={`uppercase tracking-wide ${
+                          order.status === 'delivered' ? 'bg-green-500/10 text-green-600 border-green-500/30' :
+                          order.status === 'shipped' ? 'bg-blue-500/10 text-blue-600 border-blue-500/30' :
+                          order.status === 'ready_for_delivery' ? 'bg-purple-500/10 text-purple-600 border-purple-500/30' :
+                          order.status === 'production' ? 'bg-orange-500/10 text-orange-600 border-orange-500/30' :
+                          order.status === 'confirmed' ? 'bg-cyan-500/10 text-cyan-600 border-cyan-500/30' :
+                          'bg-yellow-500/10 text-yellow-600 border-yellow-500/30'
+                        }`}
+                      >
                         {order.status?.replace(/_/g, " ") || "PENDING"}
                       </Badge>
-                      <p className="text-sm font-semibold text-gold">
-                        Total: {formatCurrency(order.net_total_rs)}
-                      </p>
+                      <div className="text-right">
+                        {order.discount_code && (
+                          <div className="flex items-center gap-1 text-xs text-muted-foreground mb-1">
+                            <Tag className="h-3 w-3" />
+                            <span>Code: {order.discount_code}</span>
+                            {order.discount_amount_rs > 0 && (
+                              <span className="text-green-600">
+                                (-{formatCurrency(order.discount_amount_rs)})
+                              </span>
+                            )}
+                          </div>
+                        )}
+                        <p className="text-sm font-semibold text-gold">
+                          Total: {formatCurrency(order.net_total_rs)}
+                        </p>
+                        {order.subtotal_rs && order.subtotal_rs !== order.net_total_rs && (
+                          <p className="text-xs text-muted-foreground line-through">
+                            {formatCurrency(order.subtotal_rs)}
+                          </p>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <div>
+                      <p className="text-xs font-semibold uppercase text-muted-foreground">
+                        Sale Order Number
+                      </p>
+                      <p className="text-lg font-semibold font-mono">
+                        {order.order_number || `SO-${order.id.slice(0, 8).toUpperCase()}`}
+                      </p>
+                    </div>
+                    <Link to={`/orders/${order.id}`}>
+                      <Button variant="outline" size="sm">
+                        <Eye className="mr-2 h-4 w-4" />
+                        View Details
+                      </Button>
+                    </Link>
+                  </div>
+
                   <div className="grid gap-4 md:grid-cols-3">
                     <div>
                       <p className="text-xs font-semibold uppercase text-muted-foreground">
@@ -278,12 +312,17 @@ const Dashboard = () => {
                         Expected Delivery
                       </p>
                       <p className="text-lg font-semibold">
-                        {order.expected_delivery_date
+                        {order.expected_delivery_date || order.delivery_date
                           ? new Date(
-                              order.expected_delivery_date
+                              order.expected_delivery_date || order.delivery_date
                             ).toLocaleDateString()
                           : "TBD"}
                       </p>
+                      {order.delivery_method && (
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Via {order.delivery_method}
+                        </p>
+                      )}
                     </div>
                   </div>
 

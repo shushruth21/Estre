@@ -88,6 +88,13 @@ const navigationGroups: { title: string; items: NavItem[] }[] = [
       { name: "Reports", href: "/admin/reports", icon: BarChart3 },
     ],
   },
+  {
+    title: "System Settings",
+    items: [
+      { name: "Discount Codes", href: "/admin/discount-codes", icon: Tag },
+      { name: "Settings", href: "/admin/settings", icon: Settings },
+    ],
+  },
 ];
 
 export function AdminLayout({ children }: AdminLayoutProps) {

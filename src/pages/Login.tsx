@@ -21,29 +21,34 @@ const Login = () => {
   // Redirect if already logged in
   useEffect(() => {
     if (!authLoading && user) {
-      // Check roles and redirect appropriately
+      // Check role from profiles table and redirect appropriately
       supabase
-        .from("user_roles")
+        .from("profiles")
         .select("role")
         .eq("user_id", user.id)
-        .then(({ data: roles, error }) => {
+        .single()
+        .then(({ data: profile, error }) => {
           if (error) {
             if (import.meta.env.DEV) {
-              console.error("❌ Error fetching roles in useEffect:", error);
+              console.error("❌ Error fetching profile in useEffect:", error);
             }
+            // Default to customer dashboard if profile not found
+            navigate("/dashboard", { replace: true });
+            return;
           }
-          if (roles && roles.length > 0) {
-            const userRole = roles[0].role;
-            if (isAdmin() || userRole === 'admin' || userRole === 'store_manager' || userRole === 'production_manager') {
+          
+          if (profile) {
+            const userRole = profile.role;
+            if (isAdmin() || userRole === 'admin') {
               navigate("/admin/dashboard", { replace: true });
-            } else if (userRole === 'factory_staff') {
+            } else if (userRole === 'staff') {
               navigate("/staff/job-cards", { replace: true });
             } else {
               // Customer role - redirect to customer dashboard
               navigate("/dashboard", { replace: true });
             }
           } else {
-            // No role found - treat as customer and redirect to customer dashboard
+            // No profile found - treat as customer and redirect to customer dashboard
             navigate("/dashboard", { replace: true });
           }
         });
@@ -77,15 +82,16 @@ const Login = () => {
         throw new Error("Login failed. Please try again.");
       }
 
-      // Fetch user roles to determine redirect
-      const { data: roles, error: rolesError } = await supabase
-        .from("user_roles")
+      // Fetch user role from profiles table to determine redirect
+      const { data: profile, error: profileError } = await supabase
+        .from("profiles")
         .select("role")
-        .eq("user_id", data.user.id);
+        .eq("user_id", data.user.id)
+        .single();
 
-      if (rolesError) {
+      if (profileError) {
         if (import.meta.env.DEV) {
-          console.warn("Error fetching roles:", rolesError);
+          console.warn("Error fetching profile:", profileError);
         }
       }
 
@@ -97,56 +103,21 @@ const Login = () => {
       // Wait for session to be fully established
       await new Promise(resolve => setTimeout(resolve, 300));
 
-      // Fetch roles using the security definer function for reliability
-      let rolesData = null;
-
-      try {
-        const { data: adminCheck } = await supabase
-          .rpc('is_admin_or_manager', { _user_id: data.user.id });
-        
-        if (adminCheck) {
-          rolesData = [{ role: 'admin' }];
-        } else {
-          const { data: staffCheck } = await supabase
-            .rpc('has_role', { 
-              _user_id: data.user.id,
-              _role: 'factory_staff'
-            });
-          
-          if (staffCheck) {
-            rolesData = [{ role: 'factory_staff' }];
-          }
-        }
-      } catch (error) {
-        if (import.meta.env.DEV) {
-          console.error("Error checking roles:", error);
-        }
-      }
-
-      // Determine redirect path based on roles
+      // Determine redirect based on role from profile
+      const userRole = profile?.role || 'customer';
       let redirectPath = "/dashboard"; // Default to customer dashboard
       
-      if (rolesData && rolesData.length > 0) {
-        const userRole = rolesData[0].role;
-        
-        if (userRole === 'admin' || userRole === 'store_manager' || userRole === 'production_manager') {
-          redirectPath = "/admin/dashboard";
-        } else if (userRole === 'factory_staff') {
-          redirectPath = "/staff/job-cards";
-          console.log("✅ Staff role detected, redirecting to:", redirectPath);
-        } else {
-          // Customer role - redirect to customer dashboard
-          redirectPath = "/dashboard";
-          console.log("✅ Customer role detected, redirecting to customer dashboard");
-        }
+      if (isAdmin() || userRole === 'admin') {
+        redirectPath = "/admin/dashboard";
+      } else if (userRole === 'staff') {
+        redirectPath = "/staff/job-cards";
       } else {
-        // No role found - treat as customer and redirect to customer dashboard
-        console.log("ℹ️ No role found, treating as customer and redirecting to customer dashboard");
+        // Customer role - redirect to customer dashboard
         redirectPath = "/dashboard";
       }
       
-      // Always redirect immediately (use window.location for reliability)
-      window.location.href = redirectPath;
+      // Redirect to appropriate dashboard
+      navigate(redirectPath, { replace: true });
     } catch (error: any) {
       console.error("Login error:", error);
       

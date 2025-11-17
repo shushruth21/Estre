@@ -6,6 +6,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
+import { AuthProvider } from "@/context/AuthContext";
 import Index from "./pages/Index";
 import Products from "./pages/Products";
 import Configure from "./pages/Configure";
@@ -15,6 +16,10 @@ import Orders from "./pages/Orders";
 import Login from "./pages/Login";
 import Signup from "./pages/Signup";
 import Dashboard from "./pages/Dashboard";
+import OrderDetail from "./pages/OrderDetail";
+import StaffOrders from "./pages/staff/StaffOrders";
+import AdminDiscountCodes from "./pages/admin/AdminDiscountCodes";
+import AdminSettings from "./pages/admin/AdminSettings";
 import AdminDashboard from "./pages/admin/AdminDashboard";
 import AdminProducts from "./pages/admin/AdminProducts";
 import AdminDropdowns from "./pages/admin/AdminDropdowns";
@@ -47,10 +52,11 @@ const App = () => (
   <ErrorBoundary>
   <ThemeProvider attribute="class" defaultTheme="light" enableSystem>
     <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <Toaster />
-        <Sonner />
-        <BrowserRouter>
+      <AuthProvider>
+        <TooltipProvider>
+          <Toaster />
+          <Sonner />
+          <BrowserRouter>
             <ErrorBoundary>
           <Routes>
           <Route path="/" element={<Index />} />
@@ -63,7 +69,16 @@ const App = () => (
           <Route path="/sale-order/:orderId/:itemId" element={<SaleOrder />} />
           <Route path="/login" element={<Login />} />
           <Route path="/signup" element={<Signup />} />
-          <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/dashboard" element={
+            <ProtectedRoute requiredRole="customer">
+              <Dashboard />
+            </ProtectedRoute>
+          } />
+          <Route path="/orders/:id" element={
+            <ProtectedRoute requiredRole="customer">
+              <OrderDetail />
+            </ProtectedRoute>
+          } />
           
           {/* Admin Routes - Protected */}
           <Route path="/admin/dashboard" element={
@@ -96,20 +111,35 @@ const App = () => (
               <AdminUsers />
             </ProtectedRoute>
           } />
+          <Route path="/admin/discount-codes" element={
+            <ProtectedRoute requiredRole="admin">
+              <AdminDiscountCodes />
+            </ProtectedRoute>
+          } />
+          <Route path="/admin/settings" element={
+            <ProtectedRoute requiredRole="admin">
+              <AdminSettings />
+            </ProtectedRoute>
+          } />
           
           {/* Staff Routes - Protected */}
           <Route path="/staff/dashboard" element={
-            <ProtectedRoute requiredRole="factory_staff">
+            <ProtectedRoute requiredRole="staff">
               <StaffDashboard />
             </ProtectedRoute>
           } />
+          <Route path="/staff/orders" element={
+            <ProtectedRoute requiredRole="staff">
+              <StaffOrders />
+            </ProtectedRoute>
+          } />
           <Route path="/staff/job-cards" element={
-            <ProtectedRoute requiredRole="factory_staff">
+            <ProtectedRoute requiredRole="staff">
               <StaffJobCards />
             </ProtectedRoute>
           } />
           <Route path="/staff/job-cards/:id" element={
-            <ProtectedRoute requiredRole="factory_staff">
+            <ProtectedRoute requiredRole="staff">
               <StaffJobCardDetail />
             </ProtectedRoute>
           } />
@@ -121,8 +151,9 @@ const App = () => (
         <FloatingCTA />
           </ErrorBoundary>
       </BrowserRouter>
-    </TooltipProvider>
-  </QueryClientProvider>
+        </TooltipProvider>
+      </AuthProvider>
+    </QueryClientProvider>
   </ThemeProvider>
   </ErrorBoundary>
 );

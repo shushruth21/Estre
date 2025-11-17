@@ -53,36 +53,128 @@ const AdminUsers = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  // Fetch all users with their roles using edge function
+  // Fetch all users with their roles using edge function (if available) or fallback to profiles
   const { data: users, isLoading } = useQuery({
     queryKey: ["admin-users"],
     queryFn: async () => {
-      const { data, error } = await supabase.functions.invoke('admin-list-users');
-      
-      if (error) {
-        console.error("Error fetching users:", error);
-        throw error;
+      // Try edge function first (if available)
+      if (isServiceRoleConfigured) {
+        try {
+          const { data, error } = await supabase.functions.invoke('admin-list-users');
+          
+          if (!error && data?.users) {
+            // Map edge function response to include role from profiles
+            const userIds = data.users.map((u: any) => u.id);
+            const { data: profiles } = await supabase
+              .from("profiles")
+              .select("user_id, role")
+              .in("user_id", userIds);
+
+            const profileMap = new Map(
+              (profiles || []).map((p: any) => [p.user_id, p.role])
+            );
+
+            return data.users.map((user: any) => ({
+              ...user,
+              roles: profileMap.has(user.id) ? [profileMap.get(user.id)] : ['customer'],
+            })) as User[];
+          }
+        } catch (e) {
+          console.warn("Edge function not available, falling back to profiles:", e);
+        }
       }
 
-      return data.users as User[];
+      // Fallback: Fetch profiles and try to get user info
+      const { data: profiles, error: profilesError } = await supabase
+        .from("profiles")
+        .select("*")
+        .order("created_at", { ascending: false });
+
+      if (profilesError) {
+        console.error("Error fetching profiles:", profilesError);
+        throw profilesError;
+      }
+
+      // Map profiles to User interface
+      // Note: Without edge function, we can't get email for all users
+      // In production, add email to profiles table or use edge function
+      return (profiles || []).map((profile: any) => ({
+        id: profile.user_id,
+        email: profile.full_name || `User ${profile.user_id.slice(0, 8)}`, // Fallback
+        created_at: profile.created_at,
+        email_confirmed_at: null,
+        roles: [profile.role] as AppRole[],
+      })) as User[];
     },
-    enabled: isServiceRoleConfigured,
     retry: false,
   });
 
-  // Create new user mutation using edge function
+  // Create new user mutation using edge function (with profile role creation)
   const createUserMutation = useMutation({
     mutationFn: async (userData: { email: string; password: string; role: AppRole }) => {
-      const { data, error } = await supabase.functions.invoke('admin-create-user', {
-        body: userData,
-      });
+      let result;
+      
+      // Try edge function first
+      if (isServiceRoleConfigured) {
+        try {
+          const { data, error } = await supabase.functions.invoke('admin-create-user', {
+            body: userData,
+          });
 
-      if (error) {
-        console.error("Error creating user:", error);
-        throw new Error(error.message || "Failed to create user");
+          if (error) {
+            throw new Error(error.message || "Failed to create user");
+          }
+
+          result = data;
+        } catch (e: any) {
+          console.error("Edge function error:", e);
+          throw new Error(e.message || "Failed to create user via edge function");
+        }
+      } else {
+        // Fallback: Create user via signup (requires email confirmation)
+        const { data: signupData, error: signupError } = await supabase.auth.signUp({
+          email: userData.email,
+          password: userData.password,
+        });
+
+        if (signupError || !signupData.user) {
+          throw new Error(signupError?.message || "Failed to create user");
+        }
+
+        // Create profile with role
+        const { error: profileError } = await supabase
+          .from("profiles")
+          .insert({
+            user_id: signupData.user.id,
+            role: userData.role,
+            full_name: userData.email.split("@")[0], // Use email prefix as name
+          });
+
+        if (profileError && profileError.code !== "23505") {
+          console.error("Error creating profile:", profileError);
+          // Continue anyway - trigger should handle it
+        }
+
+        result = { user: signupData.user };
       }
 
-      return data;
+      // Ensure profile exists with correct role (upsert to handle edge function case)
+      if (result?.user?.id) {
+        const { error: profileError } = await supabase
+          .from("profiles")
+          .upsert({
+            user_id: result.user.id,
+            role: userData.role,
+          }, {
+            onConflict: "user_id",
+          });
+
+        if (profileError && profileError.code !== "23505") {
+          console.warn("Error updating profile role:", profileError);
+        }
+      }
+
+      return result;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin-users"] });
@@ -133,14 +225,36 @@ const AdminUsers = () => {
     },
   });
 
-  // Assign role mutation using edge function
+  // Assign role mutation - update profiles table
   const assignRoleMutation = useMutation({
     mutationFn: async ({ userId, role }: { userId: string; role: AppRole }) => {
-      const { data, error } = await supabase.functions.invoke('admin-update-user-role', {
-        body: { userId, role },
-      });
+      // Update profile role
+      const { data, error } = await supabase
+        .from("profiles")
+        .update({ role })
+        .eq("user_id", userId)
+        .select()
+        .single();
 
       if (error) {
+        // If profile doesn't exist, create it
+        if (error.code === "PGRST116") {
+          const { data: newProfile, error: createError } = await supabase
+            .from("profiles")
+            .insert({
+              user_id: userId,
+              role,
+            })
+            .select()
+            .single();
+
+          if (createError) {
+            throw new Error(createError.message || "Failed to create profile");
+          }
+
+          return newProfile;
+        }
+
         throw new Error(error.message || "Failed to update role");
       }
 
@@ -148,6 +262,7 @@ const AdminUsers = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin-users"] });
+      queryClient.invalidateQueries({ queryKey: ["user"] }); // Invalidate auth context
       toast({
         title: "Role Updated",
         description: "User role has been updated successfully",

@@ -11,6 +11,7 @@ import { ReviewStep } from "@/components/checkout/ReviewStep";
 import { PaymentStep } from "@/components/checkout/PaymentStep";
 import { calculateDynamicPrice } from "@/lib/dynamic-pricing";
 import { generateSaleOrderData } from "@/lib/sale-order-generator";
+import { DiscountCodeSelector } from "@/components/DiscountCodeSelector";
 
 const STEPS = [
   { id: 1, name: "Delivery", description: "Shipping details" },
@@ -34,6 +35,8 @@ const Checkout = () => {
   const [specialInstructions, setSpecialInstructions] = useState("");
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState("card");
+  const [discountCode, setDiscountCode] = useState<string>("");
+  const [discountAmount, setDiscountAmount] = useState<number>(0);
 
   const { data: user } = useQuery({
     queryKey: ["user"],
@@ -68,6 +71,7 @@ const Checkout = () => {
 
       const orderNumber = `ORD-${Date.now()}`;
       const subtotal = cartItems.reduce((sum, item) => sum + (item.calculated_price || 0), 0);
+      const netTotal = subtotal - discountAmount;
 
       const { data: order, error: orderError } = await supabase
         .from("orders")
@@ -81,13 +85,15 @@ const Checkout = () => {
           expected_delivery_date: expectedDeliveryDate?.toISOString().split('T')[0],
           special_instructions: specialInstructions,
           subtotal_rs: subtotal,
-          net_total_rs: subtotal,
+          discount_code: discountCode || null,
+          discount_amount_rs: discountAmount,
+          net_total_rs: netTotal,
           status: "pending",
           payment_status: "pending",
           payment_method: paymentMethod,
           advance_percent: 50,
-          advance_amount_rs: subtotal * 0.5,
-          balance_amount_rs: subtotal * 0.5,
+          advance_amount_rs: netTotal * 0.5,
+          balance_amount_rs: netTotal * 0.5,
           terms_accepted: termsAccepted,
           terms_accepted_at: new Date().toISOString(),
         })
@@ -253,8 +259,78 @@ const Checkout = () => {
     },
   });
 
+  // Handle discount code application
+  const handleApplyDiscount = async (code: string) => {
+    try {
+      // Fetch discount code details
+      const { data: discountData, error: discountError } = await supabase
+        .from("discount_codes")
+        .select("*")
+        .eq("code", code)
+        .eq("is_active", true)
+        .single();
+
+      if (discountError || !discountData) {
+        toast({
+          title: "Invalid Discount Code",
+          description: "The discount code is invalid or inactive.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Check if code has expired
+      if (discountData.expires_at && new Date(discountData.expires_at) < new Date()) {
+        toast({
+          title: "Expired Discount Code",
+          description: "This discount code has expired.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Check max usage
+      if (discountData.max_usage && (discountData.usage_count || 0) >= discountData.max_usage) {
+        toast({
+          title: "Discount Code Limit Reached",
+          description: "This discount code has reached its maximum usage limit.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Calculate discount amount
+      const subtotal = cartItems?.reduce((sum, item) => sum + (item.calculated_price || 0), 0) || 0;
+      let calculatedDiscount = 0;
+
+      if (discountData.type === "percent") {
+        calculatedDiscount = (subtotal * discountData.percent) / 100;
+      } else {
+        calculatedDiscount = discountData.value || 0;
+      }
+
+      setDiscountCode(code);
+      setDiscountAmount(calculatedDiscount);
+
+      toast({
+        title: "Discount Applied",
+        description: `Discount code ${code} applied successfully. Discount: ₹${Math.round(calculatedDiscount).toLocaleString()}`,
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error Applying Discount",
+        description: error.message || "Failed to apply discount code",
+        variant: "destructive",
+      });
+    }
+  };
+
   const isDeliveryValid = deliveryAddress.street && deliveryAddress.city && 
                           deliveryAddress.state && deliveryAddress.pincode;
+  
+  const subtotal = cartItems?.reduce((sum, item) => sum + (item.calculated_price || 0), 0) || 0;
+  const total = subtotal - discountAmount;
+  const advanceAmount = total * 0.5;
 
   const handleNext = () => {
     if (currentStep === 1 && !isDeliveryValid) {
@@ -333,16 +409,18 @@ const Checkout = () => {
 
           {currentStep === 2 && (
             <ReviewStep
-              cartItems={cartItems}
+              cartItems={cartItems || []}
               deliveryAddress={deliveryAddress}
               expectedDeliveryDate={expectedDeliveryDate}
               specialInstructions={specialInstructions}
               subtotal={subtotal}
-              discount={discount}
+              discount={discountAmount}
+              discountCode={discountCode}
               total={total}
               advanceAmount={advanceAmount}
               termsAccepted={termsAccepted}
               onTermsChange={setTermsAccepted}
+              onApplyDiscount={handleApplyDiscount}
               onEditDelivery={() => setCurrentStep(1)}
             />
           )}
