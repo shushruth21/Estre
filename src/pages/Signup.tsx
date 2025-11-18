@@ -53,6 +53,11 @@ const Signup = () => {
     setIsLoading(true);
 
     try {
+      // Get the current origin, fallback to localhost:8080 for development
+      const redirectUrl = typeof window !== 'undefined' 
+        ? `${window.location.origin}/` 
+        : 'http://localhost:8080/';
+      
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
@@ -60,7 +65,7 @@ const Signup = () => {
           data: {
             full_name: fullName.trim(),
           },
-          emailRedirectTo: `${window.location.origin}/`,
+          emailRedirectTo: redirectUrl,
         },
       });
 
@@ -71,18 +76,24 @@ const Signup = () => {
         try {
           const { error: profileError } = await supabase
             .from("profiles")
-            .insert({
+            .upsert({
               user_id: data.user.id,
               full_name: fullName.trim(),
               role: "customer",
+            }, {
+              onConflict: "user_id"
             });
 
-          if (profileError && profileError.code !== "23505") {
-            // Ignore duplicate key errors (trigger might have already created it)
-            console.error("Error creating profile:", profileError);
+          if (profileError) {
+            if (import.meta.env.DEV) {
+              console.error("Error creating/updating profile:", profileError);
+            }
+            // Don't throw - trigger should handle it, but log for debugging
           }
         } catch (profileErr) {
-          console.error("Error creating profile:", profileErr);
+          if (import.meta.env.DEV) {
+            console.error("Error creating profile:", profileErr);
+          }
           // Continue anyway - trigger should handle it
         }
       }

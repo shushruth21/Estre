@@ -691,43 +691,6 @@ export const calculateFabricMeters = async (
         totalMeters += pillowQuantity * pillowFabricMeters;
       }
 
-      break;
-    }
-    
-    case "recliner": {
-      // Recliner fabric calculation (similar to sofa)
-      const sections = configuration.sections || configuration.basic_recliner?.sections || {};
-      
-      // Helper to parse seat count
-      const parseSeatCount = (seaterType: string): number => {
-        if (!seaterType) return 0;
-        const lower = seaterType.toLowerCase();
-        if (lower.includes("4-seater")) return 4;
-        if (lower.includes("3-seater")) return 3;
-        if (lower.includes("2-seater")) return 2;
-        if (lower.includes("1-seater")) return 1;
-        return 0;
-      };
-
-      // Calculate total seats from sections
-      let totalSeats = 0;
-      if (sections.front) {
-        totalSeats += parseSeatCount(sections.front);
-      }
-      if (sections.left_l2) {
-        totalSeats += parseSeatCount(sections.left_l2);
-      }
-
-      // First recliner: 6.0 meters (or from settings)
-      const firstReclinerMeters = getSettingValue(settings, "fabric_first_recliner_mtrs", 6.0);
-      totalMeters += firstReclinerMeters;
-
-      // Additional seats: +3.5 meters per seat (or from settings)
-      if (totalSeats > 1) {
-        const additionalSeatMeters = getSettingValue(settings, "fabric_additional_seat_mtrs", 3.5);
-        totalMeters += (totalSeats - 1) * additionalSeatMeters;
-      }
-
       // Pillow fabric - Get from pillow_size metadata (fabric_matrix)
       if (configuration.additionalPillows?.required === "Yes" || configuration.additionalPillows?.required === true) {
         const pillowType = configuration.additionalPillows?.type || "Simple pillow";

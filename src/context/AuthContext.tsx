@@ -74,7 +74,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             .single();
 
           if (createError) {
-            console.error("Error creating profile:", createError);
+            if (import.meta.env.DEV) {
+              console.error("Error creating profile:", createError);
+            }
             setProfile(null);
             return;
           }
@@ -83,14 +85,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           return;
         }
 
-        console.error("Error fetching profile:", error);
+        if (import.meta.env.DEV) {
+          console.error("Error fetching profile:", error);
+        }
         setProfile(null);
         return;
       }
 
       setProfile(data as Profile);
     } catch (error) {
-      console.error("Error in fetchProfile:", error);
+      if (import.meta.env.DEV) {
+        console.error("Error in fetchProfile:", error);
+      }
       setProfile(null);
     }
   };

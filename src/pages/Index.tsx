@@ -11,7 +11,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useQuery } from "@tanstack/react-query";
 
 const Index = () => {
-  const { user, isAdmin, loading, userRoles } = useAuth();
+  const { user, role, loading } = useAuth();
   const navigate = useNavigate();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
@@ -56,7 +56,7 @@ const Index = () => {
             console.log("🎯 Index.tsx: User role detected:", userRole);
           }
           
-          if (isAdmin() || userRole === 'admin') {
+          if (userRole === 'admin' || role === 'admin') {
             if (import.meta.env.DEV) {
               console.log("🚀 Index.tsx: Redirecting admin to dashboard");
             }
@@ -64,7 +64,7 @@ const Index = () => {
             return;
           }
           
-          if (userRole === 'staff') {
+          if (userRole === 'staff' || role === 'staff') {
             if (import.meta.env.DEV) {
               console.log("🚀 Index.tsx: Redirecting staff to job cards");
             }
@@ -76,7 +76,7 @@ const Index = () => {
 
       checkAndRedirect();
     }
-  }, [user, loading, isAdmin]);
+  }, [user, loading, role]);
   const categories = [
     {
       icon: Sofa,
@@ -181,7 +181,7 @@ const Index = () => {
               </Link>
             )}
             <ThemeToggle />
-            {!loading && user && isAdmin() && (
+            {!loading && user && role === 'admin' && (
               <Link to="/admin/dashboard">
                 <Button variant="outline" className="font-medium border-gold/30 hover:border-gold hover:text-gold transition-colors">
                   <LayoutDashboard className="mr-2 h-4 w-4" />
@@ -196,7 +196,7 @@ const Index = () => {
                 </Button>
               </Link>
             )}
-            {!loading && user && !isAdmin() && (
+            {!loading && user && role !== 'admin' && (
               <Link to="/dashboard">
                 <Button variant="outline" className="font-medium border-gold/30 hover:border-gold hover:text-gold transition-colors">
                   Dashboard
@@ -240,7 +240,7 @@ const Index = () => {
                   <Button variant="ghost" className="w-full justify-start font-medium">Dashboard</Button>
                 </Link>
               )}
-              {!loading && user && isAdmin() && (
+              {!loading && user && role === 'admin' && (
                 <Link to="/admin/dashboard" onClick={() => setMobileMenuOpen(false)}>
                   <Button variant="ghost" className="w-full justify-start font-medium">Admin Panel</Button>
                 </Link>
