@@ -16,7 +16,7 @@ const Login = () => {
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { user, loading: authLoading, isAdmin } = useAuth();
+  const { user, loading: authLoading, role } = useAuth();
 
   // Redirect if already logged in
   useEffect(() => {
@@ -38,8 +38,8 @@ const Login = () => {
           }
           
           if (profile) {
-            const userRole = profile.role;
-            if (isAdmin() || userRole === 'admin') {
+            const userRole = profile.role || role || 'customer';
+            if (userRole === 'admin') {
               navigate("/admin/dashboard", { replace: true });
             } else if (userRole === 'staff') {
               navigate("/staff/job-cards", { replace: true });
@@ -53,7 +53,7 @@ const Login = () => {
           }
         });
     }
-  }, [user, authLoading, navigate, isAdmin]);
+  }, [user, authLoading, navigate, role]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -107,7 +107,7 @@ const Login = () => {
       const userRole = profile?.role || 'customer';
       let redirectPath = "/dashboard"; // Default to customer dashboard
       
-      if (isAdmin() || userRole === 'admin') {
+      if (userRole === 'admin') {
         redirectPath = "/admin/dashboard";
       } else if (userRole === 'staff') {
         redirectPath = "/staff/job-cards";
@@ -119,13 +119,15 @@ const Login = () => {
       // Redirect to appropriate dashboard
       navigate(redirectPath, { replace: true });
     } catch (error: any) {
-      console.error("Login error:", error);
+      if (import.meta.env.DEV) {
+        console.error("Login error:", error);
+      }
       
       // Provide user-friendly error messages
       let errorMessage = "Invalid email or password";
-      if (error.message.includes("Invalid login credentials")) {
+      if (error.message?.includes("Invalid login credentials")) {
         errorMessage = "Invalid email or password. Please check your credentials.";
-      } else if (error.message.includes("Email not confirmed")) {
+      } else if (error.message?.includes("Email not confirmed")) {
         errorMessage = "Please verify your email before logging in.";
       } else if (error.message) {
         errorMessage = error.message;

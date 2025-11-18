@@ -380,11 +380,6 @@ const Checkout = () => {
     return null;
   }
 
-  const subtotal = cartItems.reduce((sum, item) => sum + (item.calculated_price || 0), 0);
-  const discount = 0;
-  const total = subtotal - discount;
-  const advanceAmount = total * 0.5;
-
   return (
     <div className="min-h-screen bg-background">
       <div className="border-b">
