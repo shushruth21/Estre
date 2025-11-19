@@ -14,46 +14,81 @@ const Login = () => {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [loginMode, setLoginMode] = useState<"auto" | "admin" | "staff">("auto");
   const navigate = useNavigate();
   const { toast } = useToast();
   const { user, loading: authLoading, role } = useAuth();
 
+  const redirectByRole = (userRole: string | null | undefined) => {
+    // Manual overrides take precedence
+    if (loginMode === "admin") {
+      navigate("/admin/dashboard", { replace: true });
+      return true;
+    }
+    if (loginMode === "staff") {
+      navigate("/staff/job-cards", { replace: true });
+      return true;
+    }
+
+    if (userRole === "admin") {
+      navigate("/admin/dashboard", { replace: true });
+      return true;
+    }
+    if (userRole === "staff" || userRole === "factory_staff") {
+      navigate("/staff/job-cards", { replace: true });
+      return true;
+    }
+    navigate("/dashboard", { replace: true });
+    return true;
+  };
+
   // Redirect if already logged in
   useEffect(() => {
-    if (!authLoading && user) {
-      // Check role from profiles table and redirect appropriately
-      supabase
-        .from("profiles")
-        .select("role")
-        .eq("user_id", user.id)
-        .single()
-        .then(({ data: profile, error }) => {
-          if (error) {
-            if (import.meta.env.DEV) {
-              console.error("❌ Error fetching profile in useEffect:", error);
-            }
-            // Default to customer dashboard if profile not found
-            navigate("/dashboard", { replace: true });
-            return;
-          }
-          
-          if (profile) {
-            const userRole = profile.role || role || 'customer';
-            if (userRole === 'admin') {
-              navigate("/admin/dashboard", { replace: true });
-            } else if (userRole === 'staff') {
-              navigate("/staff/job-cards", { replace: true });
-            } else {
-              // Customer role - redirect to customer dashboard
-              navigate("/dashboard", { replace: true });
-            }
-          } else {
-            // No profile found - treat as customer and redirect to customer dashboard
-            navigate("/dashboard", { replace: true });
-          }
-        });
+    if (authLoading || !user) return;
+
+    if (loginMode !== "auto") {
+      redirectByRole(loginMode);
+      return;
     }
-  }, [user, authLoading, navigate, role]);
+
+    if (redirectByRole(role)) {
+      return;
+    }
+
+    const resolveRole = async () => {
+      try {
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("role")
+          .eq("user_id", user.id)
+          .single();
+
+        if (profile?.role && redirectByRole(profile.role)) {
+          return;
+        }
+
+        const { data: legacyRoles } = await supabase
+          .from("user_roles")
+          .select("role")
+          .eq("user_id", user.id);
+
+        const legacyRole = legacyRoles?.[0]?.role;
+        if (legacyRole) {
+          redirectByRole(legacyRole);
+          return;
+        }
+
+        redirectByRole("customer");
+      } catch (error) {
+        if (import.meta.env.DEV) {
+          console.error("❌ Error determining role during login redirect:", error);
+        }
+        redirectByRole("customer");
+      }
+    };
+
+    resolveRole();
+  }, [user, authLoading, navigate, role, loginMode]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -104,20 +139,17 @@ const Login = () => {
       await new Promise(resolve => setTimeout(resolve, 300));
 
       // Determine redirect based on role from profile
-      const userRole = profile?.role || 'customer';
-      let redirectPath = "/dashboard"; // Default to customer dashboard
-      
-      if (userRole === 'admin') {
-        redirectPath = "/admin/dashboard";
-      } else if (userRole === 'staff') {
-        redirectPath = "/staff/job-cards";
-      } else {
-        // Customer role - redirect to customer dashboard
-        redirectPath = "/dashboard";
+      let userRole = profile?.role || role;
+
+      if (!userRole && loginMode === "auto") {
+        const { data: legacyRoles } = await supabase
+          .from("user_roles")
+          .select("role")
+          .eq("user_id", data.user.id);
+        userRole = legacyRoles?.[0]?.role || "customer";
       }
-      
-      // Redirect to appropriate dashboard
-      navigate(redirectPath, { replace: true });
+
+      redirectByRole(loginMode === "auto" ? userRole : loginMode);
     } catch (error: any) {
       if (import.meta.env.DEV) {
         console.error("Login error:", error);
@@ -165,6 +197,30 @@ const Login = () => {
             </CardDescription>
           </CardHeader>
           <CardContent>
+            <div className="mb-4">
+              <Label className="mb-2 block text-sm font-medium">
+                Login Mode
+              </Label>
+              <div className="grid grid-cols-3 gap-2">
+                {(["auto", "admin", "staff"] as const).map((mode) => (
+                  <Button
+                    key={mode}
+                    type="button"
+                    variant={loginMode === mode ? "default" : "outline"}
+                    onClick={() => setLoginMode(mode)}
+                    disabled={isLoading || authLoading}
+                  >
+                    {mode === "auto"
+                      ? "Auto"
+                      : mode.charAt(0).toUpperCase() + mode.slice(1)}
+                  </Button>
+                ))}
+              </div>
+              <p className="mt-2 text-xs text-muted-foreground">
+                Auto detects your role from Supabase profiles. Choose Admin or
+                Staff to bypass directly to that dashboard after login.
+              </p>
+            </div>
             {authLoading ? (
               <div className="flex items-center justify-center py-8">
                 <Loader2 className="h-6 w-6 animate-spin text-primary" />
