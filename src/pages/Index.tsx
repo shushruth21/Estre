@@ -11,7 +11,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useQuery } from "@tanstack/react-query";
 
 const Index = () => {
-  const { user, role, loading } = useAuth();
+  const { user, role, loading, isAdmin, isStaff, isCustomer } = useAuth();
   const navigate = useNavigate();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
@@ -34,49 +34,19 @@ const Index = () => {
 
   // Redirect admins and staff to their dashboards if they land on homepage
   useEffect(() => {
-    if (!loading && user) {
-      const checkAndRedirect = async () => {
-        // Wait for roles to load
-        await new Promise(resolve => setTimeout(resolve, 800));
-        
-        // Fetch role from profiles table
-        const { data: profile } = await supabase
-          .from("profiles")
-          .select("role")
-          .eq("user_id", user.id)
-          .single();
-        
-        if (import.meta.env.DEV) {
-          console.log("🔍 Index.tsx: User profile:", profile);
-        }
-        
-        if (profile) {
-          const userRole = profile.role;
-          if (import.meta.env.DEV) {
-            console.log("🎯 Index.tsx: User role detected:", userRole);
-          }
-          
-          if (userRole === 'admin' || role === 'admin') {
-            if (import.meta.env.DEV) {
-              console.log("🚀 Index.tsx: Redirecting admin to dashboard");
-            }
-            window.location.href = "/admin/dashboard";
-            return;
-          }
-          
-          if (userRole === 'staff' || role === 'staff') {
-            if (import.meta.env.DEV) {
-              console.log("🚀 Index.tsx: Redirecting staff to job cards");
-            }
-            window.location.href = "/staff/job-cards";
-            return;
-          }
-        }
-      };
-
-      checkAndRedirect();
+    if (!loading && user && role) {
+      // Use normalized role helpers
+      if (isAdmin()) {
+        navigate("/admin/dashboard", { replace: true });
+        return;
+      }
+      if (isStaff()) {
+        navigate("/staff/dashboard", { replace: true });
+        return;
+      }
+      // Customers can stay on homepage
     }
-  }, [user, loading, role]);
+  }, [user, loading, role, isAdmin, isStaff, navigate]);
   const categories = [
     {
       icon: Sofa,
@@ -181,7 +151,7 @@ const Index = () => {
               </Link>
             )}
             <ThemeToggle />
-            {!loading && user && role === 'admin' && (
+            {!loading && user && isAdmin() && (
               <Link to="/admin/dashboard">
                 <Button variant="outline" className="font-medium border-gold/30 hover:border-gold hover:text-gold transition-colors">
                   <LayoutDashboard className="mr-2 h-4 w-4" />
@@ -196,7 +166,7 @@ const Index = () => {
                 </Button>
               </Link>
             )}
-            {!loading && user && role !== 'admin' && (
+            {!loading && user && isCustomer() && (
               <Link to="/dashboard">
                 <Button variant="outline" className="font-medium border-gold/30 hover:border-gold hover:text-gold transition-colors">
                   Dashboard
@@ -240,9 +210,14 @@ const Index = () => {
                   <Button variant="ghost" className="w-full justify-start font-medium">Dashboard</Button>
                 </Link>
               )}
-              {!loading && user && role === 'admin' && (
+              {!loading && user && isAdmin() && (
                 <Link to="/admin/dashboard" onClick={() => setMobileMenuOpen(false)}>
                   <Button variant="ghost" className="w-full justify-start font-medium">Admin Panel</Button>
+                </Link>
+              )}
+              {!loading && user && isStaff() && (
+                <Link to="/staff/dashboard" onClick={() => setMobileMenuOpen(false)}>
+                  <Button variant="ghost" className="w-full justify-start font-medium">Staff Dashboard</Button>
                 </Link>
               )}
               {!loading && !user && (

@@ -101,7 +101,7 @@ const navigationGroups: { title: string; items: NavItem[] }[] = [
 export function AdminLayout({ children }: AdminLayoutProps) {
   const location = useLocation();
   const navigate = useNavigate();
-  const { user, isAdmin, loading, userRoles } = useAuth();
+  const { user, isAdmin, loading, role } = useAuth();
   const { toast } = useToast();
 
   // Fetch quick stats for badges/notifications
@@ -129,44 +129,8 @@ export function AdminLayout({ children }: AdminLayoutProps) {
     refetchInterval: 30000,
   });
 
-  // Try direct query as fallback if roles are empty (MUST be before any conditional returns)
-  useEffect(() => {
-    if (userRoles.length === 0 && !loading && user?.id) {
-      const checkRoleDirectly = async () => {
-        try {
-          const { data: rolesData, error } = await supabase
-            .from("user_roles")
-            .select("role")
-            .eq("user_id", user.id);
-          
-          if (error) {
-            console.error("❌ AdminLayout: Error fetching roles:", error);
-            // Try security definer function
-            const { data: adminCheck } = await supabase
-              .rpc('is_admin_or_manager', { _user_id: user.id });
-            
-            if (adminCheck) {
-              console.log("✅ AdminLayout: Admin role confirmed via function");
-              // Force reload to update state
-              window.location.reload();
-            }
-          } else if (rolesData && rolesData.length > 0) {
-            const roles = rolesData.map((r: any) => r.role);
-            if (roles.includes('admin') || roles.includes('store_manager') || roles.includes('production_manager')) {
-              console.log("✅ AdminLayout: Admin role confirmed via direct query");
-              // Force reload to update state
-              window.location.reload();
-            }
-          }
-        } catch (err) {
-          console.error("❌ AdminLayout: Error in checkRoleDirectly:", err);
-        }
-      };
-      
-      const timer = setTimeout(checkRoleDirectly, 1000);
-      return () => clearTimeout(timer);
-    }
-  }, [userRoles.length, loading, user?.id]);
+  // Role checking is handled by ProtectedRoute, but we can verify here
+  // This component only renders if user is admin (via ProtectedRoute guard)
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -213,66 +177,8 @@ export function AdminLayout({ children }: AdminLayoutProps) {
     return null;
   }
 
-  // Check admin role after loading is complete
-  // Also check if roles are still being fetched (userRoles might be empty initially)
-  const hasAdminRole = isAdmin() || 
-    userRoles.includes('admin') || 
-    userRoles.includes('store_manager') || 
-    userRoles.includes('production_manager');
-
-  // If roles are still loading, show loading state instead of denying access
-  if (userRoles.length === 0 && !loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="text-center space-y-4">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
-          <p className="text-muted-foreground">Verifying access...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (!hasAdminRole && userRoles.length > 0) {
-    // Only deny access if roles have been loaded and user doesn't have admin role
-    if (import.meta.env.DEV) {
-      console.warn("⚠️ Admin access denied:", {
-        user: user?.email,
-        userRoles,
-        isAdmin: isAdmin(),
-        loading,
-      });
-    }
-
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="text-center space-y-4 max-w-md">
-          <h2 className="text-2xl font-bold">Access Denied</h2>
-          <p className="text-muted-foreground">
-            You don't have permission to access this page.
-          </p>
-          <div className="bg-muted p-4 rounded-lg text-left text-sm space-y-2">
-            <p>
-              <strong>User:</strong> {user?.email || "Not logged in"}
-            </p>
-            <p>
-              <strong>Roles:</strong>{" "}
-              {userRoles.length > 0 ? userRoles.join(", ") : "None (still loading...)"}
-            </p>
-            <p>
-              <strong>Required:</strong> admin, store_manager, or
-              production_manager
-            </p>
-          </div>
-          <div className="flex gap-2 justify-center">
-            <Button onClick={() => navigate("/")}>Go Home</Button>
-            <Button onClick={() => navigate("/login")} variant="outline">
-              Login
-            </Button>
-          </div>
-        </div>
-      </div>
-    );
-  }
+  // ProtectedRoute ensures only admins can access this component
+  // If we reach here, user is authenticated and has admin role
 
   return (
     <div className="min-h-screen bg-background">
@@ -353,7 +259,7 @@ export function AdminLayout({ children }: AdminLayoutProps) {
             <div className="flex-1 min-w-0">
               <p className="text-sm font-medium truncate">{user?.email}</p>
               <p className="text-xs text-muted-foreground truncate">
-                {userRoles.join(", ") || "Admin"}
+                {role || "Admin"}
               </p>
             </div>
           </div>
@@ -411,7 +317,7 @@ export function AdminLayout({ children }: AdminLayoutProps) {
                         {user?.email}
                       </p>
                       <p className="text-xs text-muted-foreground truncate">
-                        {userRoles.join(", ") || "Admin"}
+                        {role || "Admin"}
                       </p>
                     </div>
                   </div>
@@ -553,7 +459,7 @@ export function AdminLayout({ children }: AdminLayoutProps) {
                     <div className="flex flex-col space-y-1">
                       <p className="text-sm font-medium">{user?.email}</p>
                       <p className="text-xs text-muted-foreground">
-                        {userRoles.join(", ") || "Admin"}
+                        {role || "Admin"}
                       </p>
                     </div>
                   </DropdownMenuLabel>

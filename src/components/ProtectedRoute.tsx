@@ -1,8 +1,8 @@
 /**
  * ProtectedRoute Component
  * 
- * Protects routes based on authentication and role requirements.
- * Supports 'customer', 'staff', 'admin' roles.
+ * Strict route protection based on normalized roles.
+ * Uses normalized role helpers from AuthContext.
  * 
  * Usage:
  * ```tsx
@@ -22,23 +22,21 @@
 
 import { ReactNode } from "react";
 import { Navigate } from "react-router-dom";
-import { useAuth } from "@/hooks/useAuth";
+import { useAuth } from "@/context/AuthContext";
 import { Loader2 } from "lucide-react";
 
 interface ProtectedRouteProps {
-  children: ReactNode;
-  requiredRole?: 'customer' | 'staff' | 'admin';
-  redirectTo?: string;
+  children: JSX.Element;
+  requiredRole: "admin" | "staff" | "customer";
 }
 
-export const ProtectedRoute = ({ 
+export function ProtectedRoute({ 
   children, 
-  requiredRole, 
-  redirectTo = "/login" 
-}: ProtectedRouteProps) => {
-  const { user, loading, role, isCustomer, isStaff, isAdmin } = useAuth();
+  requiredRole 
+}: ProtectedRouteProps) {
+  const { loading, role, isAdmin, isStaff, isCustomer } = useAuth();
 
-  // Show loading spinner while checking auth
+  // Show loading while checking auth
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -50,47 +48,37 @@ export const ProtectedRoute = ({
     );
   }
 
-  // Redirect to login if not authenticated
-  if (!user) {
-    return <Navigate to={redirectTo} replace />;
+  // No session present → redirect to login
+  if (!role) {
+    return <Navigate to="/login" replace />;
   }
 
-  // Check role requirements
-  if (requiredRole) {
-    let hasAccess = false;
-    let errorMessage = "";
-
-    switch (requiredRole) {
-      case 'customer':
-        hasAccess = isCustomer();
-        errorMessage = "You don't have permission to access this page. Customer access is required.";
-        break;
-      case 'staff':
-        hasAccess = isStaff() || isAdmin(); // Admins can access staff routes
-        errorMessage = "You don't have permission to access this page. Staff or admin access is required.";
-        break;
-      case 'admin':
-        hasAccess = isAdmin();
-        errorMessage = "You don't have permission to access this page. Admin access is required.";
-        break;
+  // Staff-level: staff + admin allowed
+  if (requiredRole === "staff") {
+    if (!isStaff()) {
+      return <Navigate to="/" replace />;
     }
-
-    if (!hasAccess) {
-      return (
-        <div className="min-h-screen flex items-center justify-center bg-background">
-          <div className="text-center max-w-md p-8">
-            <h1 className="text-2xl font-bold mb-4">Access Denied</h1>
-            <p className="text-muted-foreground mb-6">{errorMessage}</p>
-            <Navigate to="/" replace />
-          </div>
-        </div>
-      );
-    }
+    return children;
   }
 
-  // Render children if all checks pass
-  return <>{children}</>;
-};
+  // Admin-only
+  if (requiredRole === "admin") {
+    if (!isAdmin()) {
+      return <Navigate to="/" replace />;
+    }
+    return children;
+  }
+
+  // Customer-only
+  if (requiredRole === "customer") {
+    if (!isCustomer()) {
+      return <Navigate to="/" replace />;
+    }
+    return children;
+  }
+
+  return children;
+}
 
 /**
  * RequireAuth Component
@@ -105,17 +93,28 @@ export const ProtectedRoute = ({
  * ```
  */
 export const RequireAuth = ({ 
-  children, 
-  redirectTo = "/login" 
+  children 
 }: { 
-  children: ReactNode; 
-  redirectTo?: string;
+  children: JSX.Element;
 }) => {
-  return (
-    <ProtectedRoute redirectTo={redirectTo}>
-      {children}
-    </ProtectedRoute>
-  );
+  const { loading, role } = useAuth();
+  
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="text-center">
+          <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto mb-4" />
+          <p className="text-muted-foreground">Verifying access...</p>
+        </div>
+      </div>
+    );
+  }
+  
+  if (!role) {
+    return <Navigate to="/login" replace />;
+  }
+  
+  return children;
 };
 
 /**
@@ -132,15 +131,13 @@ export const RequireAuth = ({
  */
 export const RequireRole = ({ 
   role, 
-  children, 
-  redirectTo = "/login" 
+  children 
 }: { 
   role: 'customer' | 'staff' | 'admin';
-  children: ReactNode;
-  redirectTo?: string;
+  children: JSX.Element;
 }) => {
   return (
-    <ProtectedRoute requiredRole={role} redirectTo={redirectTo}>
+    <ProtectedRoute requiredRole={role}>
       {children}
     </ProtectedRoute>
   );

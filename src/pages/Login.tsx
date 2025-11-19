@@ -17,78 +17,48 @@ const Login = () => {
   const [loginMode, setLoginMode] = useState<"auto" | "admin" | "staff">("auto");
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { user, loading: authLoading, role } = useAuth();
+  const { user, loading: authLoading, role, isAdmin, isStaff, isCustomer } = useAuth();
 
-  const redirectByRole = (userRole: string | null | undefined) => {
-    // Manual overrides take precedence
+  const redirectByRole = () => {
+    // Manual overrides take precedence (bypass mode)
     if (loginMode === "admin") {
       navigate("/admin/dashboard", { replace: true });
-      return true;
+      return;
     }
     if (loginMode === "staff") {
-      navigate("/staff/job-cards", { replace: true });
-      return true;
+      navigate("/staff/dashboard", { replace: true });
+      return;
     }
 
-    if (userRole === "admin") {
+    // Use normalized role helpers
+    if (isAdmin()) {
       navigate("/admin/dashboard", { replace: true });
-      return true;
+      return;
     }
-    if (userRole === "staff" || userRole === "factory_staff") {
-      navigate("/staff/job-cards", { replace: true });
-      return true;
+    if (isStaff()) {
+      navigate("/staff/dashboard", { replace: true });
+      return;
     }
+    if (isCustomer()) {
+      navigate("/dashboard", { replace: true });
+      return;
+    }
+    
+    // Fallback to customer dashboard
     navigate("/dashboard", { replace: true });
-    return true;
   };
 
   // Redirect if already logged in
   useEffect(() => {
     if (authLoading || !user) return;
 
-    if (loginMode !== "auto") {
-      redirectByRole(loginMode);
-      return;
-    }
+    // Wait a bit for profile to load
+    const timer = setTimeout(() => {
+      redirectByRole();
+    }, 100);
 
-    if (redirectByRole(role)) {
-      return;
-    }
-
-    const resolveRole = async () => {
-      try {
-        const { data: profile } = await supabase
-          .from("profiles")
-          .select("role")
-          .eq("user_id", user.id)
-          .single();
-
-        if (profile?.role && redirectByRole(profile.role)) {
-          return;
-        }
-
-        const { data: legacyRoles } = await supabase
-          .from("user_roles")
-          .select("role")
-          .eq("user_id", user.id);
-
-        const legacyRole = legacyRoles?.[0]?.role;
-        if (legacyRole) {
-          redirectByRole(legacyRole);
-          return;
-        }
-
-        redirectByRole("customer");
-      } catch (error) {
-        if (import.meta.env.DEV) {
-          console.error("❌ Error determining role during login redirect:", error);
-        }
-        redirectByRole("customer");
-      }
-    };
-
-    resolveRole();
-  }, [user, authLoading, navigate, role, loginMode]);
+    return () => clearTimeout(timer);
+  }, [user, authLoading, role, loginMode, isAdmin, isStaff, isCustomer, navigate]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -135,21 +105,11 @@ const Login = () => {
         description: "Logged in successfully",
       });
 
-      // Wait for session to be fully established
-      await new Promise(resolve => setTimeout(resolve, 300));
+      // Wait for session to be fully established and profile to load
+      await new Promise(resolve => setTimeout(resolve, 500));
 
-      // Determine redirect based on role from profile
-      let userRole = profile?.role || role;
-
-      if (!userRole && loginMode === "auto") {
-        const { data: legacyRoles } = await supabase
-          .from("user_roles")
-          .select("role")
-          .eq("user_id", data.user.id);
-        userRole = legacyRoles?.[0]?.role || "customer";
-      }
-
-      redirectByRole(loginMode === "auto" ? userRole : loginMode);
+      // Use normalized role helpers for redirect
+      redirectByRole();
     } catch (error: any) {
       if (import.meta.env.DEV) {
         console.error("Login error:", error);

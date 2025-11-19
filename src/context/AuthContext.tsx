@@ -24,20 +24,43 @@ interface Profile {
   phone: string | null;
   avatar_url: string | null;
   department: string | null;
-  role: "customer" | "staff" | "admin";
+  role: string | null; // Raw role from Supabase (can be any string)
   created_at: string;
   updated_at: string;
+}
+
+/**
+ * Normalize Supabase roles into standardized buckets
+ * Maps various Supabase roles to: admin, staff, or customer
+ */
+function normalizeRole(role: string | null | undefined): "admin" | "staff" | "customer" {
+  if (!role) return "customer";
+
+  const adminRoles = ["admin", "super_admin"];
+  const staffRoles = [
+    "staff",
+    "production_manager",
+    "store_manager",
+    "factory_staff",
+    "ops_team",
+  ];
+
+  const normalized = role.toLowerCase().trim();
+  
+  if (adminRoles.includes(normalized)) return "admin";
+  if (staffRoles.includes(normalized)) return "staff";
+  return "customer";
 }
 
 interface AuthContextType {
   user: User | null;
   session: Session | null;
   profile: Profile | null;
-  role: "customer" | "staff" | "admin" | null;
+  role: "customer" | "staff" | "admin" | null; // Normalized role
   loading: boolean;
-  // Role helper functions
+  // Role helper functions (based on normalized role)
   isCustomer: () => boolean;
-  isStaff: () => boolean;
+  isStaff: () => boolean; // Returns true for staff OR admin
   isAdmin: () => boolean;
   hasRole: (role: "customer" | "staff" | "admin") => boolean;
   // Refresh profile
@@ -142,28 +165,36 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  // Role helper functions
+  // Normalize role from profile
+  const normalizedRole = normalizeRole(profile?.role ?? null);
+
+  // Role helper functions (based on normalized role)
   const isCustomer = () => {
-    return profile?.role === "customer";
+    return normalizedRole === "customer";
   };
 
   const isStaff = () => {
-    return profile?.role === "staff";
+    // Staff includes both staff and admin (admin can access staff routes)
+    return normalizedRole === "staff" || normalizedRole === "admin";
   };
 
   const isAdmin = () => {
-    return profile?.role === "admin";
+    return normalizedRole === "admin";
   };
 
   const hasRole = (roleToCheck: "customer" | "staff" | "admin") => {
-    return profile?.role === roleToCheck;
+    if (roleToCheck === "staff") {
+      // Staff requirement: admin OR staff
+      return normalizedRole === "staff" || normalizedRole === "admin";
+    }
+    return normalizedRole === roleToCheck;
   };
 
   const value: AuthContextType = {
     user,
     session,
     profile,
-    role: profile?.role ?? null,
+    role: normalizedRole,
     loading,
     isCustomer,
     isStaff,

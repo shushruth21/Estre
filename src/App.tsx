@@ -63,10 +63,26 @@ const App = () => (
           <Route path="/products" element={<Products />} />
           <Route path="/configure/:category/:productId" element={<Configure />} />
           <Route path="/cart" element={<Cart />} />
-          <Route path="/checkout" element={<Checkout />} />
-          <Route path="/orders" element={<Orders />} />
-          <Route path="/sale-order/:orderId" element={<SaleOrder />} />
-          <Route path="/sale-order/:orderId/:itemId" element={<SaleOrder />} />
+          <Route path="/checkout" element={
+            <ProtectedRoute requiredRole="customer">
+              <Checkout />
+            </ProtectedRoute>
+          } />
+          <Route path="/orders" element={
+            <ProtectedRoute requiredRole="customer">
+              <Orders />
+            </ProtectedRoute>
+          } />
+          <Route path="/sale-order/:orderId" element={
+            <ProtectedRoute requiredRole="staff">
+              <SaleOrder />
+            </ProtectedRoute>
+          } />
+          <Route path="/sale-order/:orderId/:itemId" element={
+            <ProtectedRoute requiredRole="staff">
+              <SaleOrder />
+            </ProtectedRoute>
+          } />
           <Route path="/login" element={<Login />} />
           <Route path="/signup" element={<Signup />} />
           <Route path="/dashboard" element={

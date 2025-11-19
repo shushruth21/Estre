@@ -1,28 +1,24 @@
 /**
- * useAuth Hook - Legacy compatibility wrapper
+ * useAuth Hook - Compatibility wrapper
  * 
- * This hook is maintained for backward compatibility.
- * New code should use the AuthContext directly via useAuth from @/context/AuthContext
- * 
- * @deprecated Use useAuth from @/context/AuthContext instead
+ * Provides normalized auth context with role helpers
  */
 import { useAuth as useAuthContext } from "@/context/AuthContext";
 
 export function useAuth() {
   const authContext = useAuthContext();
   
-  // Map new context to old interface for backward compatibility
   return {
+    ...authContext,
     user: authContext.user,
     session: authContext.session,
     loading: authContext.loading,
-    userRoles: authContext.role ? [authContext.role] : [],
-    hasRole: (role: string) => authContext.hasRole(role as "customer" | "staff" | "admin"),
-    isAdmin: () => authContext.isAdmin(),
-    // New properties available
-    profile: authContext.profile,
-    role: authContext.role,
-    isCustomer: authContext.isCustomer,
+    role: authContext.role, // normalized role
+    userRoles: authContext.role ? [authContext.role] : [], // legacy compatibility
+    hasRole: authContext.hasRole,
+    isAdmin: authContext.isAdmin,
     isStaff: authContext.isStaff,
+    isCustomer: authContext.isCustomer,
+    profile: authContext.profile,
   };
 }
