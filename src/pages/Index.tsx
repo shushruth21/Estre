@@ -159,17 +159,31 @@ const Index = () => {
                 </Button>
               </Link>
             )}
-            {!loading && !user && (
+            {!user && (
               <Link to="/login">
                 <Button className="luxury-button bg-gradient-gold text-white border-gold hover:shadow-gold-glow transition-premium">
-                  Login
+                  {loading ? "Loading..." : "Login"}
                 </Button>
               </Link>
             )}
             {!loading && user && isCustomer() && (
-              <Link to="/dashboard">
-                <Button variant="outline" className="font-medium border-gold/30 hover:border-gold hover:text-gold transition-colors">
-                  Dashboard
+              <>
+                <Link to="/dashboard">
+                  <Button variant="outline" className="font-medium border-gold/30 hover:border-gold hover:text-gold transition-colors">
+                    Dashboard
+                  </Button>
+                </Link>
+                <Link to="/login">
+                  <Button variant="ghost" className="font-medium hover:text-gold transition-colors">
+                    Switch Account
+                  </Button>
+                </Link>
+              </>
+            )}
+            {!loading && user && isStaff() && !isAdmin() && (
+              <Link to="/login">
+                <Button variant="ghost" className="font-medium hover:text-gold transition-colors">
+                  Switch Account
                 </Button>
               </Link>
             )}

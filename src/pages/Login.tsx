@@ -157,28 +157,43 @@ const Login = () => {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="mb-4">
-              <Label className="mb-2 block text-sm font-medium">
-                Login Mode
+            <div className="mb-6">
+              <Label className="mb-3 block text-sm font-medium">
+                Choose your access type
               </Label>
-              <div className="grid grid-cols-3 gap-2">
-                {(["auto", "admin", "staff"] as const).map((mode) => (
-                  <Button
-                    key={mode}
-                    type="button"
-                    variant={loginMode === mode ? "default" : "outline"}
-                    onClick={() => setLoginMode(mode)}
-                    disabled={isLoading || authLoading}
+              <div className="grid grid-cols-3 gap-3">
+                {([
+                  { value: "auto" as const, label: "Customer" },
+                  { value: "staff" as const, label: "Staff" },
+                  { value: "admin" as const, label: "Admin" },
+                ]).map(({ value, label }) => (
+                  <label
+                    key={value}
+                    className={`flex items-center justify-center p-3 rounded-lg border-2 cursor-pointer transition-all ${
+                      loginMode === value
+                        ? "border-primary bg-primary/10 text-primary font-medium"
+                        : "border-muted hover:border-primary/50 text-muted-foreground"
+                    }`}
                   >
-                    {mode === "auto"
-                      ? "Auto"
-                      : mode.charAt(0).toUpperCase() + mode.slice(1)}
-                  </Button>
+                    <input
+                      type="radio"
+                      name="loginMode"
+                      value={value}
+                      checked={loginMode === value}
+                      onChange={() => setLoginMode(value)}
+                      disabled={isLoading || authLoading}
+                      className="sr-only"
+                    />
+                    <span className="text-sm">{label}</span>
+                  </label>
                 ))}
               </div>
-              <p className="mt-2 text-xs text-muted-foreground">
-                Auto detects your role from Supabase profiles. Choose Admin or
-                Staff to bypass directly to that dashboard after login.
+              <p className="mt-3 text-xs text-muted-foreground text-center">
+                {loginMode === "auto"
+                  ? "Customer access - view orders and track deliveries"
+                  : loginMode === "staff"
+                  ? "Staff access - manage job cards and orders"
+                  : "Admin access - full system management"}
               </p>
             </div>
             {authLoading ? (
