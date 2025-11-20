@@ -30,6 +30,10 @@ const getCategoryTableName = (category: string): string => {
 
 // Column mapping for different category tables
 const CATEGORY_COLUMNS = {
+  sofa: {
+    netPrice: 'net_price_rs',
+    strikePrice: 'strike_price_rs'  // Fixed: Changed from strike_price_1seater_rs
+  },
   bed: {
     netPrice: 'net_price_single_no_storage_rs',
     strikePrice: 'strike_price_rs'
@@ -48,7 +52,7 @@ const CATEGORY_COLUMNS = {
   },
   default: {
     netPrice: 'net_price_rs',
-    strikePrice: 'strike_price_1seater_rs'
+    strikePrice: 'strike_price_rs'  // Fixed: Changed from strike_price_1seater_rs
   }
 };
 
@@ -95,7 +99,13 @@ const Products = () => {
       const columns = getCategoryColumns(category);
       
       // Build select query - handle categories that don't have bom_rs column
-      let selectFields = `id, title, images, ${columns.netPrice}, ${columns.strikePrice}, discount_percent, discount_rs, bom_rs`;
+      // Use try-catch approach: select only columns that exist
+      let selectFields = `id, title, images, ${columns.netPrice}, ${columns.strikePrice}, discount_percent, discount_rs`;
+      
+      // Only add bom_rs if category supports it
+      if (category !== "sofabed" && category !== "recliner" && category !== "cinema_chairs" && category !== "database_pouffes") {
+        selectFields += `, bom_rs`;
+      }
       if (category === "sofabed") {
         // For sofabed, bom_rs has been renamed to strike_price_2seater_rs
         selectFields = `id, title, images, ${columns.netPrice}, ${columns.strikePrice}, strike_price_2seater_rs, discount_percent, discount_rs`;
