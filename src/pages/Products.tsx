@@ -86,13 +86,12 @@ const Products = () => {
   const { data: products, isLoading, error } = useQuery({
     queryKey: ["products", category],
     queryFn: async () => {
-      // Log query attempt in development
-      if (import.meta.env.DEV) {
-        console.log('🔍 Fetching products:', {
-          category,
-          table: getCategoryTableName(category),
-        });
-      }
+      // Log query attempt - always log for debugging
+      console.log('🔍 Fetching products:', {
+        category,
+        table: getCategoryTableName(category),
+        timestamp: new Date().toISOString()
+      });
       const columns = getCategoryColumns(category);
       
       // Build select query - handle categories that don't have bom_rs column
@@ -121,7 +120,7 @@ const Products = () => {
       const { data, error } = await query.order("title", { ascending: true }) as any;
 
       if (error) {
-        // Enhanced error logging - always log in dev, show user-friendly message
+        // Enhanced error logging - always log errors
         console.error('❌ Supabase query error:', {
           category,
           table: getCategoryTableName(category),
@@ -133,6 +132,11 @@ const Products = () => {
             hint: error.hint,
           }
         });
+        
+        // Also log the full error object for debugging
+        if (import.meta.env.DEV) {
+          console.error('Full error object:', error);
+        }
         
         // Provide specific error messages based on error code
         let userMessage = `Failed to load products: ${error.message}`;
@@ -147,29 +151,28 @@ const Products = () => {
         throw new Error(userMessage);
       }
       
-      // Debug: Log raw data from database in development only
-      if (import.meta.env.DEV) {
-        if (data && data.length > 0) {
-          console.log('📦 Raw product data from database:', {
-            category,
-            count: data.length,
-            columns: columns,
-            firstItem: {
-              id: data[0].id,
-              title: data[0].title,
-              netPrice: data[0][columns.netPrice],
-              strikePrice: data[0][columns.strikePrice],
-              strike_price_2seater_rs: category === "sofabed" ? data[0].strike_price_2seater_rs : undefined,
-              discount_percent: data[0].discount_percent,
-            }
-          });
-        } else {
-          console.warn('⚠️ No products found in database:', {
-            category,
-            table: getCategoryTableName(category),
-            message: 'Table exists but contains no data or all items are inactive'
-          });
-        }
+      // Debug: Log raw data from database
+      if (data && data.length > 0) {
+        console.log('📦 Raw product data from database:', {
+          category,
+          count: data.length,
+          columns: columns,
+          firstItem: {
+            id: data[0].id,
+            title: data[0].title,
+            netPrice: data[0][columns.netPrice],
+            strikePrice: data[0][columns.strikePrice],
+            strike_price_2seater_rs: category === "sofabed" ? data[0].strike_price_2seater_rs : undefined,
+            discount_percent: data[0].discount_percent,
+          }
+        });
+      } else {
+        console.warn('⚠️ No products found in database:', {
+          category,
+          table: getCategoryTableName(category),
+          message: 'Table exists but contains no data or all items are inactive',
+          suggestion: 'Check if products exist and have is_active = true'
+        });
       }
       
       // Normalize the data to use consistent property names
