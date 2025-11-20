@@ -15,7 +15,7 @@ const Index = () => {
   const navigate = useNavigate();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
-  // Fetch cart count
+  // Fetch cart count (optimized with caching)
   const { data: cartCount } = useQuery({
     queryKey: ["cart-count", user?.id],
     queryFn: async () => {
@@ -30,6 +30,8 @@ const Index = () => {
       return data?.length || 0;
     },
     enabled: !!user,
+    staleTime: 30 * 1000, // Cache for 30 seconds
+    refetchInterval: 60000, // Refetch every minute
   });
 
   // Redirect admins and staff to their dashboards if they land on homepage
@@ -151,6 +153,7 @@ const Index = () => {
               </Link>
             )}
             <ThemeToggle />
+            {/* Admin Panel Button - Always visible when admin is logged in */}
             {!loading && user && isAdmin() && (
               <Link to="/admin/dashboard">
                 <Button variant="outline" className="font-medium border-gold/30 hover:border-gold hover:text-gold transition-colors">
@@ -159,13 +162,15 @@ const Index = () => {
                 </Button>
               </Link>
             )}
-            {!user && (
+            {/* Login Button - Show when not logged in */}
+            {!loading && !user && (
               <Link to="/login">
                 <Button className="luxury-button bg-gradient-gold text-white border-gold hover:shadow-gold-glow transition-premium">
-                  {loading ? "Loading..." : "Login"}
+                  Login
                 </Button>
               </Link>
             )}
+            {/* Customer Dashboard and Switch Account */}
             {!loading && user && isCustomer() && (
               <>
                 <Link to="/dashboard">
@@ -180,6 +185,7 @@ const Index = () => {
                 </Link>
               </>
             )}
+            {/* Staff Switch Account */}
             {!loading && user && isStaff() && !isAdmin() && (
               <Link to="/login">
                 <Button variant="ghost" className="font-medium hover:text-gold transition-colors">
@@ -219,14 +225,39 @@ const Index = () => {
               <Link to="/products" onClick={() => setMobileMenuOpen(false)}>
                 <Button variant="ghost" className="w-full justify-start font-medium">Products</Button>
               </Link>
-              {!loading && user && (
+              {/* Admin Panel - Mobile */}
+              {!loading && user && isAdmin() && (
+                <Link to="/admin/dashboard" onClick={() => setMobileMenuOpen(false)}>
+                  <Button variant="ghost" className="w-full justify-start font-medium">
+                    <LayoutDashboard className="mr-2 h-4 w-4" />
+                    Admin Panel
+                  </Button>
+                </Link>
+              )}
+              {/* Customer Dashboard - Mobile */}
+              {!loading && user && isCustomer() && (
                 <Link to="/dashboard" onClick={() => setMobileMenuOpen(false)}>
                   <Button variant="ghost" className="w-full justify-start font-medium">Dashboard</Button>
                 </Link>
               )}
-              {!loading && user && isAdmin() && (
-                <Link to="/admin/dashboard" onClick={() => setMobileMenuOpen(false)}>
-                  <Button variant="ghost" className="w-full justify-start font-medium">Admin Panel</Button>
+              {/* Staff Dashboard - Mobile */}
+              {!loading && user && isStaff() && !isAdmin() && (
+                <Link to="/staff/dashboard" onClick={() => setMobileMenuOpen(false)}>
+                  <Button variant="ghost" className="w-full justify-start font-medium">Staff Dashboard</Button>
+                </Link>
+              )}
+              {/* Login Button - Mobile */}
+              {!loading && !user && (
+                <Link to="/login" onClick={() => setMobileMenuOpen(false)}>
+                  <Button className="w-full luxury-button bg-gradient-gold text-white border-gold">
+                    Login
+                  </Button>
+                </Link>
+              )}
+              {/* Switch Account - Mobile */}
+              {!loading && user && (
+                <Link to="/login" onClick={() => setMobileMenuOpen(false)}>
+                  <Button variant="ghost" className="w-full justify-start font-medium">Switch Account</Button>
                 </Link>
               )}
               {!loading && user && isStaff() && (

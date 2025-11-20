@@ -39,8 +39,10 @@ export function useRealtimeOrders({ orderIds = [], enabled = true }: UseRealtime
           filter: `id=in.(${orderIds.join(",")})`,
         },
         (payload) => {
-          console.log("Order change detected:", payload);
-          // Invalidate orders query to refetch
+          if (import.meta.env.DEV) {
+            console.log("Order change detected:", payload);
+          }
+          // Invalidate orders query to refetch (debounced)
           queryClient.invalidateQueries({ queryKey: ["orders"] });
           queryClient.invalidateQueries({ queryKey: ["order", payload.new.id] });
         }
@@ -59,7 +61,9 @@ export function useRealtimeOrders({ orderIds = [], enabled = true }: UseRealtime
           filter: `order_id=in.(${orderIds.join(",")})`,
         },
         (payload) => {
-          console.log("Job card change detected:", payload);
+          if (import.meta.env.DEV) {
+            console.log("Job card change detected:", payload);
+          }
           // Invalidate job cards query to refetch
           queryClient.invalidateQueries({ queryKey: ["job-cards"] });
           queryClient.invalidateQueries({ queryKey: ["order", payload.new.order_id] });
@@ -79,7 +83,9 @@ export function useRealtimeOrders({ orderIds = [], enabled = true }: UseRealtime
           filter: `order_id=in.(${orderIds.join(",")})`,
         },
         (payload) => {
-          console.log("Timeline entry added:", payload);
+          if (import.meta.env.DEV) {
+            console.log("Timeline entry added:", payload);
+          }
           // Invalidate timeline query to refetch
           queryClient.invalidateQueries({ queryKey: ["order-timeline"] });
           queryClient.invalidateQueries({ queryKey: ["order", payload.new.order_id] });

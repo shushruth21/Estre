@@ -33,17 +33,20 @@ import SaleOrder from "./pages/SaleOrder";
 import NotFound from "./pages/NotFound";
 import { FloatingCTA } from "@/components/ui/FloatingCTA";
 
-// Configure QueryClient with better error handling
+// Configure QueryClient with optimized performance settings
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      retry: 2,
+      retry: 1, // Reduced retries for faster failure
       refetchOnWindowFocus: false,
-      staleTime: 5 * 60 * 1000, // 5 minutes
-      gcTime: 10 * 60 * 1000, // 10 minutes (formerly cacheTime)
+      refetchOnMount: false, // Don't refetch on mount if data is fresh
+      refetchOnReconnect: true,
+      staleTime: 10 * 60 * 1000, // 10 minutes - increased cache time
+      gcTime: 30 * 60 * 1000, // 30 minutes - keep cached data longer
+      structuralSharing: true, // Enable structural sharing for better performance
     },
     mutations: {
-      retry: 1,
+      retry: 0, // Don't retry mutations
     },
   },
 });

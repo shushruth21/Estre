@@ -86,6 +86,13 @@ const Products = () => {
   const { data: products, isLoading, error } = useQuery({
     queryKey: ["products", category],
     queryFn: async () => {
+      // Log query attempt in development
+      if (import.meta.env.DEV) {
+        console.log('🔍 Fetching products:', {
+          category,
+          table: getCategoryTableName(category),
+        });
+      }
       const columns = getCategoryColumns(category);
       
       // Build select query - handle categories that don't have bom_rs column
@@ -113,23 +120,56 @@ const Products = () => {
       
       const { data, error } = await query.order("title", { ascending: true }) as any;
 
-      if (error) throw error;
-      
-      // Debug: Log raw data from database in development only
-      if (import.meta.env.DEV && data && data.length > 0) {
-        console.log('📦 Raw product data from database:', {
+      if (error) {
+        // Enhanced error logging - always log in dev, show user-friendly message
+        console.error('❌ Supabase query error:', {
           category,
-          count: data.length,
-          columns: columns,
-          firstItem: {
-            id: data[0].id,
-            title: data[0].title,
-            netPrice: data[0][columns.netPrice],
-            strikePrice: data[0][columns.strikePrice],
-            strike_price_2seater_rs: category === "sofabed" ? data[0].strike_price_2seater_rs : undefined,
-            discount_percent: data[0].discount_percent,
+          table: getCategoryTableName(category),
+          selectFields,
+          error: {
+            message: error.message,
+            code: error.code,
+            details: error.details,
+            hint: error.hint,
           }
         });
+        
+        // Provide specific error messages based on error code
+        let userMessage = `Failed to load products: ${error.message}`;
+        if (error.code === 'PGRST301' || error.message?.includes('permission denied')) {
+          userMessage = `Access denied. Please check RLS policies for table "${getCategoryTableName(category)}".`;
+        } else if (error.code === '42P01' || error.message?.includes('does not exist')) {
+          userMessage = `Table "${getCategoryTableName(category)}" does not exist in database.`;
+        } else if (error.hint) {
+          userMessage += ` (${error.hint})`;
+        }
+        
+        throw new Error(userMessage);
+      }
+      
+      // Debug: Log raw data from database in development only
+      if (import.meta.env.DEV) {
+        if (data && data.length > 0) {
+          console.log('📦 Raw product data from database:', {
+            category,
+            count: data.length,
+            columns: columns,
+            firstItem: {
+              id: data[0].id,
+              title: data[0].title,
+              netPrice: data[0][columns.netPrice],
+              strikePrice: data[0][columns.strikePrice],
+              strike_price_2seater_rs: category === "sofabed" ? data[0].strike_price_2seater_rs : undefined,
+              discount_percent: data[0].discount_percent,
+            }
+          });
+        } else {
+          console.warn('⚠️ No products found in database:', {
+            category,
+            table: getCategoryTableName(category),
+            message: 'Table exists but contains no data or all items are inactive'
+          });
+        }
       }
       
       // Normalize the data to use consistent property names
@@ -193,6 +233,8 @@ const Products = () => {
       return normalizedData as Product[];
     },
     retry: 1,
+    staleTime: 5 * 60 * 1000, // Cache for 5 minutes
+    gcTime: 15 * 60 * 1000, // Keep in cache for 15 minutes
   });
 
   return (
@@ -230,9 +272,28 @@ const Products = () => {
 
         {/* Products Grid */}
         {error && (
-          <div className="text-center py-20">
-            <p className="text-destructive text-lg mb-2">Error loading products</p>
-            <p className="text-muted-foreground">{error.message}</p>
+          <div className="text-center py-20 max-w-2xl mx-auto">
+            <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-6 mb-4">
+              <p className="text-destructive text-lg font-semibold mb-2">Error loading products</p>
+              <p className="text-muted-foreground mb-4">{error.message}</p>
+              <div className="text-left bg-background/50 rounded p-4 text-sm space-y-2">
+                <p className="font-medium">Troubleshooting steps:</p>
+                <ul className="list-disc list-inside space-y-1 text-muted-foreground">
+                  <li>Check browser console (F12) for detailed error messages</li>
+                  <li>Verify Supabase connection in Network tab</li>
+                  <li>Ensure table "{getCategoryTableName(category)}" exists in Supabase</li>
+                  <li>Check RLS policies allow public read access</li>
+                  <li>Verify environment variables are set correctly</li>
+                </ul>
+              </div>
+              <Button 
+                onClick={() => window.location.reload()} 
+                variant="outline" 
+                className="mt-4"
+              >
+                Retry
+              </Button>
+            </div>
           </div>
         )}
         
@@ -251,9 +312,9 @@ const Products = () => {
               </Card>
             ))}
           </div>
-        ) : !error && (
+        ) : !error && products && products.length > 0 ? (
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {products?.map((product) => (
+            {products.map((product) => (
               <Card key={product.id} className="group overflow-hidden luxury-card border-muted/50 hover:border-gold transition-premium">
                 <div className="aspect-[4/3] bg-gradient-to-br from-muted to-muted/50 overflow-hidden relative">
                   <img
@@ -333,7 +394,23 @@ const Products = () => {
               </Card>
             ))}
           </div>
-        )}
+        ) : !error && !isLoading && (!products || products.length === 0) ? (
+          <div className="text-center py-20">
+            <div className="bg-muted/50 border border-muted rounded-lg p-6 max-w-md mx-auto">
+              <p className="text-lg font-semibold mb-2">No products found</p>
+              <p className="text-muted-foreground mb-4">
+                There are no products available in the "{category}" category.
+              </p>
+              <p className="text-sm text-muted-foreground">
+                {import.meta.env.DEV && (
+                  <span>
+                    Check if table "{getCategoryTableName(category)}" has data and RLS policies allow public read access.
+                  </span>
+                )}
+              </p>
+            </div>
+          </div>
+        ) : null}
 
         {!isLoading && products?.length === 0 && (
           <div className="text-center py-20">

@@ -69,9 +69,6 @@ const navigationGroups: { title: string; items: NavItem[] }[] = [
     items: [
       { name: "Products", href: "/admin/products", icon: Package },
       { name: "Dropdowns", href: "/admin/dropdowns", icon: Settings },
-      { name: "Pricing Formulas", href: "/admin/pricing", icon: DollarSign },
-      { name: "Fabrics", href: "/admin/fabrics", icon: Shirt },
-      { name: "Accessories", href: "/admin/accessories", icon: Wrench },
     ],
   },
   {
@@ -82,11 +79,9 @@ const navigationGroups: { title: string; items: NavItem[] }[] = [
     ],
   },
   {
-    title: "Team & Analytics",
+    title: "Team Management",
     items: [
       { name: "Users", href: "/admin/users", icon: Users },
-      { name: "Staff", href: "/admin/staff", icon: Users },
-      { name: "Reports", href: "/admin/reports", icon: BarChart3 },
     ],
   },
   {
@@ -104,7 +99,7 @@ export function AdminLayout({ children }: AdminLayoutProps) {
   const { user, isAdmin, loading, role } = useAuth();
   const { toast } = useToast();
 
-  // Fetch quick stats for badges/notifications
+  // Fetch quick stats for badges/notifications (optimized)
   const { data: pendingOrders } = useQuery({
     queryKey: ["pending-orders-count"],
     queryFn: async () => {
@@ -114,7 +109,8 @@ export function AdminLayout({ children }: AdminLayoutProps) {
         .eq("status", "pending");
       return count || 0;
     },
-    refetchInterval: 30000, // Refresh every 30 seconds
+    refetchInterval: 60000, // Refresh every 60 seconds (reduced frequency)
+    staleTime: 30 * 1000, // Consider fresh for 30 seconds
   });
 
   const { data: activeJobCards } = useQuery({
@@ -126,7 +122,8 @@ export function AdminLayout({ children }: AdminLayoutProps) {
         .in("status", ["pending", "fabric_cutting", "upholstery", "finishing", "quality_check", "frame_assembly"]);
       return count || 0;
     },
-    refetchInterval: 30000,
+    refetchInterval: 60000, // Refresh every 60 seconds (reduced frequency)
+    staleTime: 30 * 1000, // Consider fresh for 30 seconds
   });
 
   // Role checking is handled by ProtectedRoute, but we can verify here

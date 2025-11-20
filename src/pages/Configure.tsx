@@ -66,9 +66,9 @@ const Configure = () => {
         breakdown: result.breakdown
       });
     } catch (error: any) {
-      console.error("Price calculation error:", error);
       // Don't show toast for calculation errors during typing - only show final error
       if (import.meta.env.DEV) {
+        console.error("Price calculation error:", error);
         console.warn("Price calculation failed:", error.message);
       }
     } finally {
@@ -86,7 +86,7 @@ const Configure = () => {
     // Debounce price calculation to avoid too many API calls
     const timeoutId = setTimeout(() => {
       calculatePrice();
-    }, 500); // 500ms debounce
+    }, 800); // 800ms debounce - increased for better performance
 
     return () => clearTimeout(timeoutId);
     // eslint-disable-next-line react-hooks/exhaustive-deps

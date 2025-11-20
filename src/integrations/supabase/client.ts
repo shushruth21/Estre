@@ -35,17 +35,28 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
 
 // Test connection on initialization (non-blocking)
 if (typeof window !== 'undefined') {
+  // Test with profiles table (more reliable than dropdown_options)
   supabase
-    .from('dropdown_options')
+    .from('profiles')
     .select('id')
     .limit(1)
     .then(({ error }) => {
-      if (error && import.meta.env.DEV) {
-        console.warn('⚠️ Supabase connection test failed:', error.message);
+      if (error) {
+        if (import.meta.env.DEV) {
+          console.warn('⚠️ Supabase connection test failed:', {
+            message: error.message,
+            code: error.code,
+            details: error.details,
+            hint: error.hint,
+          });
+        }
       } else if (import.meta.env.DEV) {
         console.log('✅ Supabase connection successful');
       }
-    }, () => {
-      // Silently fail - connection will be tested when needed
+    })
+    .catch((err) => {
+      if (import.meta.env.DEV) {
+        console.error('❌ Supabase connection test error:', err);
+      }
     });
 }

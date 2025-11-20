@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -17,9 +17,9 @@ const Login = () => {
   const [loginMode, setLoginMode] = useState<"auto" | "admin" | "staff">("auto");
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { user, loading: authLoading, role, isAdmin, isStaff, isCustomer } = useAuth();
+  const { user, loading: authLoading, role, isAdmin, isStaff, isCustomer, refreshProfile } = useAuth();
 
-  const redirectByRole = () => {
+  const redirectByRole = useCallback(() => {
     // Manual overrides take precedence (bypass mode)
     if (loginMode === "admin") {
       navigate("/admin/dashboard", { replace: true });
@@ -46,19 +46,30 @@ const Login = () => {
     
     // Fallback to customer dashboard
     navigate("/dashboard", { replace: true });
-  };
+  }, [loginMode, isAdmin, isStaff, isCustomer, navigate]);
 
   // Redirect if already logged in
   useEffect(() => {
     if (authLoading || !user) return;
 
-    // Wait a bit for profile to load
-    const timer = setTimeout(() => {
-      redirectByRole();
-    }, 100);
+    // Wait for role to be available before redirecting
+    const checkAndRedirect = async () => {
+      // If role is already available, redirect immediately
+      if (role) {
+        redirectByRole();
+        return;
+      }
 
-    return () => clearTimeout(timer);
-  }, [user, authLoading, role, loginMode, isAdmin, isStaff, isCustomer, navigate]);
+      // Otherwise wait a bit for profile to load
+      const timer = setTimeout(() => {
+        redirectByRole();
+      }, 500);
+
+      return () => clearTimeout(timer);
+    };
+
+    checkAndRedirect();
+  }, [user, authLoading, role, loginMode, redirectByRole]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -105,8 +116,35 @@ const Login = () => {
         description: "Logged in successfully",
       });
 
-      // Wait for session to be fully established and profile to load
-      await new Promise(resolve => setTimeout(resolve, 500));
+      // Force refresh profile in AuthContext to ensure role is loaded
+      if (refreshProfile) {
+        await refreshProfile();
+      }
+
+      // Wait for AuthContext to update with new profile/role
+      // Poll for role to be available (max 3 seconds)
+      let attempts = 0;
+      const maxAttempts = 15; // 15 attempts * 200ms = 3 seconds max
+      
+      while (attempts < maxAttempts) {
+        await new Promise(resolve => setTimeout(resolve, 200));
+        
+        // Check if role is now available
+        const { data: { user: currentUser } } = await supabase.auth.getUser();
+        if (currentUser) {
+          const { data: profile } = await supabase
+            .from("profiles")
+            .select("role")
+            .eq("user_id", currentUser.id)
+            .single();
+          
+          if (profile?.role) {
+            // Role is loaded, break and redirect
+            break;
+          }
+        }
+        attempts++;
+      }
 
       // Use normalized role helpers for redirect
       redirectByRole();
@@ -190,11 +228,16 @@ const Login = () => {
               </div>
               <p className="mt-3 text-xs text-muted-foreground text-center">
                 {loginMode === "auto"
-                  ? "Customer access - view orders and track deliveries"
+                  ? "Auto-detect role from your account"
                   : loginMode === "staff"
-                  ? "Staff access - manage job cards and orders"
-                  : "Admin access - full system management"}
+                  ? "Bypass to Staff Dashboard (for testing)"
+                  : "Bypass to Admin Dashboard (for testing)"}
               </p>
+              {loginMode !== "auto" && (
+                <p className="mt-1 text-xs text-amber-600 dark:text-amber-400 text-center font-medium">
+                  ⚠️ Bypass mode: Will redirect regardless of actual role
+                </p>
+              )}
             </div>
             {authLoading ? (
               <div className="flex items-center justify-center py-8">

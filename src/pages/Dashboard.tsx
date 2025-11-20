@@ -52,10 +52,9 @@ const Dashboard = () => {
       }
       fetchOrders(user);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user, authLoading, navigate]);
+  }, [user, authLoading, navigate, fetchOrders]);
 
-  const fetchOrders = async (currentUser: any) => {
+  const fetchOrders = useCallback(async (currentUser: any) => {
     setOrdersState((prev) => ({ ...prev, isLoading: true }));
 
     const { data: orders, error } = await supabase
@@ -64,10 +63,13 @@ const Dashboard = () => {
         "id, order_number, status, expected_delivery_date, net_total_rs, advance_amount_rs, balance_amount_rs, discount_code, discount_amount_rs, subtotal_rs, created_at, metadata, delivery_method, delivery_date"
       )
       .eq("customer_id", currentUser.id)
-      .order("created_at", { ascending: false });
+      .order("created_at", { ascending: false })
+      .limit(50); // Limit to 50 most recent orders for performance
 
     if (error) {
-      console.error("Error fetching orders:", error);
+      if (import.meta.env.DEV) {
+        console.error("Error fetching orders:", error);
+      }
       toast({
         title: "Unable to load orders",
         description: "Please try again in a moment.",
@@ -128,7 +130,7 @@ const Dashboard = () => {
       orders: enrichedOrders,
       isLoading: false,
     });
-  };
+  }, [toast]);
 
   const handleLogout = async () => {
     await supabase.auth.signOut();

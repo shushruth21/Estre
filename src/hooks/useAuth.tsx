@@ -20,5 +20,6 @@ export function useAuth() {
     isStaff: authContext.isStaff,
     isCustomer: authContext.isCustomer,
     profile: authContext.profile,
+    refreshProfile: authContext.refreshProfile, // Expose refreshProfile
   };
 }
