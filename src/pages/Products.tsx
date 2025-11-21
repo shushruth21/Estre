@@ -117,171 +117,170 @@ const Products = () => {
       // Start performance timer
       const endTimer = performanceMonitor.startTimer('product-query');
 
-      // Log query attempt - always log for debugging
-      console.log('🔍 Fetching products:', {
-        category,
-        table: getCategoryTableName(category),
-        timestamp: new Date().toISOString()
-      });
+      const tableName = getCategoryTableName(category);
       const columns = getCategoryColumns(category);
       
-      // Build select query - handle categories that don't have bom_rs column
-      // Use try-catch approach: select only columns that exist
-      let selectFields = `id, title, images, ${columns.netPrice}, ${columns.strikePrice}, discount_percent, discount_rs`;
-      
-      // Only add bom_rs if category supports it
-      if (category !== "sofabed" && category !== "recliner" && category !== "cinema_chairs" && category !== "database_pouffes") {
-        selectFields += `, bom_rs`;
-      }
-      if (category === "sofabed") {
-        // For sofabed, bom_rs has been renamed to strike_price_2seater_rs
-        selectFields = `id, title, images, ${columns.netPrice}, ${columns.strikePrice}, strike_price_2seater_rs, discount_percent, discount_rs`;
-      } else if (category === "recliner" || category === "cinema_chairs") {
-        // For recliner and cinema chairs, bom_rs doesn't exist - use primary pricing columns only
-        selectFields = `id, title, images, ${columns.netPrice}, ${columns.strikePrice}, discount_percent, discount_rs`;
-      } else if (category === "database_pouffes") {
-        // For pouffes, use image column (singular, not images)
-        selectFields = `id, title, image, ${columns.netPrice}, ${columns.strikePrice}, discount_percent, discount_rs`;
-      }
-      
-      // Using dynamic table names with Supabase requires runtime querying
-      let query = supabase
-        .from(getCategoryTableName(category) as any)
-        .select(selectFields);
-      
-      // Only filter by is_active if the table has that column (exclude database_pouffes)
-      if (category !== "database_pouffes") {
-        query = query.eq("is_active", true);
-      }
-      
-      const { data, error } = await query.order("title", { ascending: true }) as any;
-
-      if (error) {
-        // Enhanced error logging - always log errors
-        console.error('❌ Supabase query error:', {
-          category,
-          table: getCategoryTableName(category),
-          selectFields,
-          error: {
-            message: error.message,
-            code: error.code,
-            details: error.details,
-            hint: error.hint,
-          }
-        });
-        
-        // Also log the full error object for debugging
-        if (import.meta.env.DEV) {
-          console.error('Full error object:', error);
-        }
-        
-        // Provide specific error messages based on error code
-        let userMessage = `Failed to load products: ${error.message}`;
-        if (error.code === 'PGRST301' || error.message?.includes('permission denied')) {
-          userMessage = `Access denied. Please check RLS policies for table "${getCategoryTableName(category)}".`;
-        } else if (error.code === '42P01' || error.message?.includes('does not exist')) {
-          userMessage = `Table "${getCategoryTableName(category)}" does not exist in database.`;
-        } else if (error.hint) {
-          userMessage += ` (${error.hint})`;
-        }
-        
-        throw new Error(userMessage);
-      }
-      
-      // Debug: Log raw data from database
-      if (data && data.length > 0) {
-        console.log('📦 Raw product data from database:', {
-          category,
-          count: data.length,
-          columns: columns,
-          firstItem: {
-            id: data[0].id,
-            title: data[0].title,
-            netPrice: data[0][columns.netPrice],
-            strikePrice: data[0][columns.strikePrice],
-            strike_price_2seater_rs: category === "sofabed" ? data[0].strike_price_2seater_rs : undefined,
-            discount_percent: data[0].discount_percent,
-          }
-        });
-      } else {
-        console.warn('⚠️ No products found in database:', {
-          category,
-          table: getCategoryTableName(category),
-          message: 'Table exists but contains no data or all items are inactive',
-          suggestion: 'Check if products exist and have is_active = true'
-        });
-      }
-      
-      // End performance timer
-      endTimer();
-
-      // Normalize the data to use consistent property names
-      const normalizedData = (data || []).map((item: any) => {
-        // Handle images - use utility function for consistent parsing
-        // Get first image for thumbnail, but store full image data for gallery
-        // For pouffes, use image column (singular), for others use images
-        const imageData = category === "database_pouffes" ? item.image : item.images;
-        const imageUrl = imageData ? getFirstImageUrl(imageData) : null;
-        
-        // Debug logging in development
-        if (import.meta.env.DEV) {
-          if (imageData && !imageUrl) {
-            console.warn('⚠️ Image parsing failed for product:', {
-              id: item.id,
-              title: item.title,
-              rawImages: imageData,
-              imagesType: typeof imageData,
-              isArray: Array.isArray(imageData)
-            });
-          } else if (imageUrl) {
-            console.log('✅ Image parsed successfully:', {
-              product: item.title,
-              original: imageData,
-              parsed: imageUrl
-            });
-          } else if (category === "database_pouffes" && !item.image) {
-            console.log('ℹ️ Pouffe product has no image:', {
-              product: item.title,
-              id: item.id
-            });
-          }
-        }
-        
-        // For sofabed, use strike_price_2seater_rs if available, otherwise use the mapped strikePrice
-        const strikePrice = category === "sofabed" && item.strike_price_2seater_rs !== null && item.strike_price_2seater_rs !== undefined
-          ? item.strike_price_2seater_rs
-          : item[columns.strikePrice];
-        
-        // Ensure numeric values are properly converted
-        const netPrice = item[columns.netPrice] !== null && item[columns.netPrice] !== undefined 
-          ? Number(item[columns.netPrice]) 
-          : null;
-        const strikePriceNum = strikePrice !== null && strikePrice !== undefined 
-          ? Number(strikePrice) 
-          : null;
-        
-        return {
-          id: item.id,
-          title: item.title,
-          images: imageUrl, // First image URL for thumbnail
-          imagesData: imageData, // Full image data for gallery (can be string, array, etc.)
-          netPrice: netPrice,
-          strikePrice: strikePriceNum,
-          discount_percent: item.discount_percent,
-          discount_rs: item.discount_rs,
-          bom_rs: (category === "sofabed" || category === "recliner" || category === "cinema_chairs" || category === "database_pouffes") ? undefined : item.bom_rs // bom_rs not present for these categories
-        };
+      // Log query attempt
+      console.log('🔍 Fetching products:', {
+        category,
+        table: tableName,
+        timestamp: new Date().toISOString()
       });
       
-      return normalizedData as Product[];
+      try {
+        // Step 1: Try minimal query first to verify table access
+        const { data: testData, error: testError } = await supabase
+          .from(tableName as any)
+          .select('id, title')
+          .limit(1);
+        
+        if (testError) {
+          console.error('❌ Table access test failed:', {
+            table: tableName,
+            error: testError.message,
+            code: testError.code,
+            details: testError.details
+          });
+          endTimer();
+          throw new Error(`Cannot access table "${tableName}": ${testError.message}`);
+        }
+        
+        if (!testData || testData.length === 0) {
+          console.warn('⚠️ Table is empty or no active products:', tableName);
+          endTimer();
+          return [];
+        }
+        
+        // Step 2: Build select query with error handling
+        let selectFields = `id, title, images, ${columns.netPrice}, ${columns.strikePrice}, discount_percent, discount_rs`;
+        
+        // Only add bom_rs if category supports it (exclude sofa too)
+        if (category !== "sofabed" && category !== "recliner" && category !== "cinema_chairs" && category !== "database_pouffes" && category !== "sofa") {
+          selectFields += `, bom_rs`;
+        }
+        
+        if (category === "sofabed") {
+          selectFields = `id, title, images, ${columns.netPrice}, ${columns.strikePrice}, strike_price_2seater_rs, discount_percent, discount_rs`;
+        } else if (category === "recliner" || category === "cinema_chairs") {
+          selectFields = `id, title, images, ${columns.netPrice}, ${columns.strikePrice}, discount_percent, discount_rs`;
+        } else if (category === "database_pouffes") {
+          selectFields = `id, title, image, ${columns.netPrice}, ${columns.strikePrice}, discount_percent, discount_rs`;
+        }
+        
+        // Step 3: Execute full query
+        let query = supabase
+          .from(tableName as any)
+          .select(selectFields);
+        
+        // Only filter by is_active if the table has that column
+        if (category !== "database_pouffes") {
+          query = query.eq("is_active", true);
+        }
+        
+        const { data, error } = await query.order("title", { ascending: true }) as any;
+        
+        if (error) {
+          console.error('❌ Supabase query error:', {
+            category,
+            table: tableName,
+            selectFields,
+            error: {
+              message: error.message,
+              code: error.code,
+              details: error.details,
+              hint: error.hint,
+            }
+          });
+          
+          endTimer();
+          
+          // Provide specific error messages
+          let userMessage = `Failed to load products: ${error.message}`;
+          if (error.code === 'PGRST301' || error.message?.includes('permission denied')) {
+            userMessage = `Access denied. RLS policies may not allow public read access to "${tableName}". Please check Supabase RLS policies.`;
+          } else if (error.code === '42P01' || error.message?.includes('does not exist')) {
+            userMessage = `Table "${tableName}" does not exist in database.`;
+          } else if (error.message?.includes('column')) {
+            userMessage = `Column mismatch: ${error.message}. Please verify column names in "${tableName}".`;
+          } else if (error.hint) {
+            userMessage += ` (${error.hint})`;
+          }
+          
+          throw new Error(userMessage);
+        }
+        
+        // Step 4: Validate and normalize data
+        if (!data || data.length === 0) {
+          console.warn('⚠️ No products found:', {
+            category,
+            table: tableName,
+            message: 'Query succeeded but returned no data'
+          });
+          endTimer();
+          return [];
+        }
+        
+        console.log('✅ Products loaded successfully:', {
+          category,
+          count: data.length,
+          table: tableName
+        });
+        
+        // End performance timer
+        endTimer();
+        
+        // Normalize the data
+        const normalizedData = (data || []).map((item: any) => {
+          const imageData = category === "database_pouffes" ? item.image : item.images;
+          const imageUrl = imageData ? getFirstImageUrl(imageData) : null;
+          
+          const strikePrice = category === "sofabed" && item.strike_price_2seater_rs !== null && item.strike_price_2seater_rs !== undefined
+            ? item.strike_price_2seater_rs
+            : item[columns.strikePrice];
+          
+          const netPrice = item[columns.netPrice] !== null && item[columns.netPrice] !== undefined 
+            ? Number(item[columns.netPrice]) 
+            : null;
+          const strikePriceNum = strikePrice !== null && strikePrice !== undefined 
+            ? Number(strikePrice) 
+            : null;
+          
+          return {
+            id: item.id,
+            title: item.title,
+            images: imageUrl,
+            imagesData: imageData,
+            netPrice: netPrice,
+            strikePrice: strikePriceNum,
+            discount_percent: item.discount_percent,
+            discount_rs: item.discount_rs,
+            bom_rs: (category === "sofabed" || category === "recliner" || category === "cinema_chairs" || category === "database_pouffes" || category === "sofa") ? undefined : item.bom_rs
+          };
+        });
+        
+        return normalizedData as Product[];
+      } catch (err: any) {
+        // Catch-all error handling
+        console.error('❌ Unexpected error in product query:', {
+          category,
+          table: tableName,
+          error: err.message || err,
+          stack: err.stack
+        });
+        endTimer();
+        throw err;
+      }
     },
     retry: 1,
-    staleTime: 15 * 60 * 1000, // Cache for 15 minutes (products don't change often)
-    gcTime: 60 * 60 * 1000, // Keep in cache for 60 minutes
+    staleTime: 5 * 60 * 1000, // Cache for 5 minutes
+    gcTime: 15 * 60 * 1000, // Keep in cache for 15 minutes
     placeholderData: (previousData) => previousData, // Keep old data while fetching new
     refetchOnMount: false, // Don't refetch if data is fresh
     refetchOnWindowFocus: false, // Don't refetch on window focus
     refetchOnReconnect: false, // Don't refetch on reconnect
+    onError: (error: any) => {
+      console.error('React Query error:', error);
+    }
   });
 
   return (

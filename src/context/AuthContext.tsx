@@ -168,6 +168,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Normalize role from profile
   const normalizedRole = normalizeRole(profile?.role ?? null);
 
+  // Debug logging for role detection (helpful for troubleshooting)
+  useEffect(() => {
+    if (user && profile) {
+      console.log('🔍 AuthContext Role Check:', {
+        userEmail: user.email,
+        rawRole: profile.role,
+        normalizedRole: normalizedRole,
+        isAdmin: normalizedRole === 'admin',
+        isStaff: normalizedRole === 'staff' || normalizedRole === 'admin',
+        isCustomer: normalizedRole === 'customer'
+      });
+    } else if (user && !profile) {
+      console.warn('⚠️ AuthContext: User exists but profile is missing', {
+        userEmail: user.email,
+        userId: user.id
+      });
+    }
+  }, [user, profile, normalizedRole]);
+
   // Role helper functions (based on normalized role)
   const isCustomer = () => {
     return normalizedRole === "customer";

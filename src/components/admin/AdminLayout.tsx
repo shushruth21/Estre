@@ -126,6 +126,20 @@ export function AdminLayout({ children }: AdminLayoutProps) {
     staleTime: 30 * 1000, // Consider fresh for 30 seconds
   });
 
+  // Debug logging for role detection
+  useEffect(() => {
+    if (user) {
+      console.log('AdminLayout render:', {
+        loading,
+        hasUser: !!user,
+        role,
+        isAdmin: isAdmin(),
+        pathname: location.pathname,
+        userEmail: user?.email
+      });
+    }
+  }, [user, loading, role, location.pathname, isAdmin]);
+
   // Role checking is handled by ProtectedRoute, but we can verify here
   // This component only renders if user is admin (via ProtectedRoute guard)
 
@@ -170,7 +184,23 @@ export function AdminLayout({ children }: AdminLayoutProps) {
 
   // Check if user is authenticated
   if (!user) {
+    console.warn('AdminLayout: No user, redirecting to login');
     navigate("/login");
+    return null;
+  }
+
+  // Double-check admin access (ProtectedRoute should handle this, but extra safety)
+  if (!isAdmin()) {
+    console.warn('AdminLayout: User is not admin, redirecting to home', {
+      role,
+      userEmail: user?.email
+    });
+    toast({
+      title: "Access Denied",
+      description: "You don't have permission to access the admin panel.",
+      variant: "destructive",
+    });
+    navigate("/");
     return null;
   }
 

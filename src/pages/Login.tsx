@@ -134,39 +134,51 @@ const Login = () => {
         await refreshProfile();
       }
 
-      // Single role fetch with timeout (optimized - no polling)
-      const fetchRoleWithTimeout = async () => {
-        const timeoutPromise = new Promise((_, reject) =>
-          setTimeout(() => reject(new Error('Role fetch timeout')), 2000)
-        );
-
-        const rolePromise = supabase
-          .from("profiles")
-          .select("role")
-          .eq("user_id", data.user.id)
-          .single();
-
-        try {
-          await Promise.race([rolePromise, timeoutPromise]);
-        } catch (error) {
-          // Role fetch failed or timed out, but continue with redirect
-          if (import.meta.env.DEV) {
-            console.warn("Role fetch timeout, continuing with default redirect:", error);
+      // Wait for AuthContext to update with new profile/role
+      // Poll for role to be available (max 5 seconds)
+      let attempts = 0;
+      const maxAttempts = 25; // 25 attempts * 200ms = 5 seconds max
+      
+      while (attempts < maxAttempts) {
+        await new Promise(resolve => setTimeout(resolve, 200));
+        
+        // Check if role is now available by fetching fresh profile
+        const { data: { user: currentUser } } = await supabase.auth.getUser();
+        if (currentUser) {
+          const { data: freshProfile } = await supabase
+            .from("profiles")
+            .select("role")
+            .eq("user_id", currentUser.id)
+            .single();
+          
+          if (freshProfile?.role) {
+            // Force another refresh to update AuthContext
+            if (refreshProfile) {
+              await refreshProfile();
+            }
+            // Wait a bit more for context to update
+            await new Promise(resolve => setTimeout(resolve, 300));
+            break;
           }
         }
-      };
-
-      await fetchRoleWithTimeout();
+        attempts++;
+      }
 
       // Brief delay to allow AuthContext to update
       await new Promise(resolve => setTimeout(resolve, 300));
 
+      // Log for debugging
+      console.log('Login redirect check:', {
+        role,
+        isAdmin: isAdmin(),
+        isStaff: isStaff(),
+        isCustomer: isCustomer()
+      });
+
       // Use normalized role helpers for redirect
       redirectByRole();
     } catch (error: any) {
-      if (import.meta.env.DEV) {
-        console.error("Login error:", error);
-      }
+      console.error("Login error:", error);
       
       // Provide user-friendly error messages
       let errorMessage = "Invalid email or password";
@@ -334,3 +346,4 @@ const Login = () => {
 };
 
 export default Login;
+
