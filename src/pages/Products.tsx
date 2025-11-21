@@ -290,21 +290,26 @@ const Products = () => {
       </header>
 
       <div className="container mx-auto px-4 py-12">
-        <h1 className="text-4xl lg:text-5xl font-serif font-bold mb-8 tracking-tight">Product Catalog</h1>
+        <div className="text-center mb-12">
+          <h1 className="text-4xl lg:text-6xl font-serif font-bold mb-4 tracking-tight">Product Catalog</h1>
+          <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+            Explore our curated collection of premium furniture, each piece customizable to your specifications
+          </p>
+        </div>
 
         {/* Category Tabs */}
-        <Tabs value={category} onValueChange={handleCategoryChange} className="mb-8">
-          <TabsList className="flex-wrap h-auto">
-            <TabsTrigger value="sofa">Sofas</TabsTrigger>
-            <TabsTrigger value="bed">Beds</TabsTrigger>
-            <TabsTrigger value="recliner">Recliners</TabsTrigger>
-            <TabsTrigger value="cinema_chairs">Cinema Chairs</TabsTrigger>
-            <TabsTrigger value="dining_chairs">Dining Chairs</TabsTrigger>
-            <TabsTrigger value="arm_chairs">Arm Chairs</TabsTrigger>
-            <TabsTrigger value="benches">Benches</TabsTrigger>
-            <TabsTrigger value="kids_bed">Kids Beds</TabsTrigger>
-            <TabsTrigger value="sofabed">Sofa Beds</TabsTrigger>
-            <TabsTrigger value="database_pouffes">Pouffes</TabsTrigger>
+        <Tabs value={category} onValueChange={handleCategoryChange} className="mb-12">
+          <TabsList className="flex-wrap h-auto gap-2 bg-muted/50 p-2">
+            <TabsTrigger value="sofa" className="data-[state=active]:bg-gold data-[state=active]:text-white">Sofas</TabsTrigger>
+            <TabsTrigger value="bed" className="data-[state=active]:bg-gold data-[state=active]:text-white">Beds</TabsTrigger>
+            <TabsTrigger value="recliner" className="data-[state=active]:bg-gold data-[state=active]:text-white">Recliners</TabsTrigger>
+            <TabsTrigger value="cinema_chairs" className="data-[state=active]:bg-gold data-[state=active]:text-white">Cinema Chairs</TabsTrigger>
+            <TabsTrigger value="dining_chairs" className="data-[state=active]:bg-gold data-[state=active]:text-white">Dining Chairs</TabsTrigger>
+            <TabsTrigger value="arm_chairs" className="data-[state=active]:bg-gold data-[state=active]:text-white">Arm Chairs</TabsTrigger>
+            <TabsTrigger value="benches" className="data-[state=active]:bg-gold data-[state=active]:text-white">Benches</TabsTrigger>
+            <TabsTrigger value="kids_bed" className="data-[state=active]:bg-gold data-[state=active]:text-white">Kids Beds</TabsTrigger>
+            <TabsTrigger value="sofabed" className="data-[state=active]:bg-gold data-[state=active]:text-white">Sofa Beds</TabsTrigger>
+            <TabsTrigger value="database_pouffes" className="data-[state=active]:bg-gold data-[state=active]:text-white">Pouffes</TabsTrigger>
           </TabsList>
         </Tabs>
 
@@ -336,25 +341,36 @@ const Products = () => {
         )}
         
         {(isLoading && !products) ? (
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {[...Array(6)].map((_, i) => (
-              <Card key={i} className="overflow-hidden luxury-card border-muted/50 animate-pulse">
-                <div className="aspect-[4/3] bg-gradient-to-br from-muted to-muted/50"></div>
-                <CardContent className="p-6 space-y-3">
-                  <div className="h-6 bg-muted rounded w-3/4"></div>
-                  <div className="h-8 bg-muted rounded w-1/2"></div>
-                </CardContent>
-                <CardFooter className="p-6 pt-0">
-                  <div className="w-full h-10 bg-muted rounded"></div>
-                </CardFooter>
-              </Card>
-            ))}
+          <div className="space-y-6">
+            <div className="text-center">
+              <div className="inline-flex items-center gap-2 px-4 py-2 bg-primary/10 rounded-full">
+                <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                <span className="text-sm font-medium text-primary">Loading products...</span>
+              </div>
+            </div>
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+              {[...Array(6)].map((_, i) => (
+                <Card key={i} className="overflow-hidden luxury-card border-muted/30 animate-pulse">
+                  <div className="aspect-[4/3] bg-gradient-to-br from-muted/50 to-muted/30"></div>
+                  <CardContent className="p-6 space-y-3">
+                    <div className="h-6 bg-muted/60 rounded w-3/4"></div>
+                    <div className="h-8 bg-muted/60 rounded w-1/2"></div>
+                  </CardContent>
+                  <CardFooter className="p-6 pt-0">
+                    <div className="w-full h-10 bg-muted/60 rounded"></div>
+                  </CardFooter>
+                </Card>
+              ))}
+            </div>
           </div>
         ) : !error && products && products.length > 0 ? (
-          <div className="space-y-4">
+          <div className="space-y-6">
             {isPlaceholderData && (
-              <div className="bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg p-3 text-center">
-                <p className="text-sm text-blue-700 dark:text-blue-300">Loading {category} products...</p>
+              <div className="bg-blue-50 dark:bg-blue-950/50 border border-blue-200 dark:border-blue-800 rounded-lg p-4 text-center shadow-sm">
+                <div className="flex items-center justify-center gap-2">
+                  <Loader2 className="h-4 w-4 animate-spin text-blue-600 dark:text-blue-400" />
+                  <p className="text-sm font-medium text-blue-700 dark:text-blue-300">Loading {category} products...</p>
+                </div>
               </div>
             )}
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">

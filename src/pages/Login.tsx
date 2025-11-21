@@ -186,17 +186,20 @@ const Login = () => {
         </div>
       </header>
 
-      <div className="flex-1 flex items-center justify-center p-4">
-        <Card className="w-full max-w-md">
-          <CardHeader>
-            <CardTitle>Login</CardTitle>
-            <CardDescription>
+      <div className="flex-1 flex items-center justify-center p-4 bg-gradient-to-br from-background via-muted/20 to-background">
+        <Card className="w-full max-w-md shadow-xl border-gold/20">
+          <CardHeader className="space-y-2 text-center">
+            <div className="mx-auto w-16 h-16 rounded-full bg-gradient-gold flex items-center justify-center shadow-lg mb-2">
+              <span className="text-white font-bold text-2xl font-luxury">E</span>
+            </div>
+            <CardTitle className="text-3xl font-serif">Welcome Back</CardTitle>
+            <CardDescription className="text-base">
               Enter your credentials to access your account
             </CardDescription>
           </CardHeader>
           <CardContent>
             <div className="mb-6">
-              <Label className="mb-3 block text-sm font-medium">
+              <Label className="mb-4 block text-sm font-semibold">
                 Choose your access type
               </Label>
               <div className="grid grid-cols-3 gap-3">
@@ -207,10 +210,10 @@ const Login = () => {
                 ]).map(({ value, label }) => (
                   <label
                     key={value}
-                    className={`flex items-center justify-center p-3 rounded-lg border-2 cursor-pointer transition-all ${
+                    className={`flex items-center justify-center p-4 rounded-xl border-2 cursor-pointer transition-all ${
                       loginMode === value
-                        ? "border-primary bg-primary/10 text-primary font-medium"
-                        : "border-muted hover:border-primary/50 text-muted-foreground"
+                        ? "border-gold bg-gold/10 text-gold font-semibold shadow-md scale-105"
+                        : "border-muted-foreground/20 hover:border-gold/50 text-muted-foreground hover:text-foreground"
                     }`}
                   >
                     <input
@@ -222,21 +225,16 @@ const Login = () => {
                       disabled={isLoading || authLoading}
                       className="sr-only"
                     />
-                    <span className="text-sm">{label}</span>
+                    <span className="text-sm font-medium">{label}</span>
                   </label>
                 ))}
               </div>
-              <p className="mt-3 text-xs text-muted-foreground text-center">
-                {loginMode === "auto"
-                  ? "Auto-detect role from your account"
-                  : loginMode === "staff"
-                  ? "Bypass to Staff Dashboard (for testing)"
-                  : "Bypass to Admin Dashboard (for testing)"}
-              </p>
               {loginMode !== "auto" && (
-                <p className="mt-1 text-xs text-amber-600 dark:text-amber-400 text-center font-medium">
-                  ⚠️ Bypass mode: Will redirect regardless of actual role
-                </p>
+                <div className="mt-3 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-lg p-3">
+                  <p className="text-xs text-amber-800 dark:text-amber-400 text-center font-medium">
+                    ⚠️ Bypass mode: Will redirect to {loginMode} dashboard regardless of actual role
+                  </p>
+                </div>
               )}
             </div>
             {authLoading ? (
@@ -289,15 +287,19 @@ const Login = () => {
                     </Button>
                   </div>
                 </div>
-                <Button type="submit" className="w-full" disabled={isLoading || authLoading}>
-                  {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                <Button
+                  type="submit"
+                  className="w-full luxury-button bg-gradient-gold text-white border-gold hover:shadow-gold-glow transition-premium text-base py-6"
+                  disabled={isLoading || authLoading}
+                >
+                  {isLoading && <Loader2 className="mr-2 h-5 w-5 animate-spin" />}
                   {isLoading ? "Signing in..." : "Sign In"}
                 </Button>
               </form>
             )}
-            <div className="mt-4 text-center text-sm">
+            <div className="mt-6 text-center">
               <span className="text-muted-foreground">Don't have an account? </span>
-              <Link to="/signup" className="text-primary hover:underline font-medium">
+              <Link to="/signup" className="text-gold hover:text-gold-dark underline-offset-4 hover:underline font-semibold transition-colors">
                 Sign up
               </Link>
             </div>
