@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { getFirstImageUrl } from "@/lib/image-utils";
+import { performanceMonitor } from "@/lib/performance-monitor";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -111,7 +112,11 @@ const Products = () => {
 
   const { data: products, isLoading, error, isPlaceholderData } = useQuery({
     queryKey: ["products", category],
+    enabled: !!category,
     queryFn: async () => {
+      // Start performance timer
+      const endTimer = performanceMonitor.startTimer('product-query');
+
       // Log query attempt - always log for debugging
       console.log('🔍 Fetching products:', {
         category,
@@ -207,6 +212,9 @@ const Products = () => {
         });
       }
       
+      // End performance timer
+      endTimer();
+
       // Normalize the data to use consistent property names
       const normalizedData = (data || []).map((item: any) => {
         // Handle images - use utility function for consistent parsing
@@ -268,11 +276,12 @@ const Products = () => {
       return normalizedData as Product[];
     },
     retry: 1,
-    staleTime: 10 * 60 * 1000, // Cache for 10 minutes
-    gcTime: 30 * 60 * 1000, // Keep in cache for 30 minutes
+    staleTime: 15 * 60 * 1000, // Cache for 15 minutes (products don't change often)
+    gcTime: 60 * 60 * 1000, // Keep in cache for 60 minutes
     placeholderData: (previousData) => previousData, // Keep old data while fetching new
     refetchOnMount: false, // Don't refetch if data is fresh
     refetchOnWindowFocus: false, // Don't refetch on window focus
+    refetchOnReconnect: false, // Don't refetch on reconnect
   });
 
   return (
@@ -382,32 +391,15 @@ const Products = () => {
                     alt={product.title}
                     className="w-full h-full object-cover image-zoom"
                     loading="lazy"
+                    decoding="async"
                     onError={(e) => {
                       const target = e.target as HTMLImageElement;
                       const currentSrc = target.src;
-                      
-                      // Log error in development
-                      if (import.meta.env.DEV) {
-                        console.error('❌ Image failed to load:', {
-                          product: product.title,
-                          attemptedUrl: product.images,
-                          failedUrl: currentSrc
-                        });
-                      }
-                      
+
                       // Only set placeholder if not already placeholder
                       if (!currentSrc.includes('placeholder.svg')) {
                         target.src = '/placeholder.svg';
                         target.onerror = null; // Prevent infinite loop
-                      }
-                    }}
-                    onLoad={() => {
-                      // Log successful load in development
-                      if (import.meta.env.DEV && product.images) {
-                        console.log('✅ Image loaded successfully:', {
-                          product: product.title,
-                          url: product.images
-                        });
                       }
                     }}
                     referrerPolicy="no-referrer-when-downgrade"

@@ -33,7 +33,7 @@ const Configure = () => {
   const [isAddingToCart, setIsAddingToCart] = useState(false);
 
   const { data: product, isLoading: loadingProduct } = useQuery({
-    queryKey: ["product", productId],
+    queryKey: ["product", category, productId],
     queryFn: async () => {
       // Handle special case for database_pouffes which already includes '_database' in the name
       const tableName = category === "database_pouffes" ? "database_pouffes" : `${category}_database`;
@@ -44,14 +44,16 @@ const Configure = () => {
         .single() as any;
 
       if (error) throw error;
-      
+
       // Keep original image data - ProductImageGallery will parse it
       // This preserves arrays, strings, comma-separated, JSON arrays, etc.
       // No normalization needed - ProductImageGallery handles all formats
-      
+
       return data;
     },
     enabled: !!category && !!productId,
+    staleTime: 30 * 60 * 1000, // Cache individual products for 30 minutes
+    gcTime: 60 * 60 * 1000, // Keep in memory for 1 hour
   });
 
   // Real-time price calculation with debouncing
