@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -41,19 +41,7 @@ const Dashboard = () => {
     return ordersState.orders.map((order) => order.id);
   }, [ordersState.orders]);
 
-  // Set up realtime subscriptions
-  useRealtimeOrders({ orderIds, enabled: orderIds.length > 0 });
-
-  useEffect(() => {
-    if (!authLoading) {
-      if (!user) {
-        navigate("/login");
-        return;
-      }
-      fetchOrders(user);
-    }
-  }, [user, authLoading, navigate, fetchOrders]);
-
+  // Define fetchOrders BEFORE useEffect to avoid initialization error
   const fetchOrders = useCallback(async (currentUser: any) => {
     setOrdersState((prev) => ({ ...prev, isLoading: true }));
 
@@ -130,7 +118,21 @@ const Dashboard = () => {
       orders: enrichedOrders,
       isLoading: false,
     });
-  }, [toast]);
+  }, [toast, navigate]);
+
+  // Set up realtime subscriptions
+  useRealtimeOrders({ orderIds, enabled: orderIds.length > 0 });
+
+  // Fetch orders when user is available
+  useEffect(() => {
+    if (!authLoading) {
+      if (!user) {
+        navigate("/login");
+        return;
+      }
+      fetchOrders(user);
+    }
+  }, [user, authLoading, navigate, fetchOrders]);
 
   const handleLogout = async () => {
     await supabase.auth.signOut();

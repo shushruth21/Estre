@@ -128,30 +128,7 @@ const Products = () => {
       });
       
       try {
-        // Step 1: Try minimal query first to verify table access
-        const { data: testData, error: testError } = await supabase
-          .from(tableName as any)
-          .select('id, title')
-          .limit(1);
-        
-        if (testError) {
-          console.error('❌ Table access test failed:', {
-            table: tableName,
-            error: testError.message,
-            code: testError.code,
-            details: testError.details
-          });
-          endTimer();
-          throw new Error(`Cannot access table "${tableName}": ${testError.message}`);
-        }
-        
-        if (!testData || testData.length === 0) {
-          console.warn('⚠️ Table is empty or no active products:', tableName);
-          endTimer();
-          return [];
-        }
-        
-        // Step 2: Build select query with error handling
+        // Build select query with error handling (removed redundant test query for performance)
         let selectFields = `id, title, images, ${columns.netPrice}, ${columns.strikePrice}, discount_percent, discount_rs`;
         
         // Only add bom_rs if category supports it (exclude sofa too)
@@ -167,7 +144,7 @@ const Products = () => {
           selectFields = `id, title, image, ${columns.netPrice}, ${columns.strikePrice}, discount_percent, discount_rs`;
         }
         
-        // Step 3: Execute full query
+        // Execute query
         let query = supabase
           .from(tableName as any)
           .select(selectFields);
@@ -209,7 +186,7 @@ const Products = () => {
           throw new Error(userMessage);
         }
         
-        // Step 4: Validate and normalize data
+        // Validate and normalize data
         if (!data || data.length === 0) {
           console.warn('⚠️ No products found:', {
             category,
@@ -272,12 +249,14 @@ const Products = () => {
       }
     },
     retry: 1,
-    staleTime: 5 * 60 * 1000, // Cache for 5 minutes
-    gcTime: 15 * 60 * 1000, // Keep in cache for 15 minutes
+    staleTime: 10 * 60 * 1000, // Cache for 10 minutes (increased for better performance)
+    gcTime: 30 * 60 * 1000, // Keep in cache for 30 minutes (increased)
     placeholderData: (previousData) => previousData, // Keep old data while fetching new
     refetchOnMount: false, // Don't refetch if data is fresh
     refetchOnWindowFocus: false, // Don't refetch on window focus
     refetchOnReconnect: false, // Don't refetch on reconnect
+    // Add structural sharing for better performance
+    structuralSharing: true,
     onError: (error: any) => {
       console.error('React Query error:', error);
     }
