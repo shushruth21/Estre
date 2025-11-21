@@ -21,8 +21,11 @@ import {
   Wrench,
   ClipboardList,
   FileText,
+  Shield,
 } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { QCInspectionForm } from "@/components/staff/QCInspectionForm";
 
 export default function StaffJobCardDetail() {
   const { id } = useParams();
@@ -33,12 +36,14 @@ export default function StaffJobCardDetail() {
   const [order, setOrder] = useState<any>(null);
   const [lineItem, setLineItem] = useState<any>(null);
   const [tasks, setTasks] = useState<any[]>([]);
+  const [qualityInspection, setQualityInspection] = useState<any>(null);
   const [staffNotes, setStaffNotes] = useState("");
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     fetchJobCard();
     fetchTasks();
+    fetchQualityInspection();
   }, [id, user]);
 
   const fetchJobCard = async () => {
@@ -107,6 +112,23 @@ export default function StaffJobCardDetail() {
     }
 
     setTasks(data || []);
+  };
+
+  const fetchQualityInspection = async () => {
+    if (!id) return;
+
+    const { data, error } = await supabase
+      .from("quality_inspections")
+      .select("*")
+      .eq("job_card_id", id)
+      .maybeSingle();
+
+    if (error) {
+      console.error("Error fetching quality inspection:", error);
+      return;
+    }
+
+    setQualityInspection(data);
   };
 
   const updateJobCardStatus = async (newStatus: string) => {
@@ -588,20 +610,52 @@ export default function StaffJobCardDetail() {
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Staff Notes</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <Textarea
-              placeholder="Add production notes, report issues, or material shortages..."
-              value={staffNotes}
-              onChange={(e) => setStaffNotes(e.target.value)}
-              rows={6}
+        <Tabs defaultValue="production" className="space-y-4">
+          <TabsList>
+            <TabsTrigger value="production">Production Details</TabsTrigger>
+            <TabsTrigger value="quality" className="flex items-center gap-2">
+              <Shield className="h-4 w-4" />
+              Quality Control
+              {qualityInspection && (
+                <Badge
+                  variant={qualityInspection.qc_status === "pass" ? "default" : qualityInspection.qc_status === "fail" ? "destructive" : "secondary"}
+                  className="ml-1"
+                >
+                  {qualityInspection.qc_status.toUpperCase()}
+                </Badge>
+              )}
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="production" className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Staff Notes</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <Textarea
+                  placeholder="Add production notes, report issues, or material shortages..."
+                  value={staffNotes}
+                  onChange={(e) => setStaffNotes(e.target.value)}
+                  rows={6}
+                />
+                <Button onClick={saveStaffNotes}>Save Notes</Button>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="quality">
+            <QCInspectionForm
+              jobCardId={id!}
+              orderId={jobCard.order_id}
+              existingInspection={qualityInspection}
+              onSuccess={() => {
+                fetchQualityInspection();
+                fetchJobCard();
+              }}
             />
-            <Button onClick={saveStaffNotes}>Save Notes</Button>
-          </CardContent>
-        </Card>
+          </TabsContent>
+        </Tabs>
       </div>
     </StaffLayout>
   );
