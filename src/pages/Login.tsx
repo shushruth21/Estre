@@ -9,6 +9,8 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { ArrowLeft, Loader2, Eye, EyeOff, AlertCircle } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { SSOButtons } from "@/components/auth/SSOButtons";
+import { SecurityIndicator } from "@/components/auth/SecurityIndicator";
 
 const Login = () => {
   const [email, setEmail] = useState("");
@@ -332,6 +334,19 @@ const Login = () => {
                 </Button>
               </form>
             )}
+
+            {!authLoading && (
+              <>
+                <div className="mt-6">
+                  <SSOButtons disabled={isLoading} />
+                </div>
+
+                <div className="mt-6">
+                  <SecurityIndicator variant="compact" showBadges={false} />
+                </div>
+              </>
+            )}
+
             <div className="mt-6 text-center">
               <span className="text-muted-foreground">Don't have an account? </span>
               <Link to="/signup" className="text-gold hover:text-gold-dark underline-offset-4 hover:underline font-semibold transition-colors">
