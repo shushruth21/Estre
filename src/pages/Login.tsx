@@ -7,30 +7,23 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
-import { ArrowLeft, Loader2, Eye, EyeOff } from "lucide-react";
+import { ArrowLeft, Loader2, Eye, EyeOff, AlertCircle } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 const Login = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [loginMode, setLoginMode] = useState<"auto" | "admin" | "staff">("auto");
+  const [authTimeout, setAuthTimeout] = useState(false);
+  const [emailError, setEmailError] = useState("");
+  const [passwordError, setPasswordError] = useState("");
   const navigate = useNavigate();
   const { toast } = useToast();
   const { user, loading: authLoading, role, isAdmin, isStaff, isCustomer, refreshProfile } = useAuth();
 
   const redirectByRole = useCallback(() => {
-    // Manual overrides take precedence (bypass mode)
-    if (loginMode === "admin") {
-      navigate("/admin/dashboard", { replace: true });
-      return;
-    }
-    if (loginMode === "staff") {
-      navigate("/staff/dashboard", { replace: true });
-      return;
-    }
-
-    // Use normalized role helpers
+    // Use normalized role helpers for secure redirect
     if (isAdmin()) {
       navigate("/admin/dashboard", { replace: true });
       return;
@@ -43,10 +36,21 @@ const Login = () => {
       navigate("/dashboard", { replace: true });
       return;
     }
-    
+
     // Fallback to customer dashboard
     navigate("/dashboard", { replace: true });
-  }, [loginMode, isAdmin, isStaff, isCustomer, navigate]);
+  }, [isAdmin, isStaff, isCustomer, navigate]);
+
+  // Add timeout for authLoading to prevent infinite spinner
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      if (authLoading) {
+        setAuthTimeout(true);
+      }
+    }, 10000); // 10 second timeout
+
+    return () => clearTimeout(timeout);
+  }, [authLoading]);
 
   // Redirect if already logged in
   useEffect(() => {
@@ -60,27 +64,49 @@ const Login = () => {
         return;
       }
 
-      // Otherwise wait a bit for profile to load
+      // Otherwise wait a bit for profile to load (max 1 second)
       const timer = setTimeout(() => {
         redirectByRole();
-      }, 500);
+      }, 1000);
 
       return () => clearTimeout(timer);
     };
 
     checkAndRedirect();
-  }, [user, authLoading, role, loginMode, redirectByRole]);
+  }, [user, authLoading, role, redirectByRole]);
+
+  const validateEmail = (email: string): boolean => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+  };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    // Basic validation
-    if (!email || !password) {
-      toast({
-        title: "Missing Information",
-        description: "Please enter both email and password",
-        variant: "destructive",
-      });
+
+    // Reset errors
+    setEmailError("");
+    setPasswordError("");
+
+    // Comprehensive validation
+    let hasError = false;
+
+    if (!email || !email.trim()) {
+      setEmailError("Email is required");
+      hasError = true;
+    } else if (!validateEmail(email.trim())) {
+      setEmailError("Please enter a valid email address");
+      hasError = true;
+    }
+
+    if (!password) {
+      setPasswordError("Password is required");
+      hasError = true;
+    } else if (password.length < 6) {
+      setPasswordError("Password must be at least 6 characters");
+      hasError = true;
+    }
+
+    if (hasError) {
       return;
     }
 
@@ -98,19 +124,6 @@ const Login = () => {
         throw new Error("Login failed. Please try again.");
       }
 
-      // Fetch user role from profiles table to determine redirect
-      const { data: profile, error: profileError } = await supabase
-        .from("profiles")
-        .select("role")
-        .eq("user_id", data.user.id)
-        .single();
-
-      if (profileError) {
-        if (import.meta.env.DEV) {
-          console.warn("Error fetching profile:", profileError);
-        }
-      }
-
       toast({
         title: "Welcome back!",
         description: "Logged in successfully",
@@ -121,30 +134,32 @@ const Login = () => {
         await refreshProfile();
       }
 
-      // Wait for AuthContext to update with new profile/role
-      // Poll for role to be available (max 3 seconds)
-      let attempts = 0;
-      const maxAttempts = 15; // 15 attempts * 200ms = 3 seconds max
-      
-      while (attempts < maxAttempts) {
-        await new Promise(resolve => setTimeout(resolve, 200));
-        
-        // Check if role is now available
-        const { data: { user: currentUser } } = await supabase.auth.getUser();
-        if (currentUser) {
-          const { data: profile } = await supabase
-            .from("profiles")
-            .select("role")
-            .eq("user_id", currentUser.id)
-            .single();
-          
-          if (profile?.role) {
-            // Role is loaded, break and redirect
-            break;
+      // Single role fetch with timeout (optimized - no polling)
+      const fetchRoleWithTimeout = async () => {
+        const timeoutPromise = new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('Role fetch timeout')), 2000)
+        );
+
+        const rolePromise = supabase
+          .from("profiles")
+          .select("role")
+          .eq("user_id", data.user.id)
+          .single();
+
+        try {
+          await Promise.race([rolePromise, timeoutPromise]);
+        } catch (error) {
+          // Role fetch failed or timed out, but continue with redirect
+          if (import.meta.env.DEV) {
+            console.warn("Role fetch timeout, continuing with default redirect:", error);
           }
         }
-        attempts++;
-      }
+      };
+
+      await fetchRoleWithTimeout();
+
+      // Brief delay to allow AuthContext to update
+      await new Promise(resolve => setTimeout(resolve, 300));
 
       // Use normalized role helpers for redirect
       redirectByRole();
@@ -175,11 +190,17 @@ const Login = () => {
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-50 focus:px-4 focus:py-2 focus:bg-gold focus:text-white focus:rounded-md focus:shadow-lg"
+      >
+        Skip to main content
+      </a>
       <header className="border-b">
         <div className="container mx-auto px-4 py-4">
           <Link to="/">
-            <Button variant="ghost" size="sm">
-              <ArrowLeft className="mr-2 h-4 w-4" />
+            <Button variant="ghost" size="sm" aria-label="Go back to home page">
+              <ArrowLeft className="mr-2 h-4 w-4" aria-hidden="true" />
               Back to Home
             </Button>
           </Link>
@@ -187,62 +208,32 @@ const Login = () => {
       </header>
 
       <div className="flex-1 flex items-center justify-center p-4 bg-gradient-to-br from-background via-muted/20 to-background">
-        <Card className="w-full max-w-md shadow-xl border-gold/20">
+        <Card className="w-full max-w-md shadow-xl border-gold/20" id="main-content" role="main">
           <CardHeader className="space-y-2 text-center">
-            <div className="mx-auto w-16 h-16 rounded-full bg-gradient-gold flex items-center justify-center shadow-lg mb-2">
+            <div className="mx-auto w-16 h-16 rounded-full bg-gradient-gold flex items-center justify-center shadow-lg mb-2" aria-hidden="true">
               <span className="text-white font-bold text-2xl font-luxury">E</span>
             </div>
-            <CardTitle className="text-3xl font-serif">Welcome Back</CardTitle>
+            <CardTitle className="text-3xl font-serif" id="login-title">Welcome Back</CardTitle>
             <CardDescription className="text-base">
               Enter your credentials to access your account
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="mb-6">
-              <Label className="mb-4 block text-sm font-semibold">
-                Choose your access type
-              </Label>
-              <div className="grid grid-cols-3 gap-3">
-                {([
-                  { value: "auto" as const, label: "Customer" },
-                  { value: "staff" as const, label: "Staff" },
-                  { value: "admin" as const, label: "Admin" },
-                ]).map(({ value, label }) => (
-                  <label
-                    key={value}
-                    className={`flex items-center justify-center p-4 rounded-xl border-2 cursor-pointer transition-all ${
-                      loginMode === value
-                        ? "border-gold bg-gold/10 text-gold font-semibold shadow-md scale-105"
-                        : "border-muted-foreground/20 hover:border-gold/50 text-muted-foreground hover:text-foreground"
-                    }`}
-                  >
-                    <input
-                      type="radio"
-                      name="loginMode"
-                      value={value}
-                      checked={loginMode === value}
-                      onChange={() => setLoginMode(value)}
-                      disabled={isLoading || authLoading}
-                      className="sr-only"
-                    />
-                    <span className="text-sm font-medium">{label}</span>
-                  </label>
-                ))}
-              </div>
-              {loginMode !== "auto" && (
-                <div className="mt-3 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-lg p-3">
-                  <p className="text-xs text-amber-800 dark:text-amber-400 text-center font-medium">
-                    ⚠️ Bypass mode: Will redirect to {loginMode} dashboard regardless of actual role
-                  </p>
-                </div>
-              )}
-            </div>
-            {authLoading ? (
-              <div className="flex items-center justify-center py-8">
-                <Loader2 className="h-6 w-6 animate-spin text-primary" />
+            {authTimeout && (
+              <Alert variant="destructive" className="mb-6">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>
+                  Authentication is taking longer than expected. The form is available below.
+                </AlertDescription>
+              </Alert>
+            )}
+            {authLoading && !authTimeout ? (
+              <div className="flex flex-col items-center justify-center py-8 space-y-4" role="status" aria-live="polite">
+                <Loader2 className="h-6 w-6 animate-spin text-primary" aria-hidden="true" />
+                <p className="text-sm text-muted-foreground">Checking authentication status...</p>
               </div>
             ) : (
-              <form onSubmit={handleLogin} className="space-y-4">
+              <form onSubmit={handleLogin} className="space-y-4" aria-label="Login form">
                 <div className="space-y-2">
                   <Label htmlFor="email">Email</Label>
                   <Input
@@ -250,26 +241,50 @@ const Login = () => {
                     type="email"
                     placeholder="you@example.com"
                     value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    required
+                    onChange={(e) => {
+                      setEmail(e.target.value);
+                      if (emailError) setEmailError("");
+                    }}
                     disabled={isLoading}
                     autoComplete="email"
                     autoFocus
+                    aria-invalid={!!emailError}
+                    aria-describedby={emailError ? "email-error" : undefined}
+                    className={emailError ? "border-destructive" : ""}
                   />
+                  {emailError && (
+                    <p id="email-error" className="text-sm text-destructive flex items-center gap-1" role="alert">
+                      <AlertCircle className="h-3 w-3" />
+                      {emailError}
+                    </p>
+                  )}
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="password">Password</Label>
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="password">Password</Label>
+                    <Link
+                      to="/forgot-password"
+                      className="text-xs text-gold hover:text-gold-dark underline-offset-4 hover:underline transition-colors"
+                      tabIndex={isLoading ? -1 : 0}
+                    >
+                      Forgot password?
+                    </Link>
+                  </div>
                   <div className="relative">
                     <Input
                       id="password"
                       type={showPassword ? "text" : "password"}
                       placeholder="Enter your password"
                       value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      required
+                      onChange={(e) => {
+                        setPassword(e.target.value);
+                        if (passwordError) setPasswordError("");
+                      }}
                       disabled={isLoading}
                       autoComplete="current-password"
-                      className="pr-10"
+                      className={`pr-10 ${passwordError ? "border-destructive" : ""}`}
+                      aria-invalid={!!passwordError}
+                      aria-describedby={passwordError ? "password-error" : undefined}
                     />
                     <Button
                       type="button"
@@ -278,21 +293,29 @@ const Login = () => {
                       className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
                       onClick={() => setShowPassword(!showPassword)}
                       disabled={isLoading}
+                      aria-label={showPassword ? "Hide password" : "Show password"}
                     >
                       {showPassword ? (
-                        <EyeOff className="h-4 w-4 text-muted-foreground" />
+                        <EyeOff className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
                       ) : (
-                        <Eye className="h-4 w-4 text-muted-foreground" />
+                        <Eye className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
                       )}
                     </Button>
                   </div>
+                  {passwordError && (
+                    <p id="password-error" className="text-sm text-destructive flex items-center gap-1" role="alert">
+                      <AlertCircle className="h-3 w-3" />
+                      {passwordError}
+                    </p>
+                  )}
                 </div>
                 <Button
                   type="submit"
                   className="w-full luxury-button bg-gradient-gold text-white border-gold hover:shadow-gold-glow transition-premium text-base py-6"
-                  disabled={isLoading || authLoading}
+                  disabled={isLoading}
+                  aria-label="Sign in to your account"
                 >
-                  {isLoading && <Loader2 className="mr-2 h-5 w-5 animate-spin" />}
+                  {isLoading && <Loader2 className="mr-2 h-5 w-5 animate-spin" aria-hidden="true" />}
                   {isLoading ? "Signing in..." : "Sign In"}
                 </Button>
               </form>

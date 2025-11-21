@@ -15,6 +15,8 @@ import { FloatingCTA } from "@/components/ui/FloatingCTA";
 import Index from "./pages/Index";
 import Login from "./pages/Login";
 import Signup from "./pages/Signup";
+import ForgotPassword from "./pages/ForgotPassword";
+import ResetPassword from "./pages/ResetPassword";
 import NotFound from "./pages/NotFound";
 
 // Lazy load non-critical pages for better initial load performance
@@ -123,6 +125,8 @@ const App = () => (
           } />
           <Route path="/login" element={<Login />} />
           <Route path="/signup" element={<Signup />} />
+          <Route path="/forgot-password" element={<ForgotPassword />} />
+          <Route path="/reset-password" element={<ResetPassword />} />
           <Route path="/dashboard" element={
             <Suspense fallback={<LoadingSpinner />}>
               <ProtectedRoute requiredRole="customer">
