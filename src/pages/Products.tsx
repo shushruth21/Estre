@@ -103,11 +103,13 @@ const Products = () => {
   }, [searchParams]);
 
   const handleCategoryChange = (newCategory: string) => {
+    // Optimistic update - immediately update UI
     setCategory(newCategory);
     setSearchParams({ category: newCategory });
+    // Query will automatically fetch in background due to placeholderData
   };
 
-  const { data: products, isLoading, error } = useQuery({
+  const { data: products, isLoading, error, isPlaceholderData } = useQuery({
     queryKey: ["products", category],
     queryFn: async () => {
       // Log query attempt - always log for debugging
@@ -266,8 +268,11 @@ const Products = () => {
       return normalizedData as Product[];
     },
     retry: 1,
-    staleTime: 5 * 60 * 1000, // Cache for 5 minutes
-    gcTime: 15 * 60 * 1000, // Keep in cache for 15 minutes
+    staleTime: 10 * 60 * 1000, // Cache for 10 minutes
+    gcTime: 30 * 60 * 1000, // Keep in cache for 30 minutes
+    placeholderData: (previousData) => previousData, // Keep old data while fetching new
+    refetchOnMount: false, // Don't refetch if data is fresh
+    refetchOnWindowFocus: false, // Don't refetch on window focus
   });
 
   return (
@@ -330,7 +335,7 @@ const Products = () => {
           </div>
         )}
         
-        {isLoading ? (
+        {(isLoading && !products) ? (
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
             {[...Array(6)].map((_, i) => (
               <Card key={i} className="overflow-hidden luxury-card border-muted/50 animate-pulse">
@@ -346,7 +351,13 @@ const Products = () => {
             ))}
           </div>
         ) : !error && products && products.length > 0 ? (
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+          <div className="space-y-4">
+            {isPlaceholderData && (
+              <div className="bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg p-3 text-center">
+                <p className="text-sm text-blue-700 dark:text-blue-300">Loading {category} products...</p>
+              </div>
+            )}
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
             {products.map((product) => (
               <Card key={product.id} className="group overflow-hidden luxury-card border-muted/50 hover:border-gold transition-premium">
                 <div className="aspect-[4/3] bg-gradient-to-br from-muted to-muted/50 overflow-hidden relative">
@@ -426,6 +437,7 @@ const Products = () => {
                 </CardFooter>
               </Card>
             ))}
+            </div>
           </div>
         ) : !error && !isLoading && (!products || products.length === 0) ? (
           <div className="text-center py-20">
