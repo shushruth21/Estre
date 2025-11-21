@@ -32,7 +32,7 @@ const getCategoryTableName = (category: string): string => {
 const CATEGORY_COLUMNS = {
   sofa: {
     netPrice: 'net_price_rs',
-    strikePrice: 'strike_price_rs'  // Fixed: Changed from strike_price_1seater_rs
+    strikePrice: 'strike_price_1seater_rs'
   },
   bed: {
     netPrice: 'net_price_single_no_storage_rs',
@@ -50,9 +50,29 @@ const CATEGORY_COLUMNS = {
     netPrice: 'net_price',
     strikePrice: 'strike_price_rs'
   },
+  recliner: {
+    netPrice: 'net_price_rs',
+    strikePrice: 'strike_price_1seater_rs'
+  },
+  cinema_chairs: {
+    netPrice: 'net_price_rs',
+    strikePrice: 'strike_price_1seater_rs'
+  },
+  dining_chairs: {
+    netPrice: 'net_price_rs',
+    strikePrice: 'strike_price_1seater_rs'
+  },
+  arm_chairs: {
+    netPrice: 'net_price_rs',
+    strikePrice: 'strike_price_1seater_rs'
+  },
+  benches: {
+    netPrice: 'net_price_rs',
+    strikePrice: 'strike_price_1seater_rs'
+  },
   default: {
     netPrice: 'net_price_rs',
-    strikePrice: 'strike_price_rs'  // Fixed: Changed from strike_price_1seater_rs
+    strikePrice: 'strike_price_rs'
   }
 };
 
