@@ -96,13 +96,10 @@ const Checkout = () => {
         terms_accepted_at: new Date().toISOString(),
       };
 
-      // Add optional columns only if they exist in schema
-      if (buyerGst) {
-        orderData.buyer_gst = buyerGst;
-      }
-      if (dispatchMethod) {
-        orderData.dispatch_method = dispatchMethod || "Safe Express";
-      }
+      // Note: buyer_gst and dispatch_method are optional columns added by migration
+      // Don't add them to insert if migration hasn't been run - prevents schema cache errors
+      // They can be added back after migration 20251121000001_add_order_enhancements.sql is run
+      // For now, we skip them to ensure orders can be placed successfully
 
       const { data: order, error: orderError } = await supabase
         .from("orders")
@@ -110,7 +107,15 @@ const Checkout = () => {
         .select()
         .single();
 
-      if (orderError) throw orderError;
+      if (orderError) {
+        // If error is about buyer_gst or schema cache, provide helpful message
+        if (orderError.message?.includes("buyer_gst") || orderError.message?.includes("schema cache")) {
+          console.error("Schema cache error - buyer_gst column may not exist yet");
+          console.error("Run migration: 20251121000001_add_order_enhancements.sql");
+          throw new Error("Database schema needs to be updated. Please contact support.");
+        }
+        throw orderError;
+      }
 
       // Create sale_order for staff review workflow
       const { data: saleOrder, error: saleOrderError } = await supabase
