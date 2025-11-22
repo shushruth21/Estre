@@ -39,8 +39,9 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Loader2, Tag, Eye, CheckCircle2 } from "lucide-react";
+import { Loader2, Tag, Eye, CheckCircle2, AlertCircle } from "lucide-react";
 import { format } from "date-fns";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 const formatCurrency = (value: number | null | undefined) => {
   if (!value || Number.isNaN(value)) return "₹0";
@@ -56,11 +57,18 @@ export default function StaffSaleOrders() {
   const [isDiscountDialogOpen, setIsDiscountDialogOpen] = useState(false);
   const [manualDiscount, setManualDiscount] = useState<string>("");
 
-  // Fetch pending sale orders
-  const { data: saleOrders, isLoading } = useQuery({
+  // Fetch pending sale orders with better error handling
+  const { data: saleOrders, isLoading, error: saleOrdersError, refetch } = useQuery({
     queryKey: ["staff-sale-orders"],
     queryFn: async () => {
-      const { data, error } = await supabase
+      console.log("🔍 Fetching sale orders...", {
+        isStaff: isStaff(),
+        isAdmin: isAdmin(),
+        userId: user?.id,
+      });
+
+      // Add timeout to prevent hanging
+      const queryPromise = supabase
         .from("sale_orders")
         .select(`
           *,
@@ -81,10 +89,29 @@ export default function StaffSaleOrders() {
         .eq("status", "pending_staff_review")
         .order("created_at", { ascending: false });
 
-      if (error) throw error;
+      const timeoutPromise = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error("Query timeout after 10 seconds")), 10000)
+      );
+
+      const { data, error } = await Promise.race([queryPromise, timeoutPromise]);
+
+      if (error) {
+        console.error("❌ Sale orders query error:", error);
+        console.error("Error details:", {
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
+          code: error.code,
+        });
+        throw error;
+      }
+
+      console.log("✅ Sale orders fetched:", data?.length || 0, "orders");
       return data || [];
     },
-    enabled: isStaff() || isAdmin(),
+    enabled: (isStaff() || isAdmin()) && !!user,
+    retry: 1,
+    refetchOnWindowFocus: true,
   });
 
   // Apply discount code mutation
@@ -325,6 +352,23 @@ export default function StaffSaleOrders() {
           </p>
         </div>
 
+        {saleOrdersError && (
+          <Alert variant="destructive" className="mb-4">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>
+              Error loading sale orders: {saleOrdersError.message || "Unknown error"}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => refetch()}
+                className="ml-4"
+              >
+                Retry
+              </Button>
+            </AlertDescription>
+          </Alert>
+        )}
+
         <Card>
           <CardHeader>
             <CardTitle>
@@ -335,6 +379,7 @@ export default function StaffSaleOrders() {
             {isLoading ? (
               <div className="flex items-center justify-center py-12">
                 <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                <span className="ml-2 text-muted-foreground">Loading sale orders...</span>
               </div>
             ) : saleOrders && saleOrders.length > 0 ? (
               <div className="overflow-x-auto">
