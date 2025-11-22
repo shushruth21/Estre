@@ -81,6 +81,9 @@ export default function StaffSaleOrders() {
       }
 
       // Add timeout to prevent hanging
+      // Note: buyer_gst and dispatch_method are optional columns added by migration
+      // If migration not run, they won't exist - so we don't select them explicitly
+      // They'll be available via * if they exist, or undefined if they don't
       const queryPromise = supabase
         .from("sale_orders")
         .select(`
@@ -94,8 +97,6 @@ export default function StaffSaleOrders() {
             delivery_address,
             expected_delivery_date,
             special_instructions,
-            buyer_gst,
-            dispatch_method,
             order_items:order_items(*)
           )
         `)

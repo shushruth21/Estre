@@ -45,21 +45,13 @@ serve(async (req) => {
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     // Fetch sale order data
+    // Note: buyer_gst and dispatch_method are optional - select all columns to include them if they exist
     const { data: saleOrder, error: saleOrderError } = await supabase
       .from("sale_orders")
       .select(`
         *,
         order:orders(
-          id,
-          order_number,
-          customer_name,
-          customer_email,
-          customer_phone,
-          delivery_address,
-          expected_delivery_date,
-          special_instructions,
-          buyer_gst,
-          dispatch_method,
+          *,
           order_items:order_items(*)
         )
       `)
@@ -254,8 +246,8 @@ serve(async (req) => {
       try {
         // Convert PDF bytes to base64 for email attachment (efficient method for large files)
         const base64Pdf = btoa(
-          Array.from(pdfBytes)
-            .map((byte: number) => String.fromCharCode(byte))
+          Array.from(new Uint8Array(pdfBytes))
+            .map((byte) => String.fromCharCode(byte))
             .join("")
         );
 
