@@ -43,6 +43,7 @@ const AdminSettings = lazy(() => import("./pages/admin/AdminSettings"));
 const StaffDashboard = lazy(() => import("./pages/staff/StaffDashboard"));
 const StaffOrders = lazy(() => import("./pages/staff/StaffOrders"));
 const StaffSaleOrders = lazy(() => import("./pages/staff/StaffSaleOrders"));
+const StaffSaleOrderDetail = lazy(() => import("./pages/staff/StaffSaleOrderDetail"));
 const StaffJobCards = lazy(() => import("./pages/staff/StaffJobCards"));
 const StaffJobCardDetail = lazy(() => import("./pages/staff/StaffJobCardDetail"));
 
@@ -230,6 +231,13 @@ const App = () => (
             <Suspense fallback={<LoadingSpinner />}>
               <ProtectedRoute requiredRole="staff">
                 <StaffSaleOrders />
+              </ProtectedRoute>
+            </Suspense>
+          } />
+          <Route path="/staff/sale-orders/:id" element={
+            <Suspense fallback={<LoadingSpinner />}>
+              <ProtectedRoute requiredRole="staff">
+                <StaffSaleOrderDetail />
               </ProtectedRoute>
             </Suspense>
           } />

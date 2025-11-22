@@ -224,8 +224,8 @@ serve(async (req) => {
     const otpExpiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
 
     // Update sale_order with PDF URL
-    // Note: Status should already be "awaiting_customer_confirmation" from staff approval
-    // We keep it as is, or set it if not already set
+    // Don't change status here - let staff approval set it to staff_approved
+    // PDF generation happens before or after approval
     const { error: updateError } = await supabase
       .from("sale_orders")
       .update({
@@ -233,9 +233,7 @@ serve(async (req) => {
         // Generate OTP for backup verification (optional)
         otp_code: otp,
         otp_expires_at: otpExpiresAt.toISOString(),
-        // Keep status as awaiting_customer_confirmation (set by staff approval)
-        // Only update if status is still awaiting_pdf_generation
-        status: "awaiting_customer_confirmation",
+        // Don't change status - keep existing status (staff_approved or pending_review)
         updated_at: new Date().toISOString(),
       })
       .eq("id", saleOrderId);

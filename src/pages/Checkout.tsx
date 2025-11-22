@@ -127,6 +127,8 @@ const Checkout = () => {
           base_price: subtotal,
           discount: 0,
           final_price: subtotal,
+          payment_mode: paymentMethod || "cash", // Add payment_mode
+          payment_status: "pending", // Add payment_status
         })
         .select()
         .single();
@@ -179,6 +181,7 @@ const Checkout = () => {
               order_id: order.id,
               order_item_id: item.id,
               order_number: jobCard.soNumber,
+              sale_order_id: saleOrder.id, // Link job card to sale order
               customer_name: jobCard.customer.name,
               customer_phone: jobCard.customer.phone,
               customer_email: jobCard.customer.email || order.customer_email,

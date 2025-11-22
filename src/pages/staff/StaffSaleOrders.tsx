@@ -524,6 +524,15 @@ export default function StaffSaleOrders() {
                         </TableCell>
                         <TableCell className="text-right">
                           <div className="flex items-center justify-end gap-2">
+                            <Button 
+                              variant="outline" 
+                              size="sm"
+                              asChild
+                            >
+                              <Link to={`/staff/sale-orders/${saleOrder.id}`}>
+                                <Eye className="h-4 w-4" />
+                              </Link>
+                            </Button>
                             <Dialog
                               open={isDetailDialogOpen && selectedSaleOrder?.id === saleOrder.id}
                               onOpenChange={(open) => {
@@ -537,7 +546,7 @@ export default function StaffSaleOrders() {
                             >
                               <DialogTrigger asChild>
                                 <Button variant="outline" size="sm">
-                                  <Eye className="h-4 w-4" />
+                                  <Tag className="h-4 w-4" />
                                 </Button>
                               </DialogTrigger>
                               <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
