@@ -39,9 +39,10 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Loader2, Tag, Eye, CheckCircle2, AlertCircle } from "lucide-react";
+import { Loader2, Tag, Eye, CheckCircle2, AlertCircle, ClipboardList, FileCheck } from "lucide-react";
 import { format } from "date-fns";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Link } from "react-router-dom";
 
 const formatCurrency = (value: number | null | undefined) => {
   if (!value || Number.isNaN(value)) return "₹0";
@@ -56,6 +57,7 @@ export default function StaffSaleOrders() {
   const [isDetailDialogOpen, setIsDetailDialogOpen] = useState(false);
   const [isDiscountDialogOpen, setIsDiscountDialogOpen] = useState(false);
   const [manualDiscount, setManualDiscount] = useState<string>("");
+  const [isCompletingOrder, setIsCompletingOrder] = useState(false);
 
   // Fetch pending sale orders with better error handling
   const { data: saleOrders, isLoading, error: saleOrdersError, refetch } = useQuery({
@@ -336,6 +338,85 @@ export default function StaffSaleOrders() {
     }
   };
 
+  // Complete order mutation (mark as advance_paid after customer confirms)
+  const completeOrderMutation = useMutation({
+    mutationFn: async (saleOrderId: string) => {
+      const { error } = await supabase
+        .from("sale_orders")
+        .update({
+          status: "advance_paid",
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", saleOrderId);
+
+      if (error) throw error;
+
+      // Update main order status to confirmed
+      const { data: saleOrder } = await supabase
+        .from("sale_orders")
+        .select("order_id, final_price")
+        .eq("id", saleOrderId)
+        .single();
+
+      if (saleOrder?.order_id) {
+        const { error: orderError } = await supabase
+          .from("orders")
+          .update({
+            status: "confirmed",
+            payment_status: "advance_paid",
+            advance_amount_rs: saleOrder.final_price * 0.5,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", saleOrder.order_id);
+
+        if (orderError) throw orderError;
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["staff-sale-orders"] });
+      toast({
+        title: "Order Completed",
+        description: "Order marked as advance paid and moved to production.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error Completing Order",
+        description: error.message || "Failed to complete order",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Finish order mutation (mark order as production ready)
+  const finishOrderMutation = useMutation({
+    mutationFn: async ({ saleOrderId, orderId }: { saleOrderId: string; orderId: string }) => {
+      const { error } = await supabase
+        .from("orders")
+        .update({
+          status: "production",
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", orderId);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["staff-sale-orders"] });
+      toast({
+        title: "Order Finished",
+        description: "Order moved to production phase.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error Finishing Order",
+        description: error.message || "Failed to finish order",
+        variant: "destructive",
+      });
+    },
+  });
+
   if (!isStaff() && !isAdmin()) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -469,6 +550,55 @@ export default function StaffSaleOrders() {
                                       )}
                                     </div>
                                   </div>
+
+                                  <div>
+                                    <Label className="text-sm font-semibold">Delivery Address</Label>
+                                    <div className="mt-2 text-sm">
+                                      {saleOrder.order?.delivery_address && typeof saleOrder.order.delivery_address === 'object' ? (
+                                        <div className="space-y-1">
+                                          <p>{saleOrder.order.delivery_address.street}</p>
+                                          <p>{saleOrder.order.delivery_address.city}, {saleOrder.order.delivery_address.state}</p>
+                                          <p>PIN: {saleOrder.order.delivery_address.pincode}</p>
+                                          {saleOrder.order.delivery_address.landmark && (
+                                            <p className="text-muted-foreground">Landmark: {saleOrder.order.delivery_address.landmark}</p>
+                                          )}
+                                        </div>
+                                      ) : (
+                                        <p className="text-muted-foreground">Address not available</p>
+                                      )}
+                                    </div>
+                                  </div>
+
+                                  {saleOrder.order?.order_items && saleOrder.order.order_items.length > 0 && (
+                                    <div>
+                                      <Label className="text-sm font-semibold">Order Items ({saleOrder.order.order_items.length})</Label>
+                                      <div className="mt-2 space-y-2">
+                                        {saleOrder.order.order_items.map((item: any, idx: number) => (
+                                          <div key={item.id || idx} className="p-3 bg-muted rounded-lg">
+                                            <div className="flex justify-between items-start">
+                                              <div className="flex-1">
+                                                <p className="font-medium">{item.product_title || item.product_category}</p>
+                                                <p className="text-xs text-muted-foreground">
+                                                  Category: {item.product_category}
+                                                </p>
+                                                {item.quantity && (
+                                                  <p className="text-xs text-muted-foreground">
+                                                    Quantity: {item.quantity}
+                                                  </p>
+                                                )}
+                                              </div>
+                                              <div className="text-right">
+                                                <p className="font-semibold">
+                                                  ₹{Math.round(item.total_price_rs || item.unit_price_rs || 0).toLocaleString()}
+                                                </p>
+                                              </div>
+                                            </div>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  )}
+
                                   <div>
                                     <Label className="text-sm font-semibold">Pricing</Label>
                                     <div className="mt-2 space-y-1 text-sm">
@@ -476,15 +606,117 @@ export default function StaffSaleOrders() {
                                         <span>Base Price:</span>
                                         <span>{formatCurrency(saleOrder.base_price)}</span>
                                       </div>
-                                      <div className="flex justify-between text-green-600">
-                                        <span>Discount:</span>
-                                        <span>-{formatCurrency(saleOrder.discount)}</span>
-                                      </div>
+                                      {saleOrder.discount > 0 && (
+                                        <div className="flex justify-between text-green-600">
+                                          <span>Discount:</span>
+                                          <span>-{formatCurrency(saleOrder.discount)}</span>
+                                        </div>
+                                      )}
                                       <div className="flex justify-between font-semibold border-t pt-1">
                                         <span>Final Price:</span>
                                         <span>{formatCurrency(saleOrder.final_price)}</span>
                                       </div>
                                     </div>
+                                  </div>
+
+                                  {saleOrder.order?.special_instructions && (
+                                    <div>
+                                      <Label className="text-sm font-semibold">Special Instructions</Label>
+                                      <p className="mt-2 text-sm text-muted-foreground">{saleOrder.order.special_instructions}</p>
+                                    </div>
+                                  )}
+
+                                  <div>
+                                    <Label className="text-sm font-semibold">Status</Label>
+                                    <div className="mt-2 flex items-center gap-2">
+                                      <Badge variant="outline" className="capitalize">
+                                        {saleOrder.status?.replace(/_/g, ' ')}
+                                      </Badge>
+                                      {saleOrder.order?.status && (
+                                        <Badge variant="secondary" className="capitalize">
+                                          Order: {saleOrder.order.status.replace(/_/g, ' ')}
+                                        </Badge>
+                                      )}
+                                    </div>
+                                  </div>
+
+                                  {/* Action Buttons */}
+                                  <div className="flex flex-wrap gap-2 pt-4 border-t">
+                                    {saleOrder.status === "confirmed_by_customer" && (
+                                      <Button
+                                        onClick={() => {
+                                          completeOrderMutation.mutate(saleOrder.id);
+                                          setIsDetailDialogOpen(false);
+                                        }}
+                                        disabled={completeOrderMutation.isPending}
+                                        className="flex-1"
+                                      >
+                                        {completeOrderMutation.isPending ? (
+                                          <>
+                                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                            Completing...
+                                          </>
+                                        ) : (
+                                          <>
+                                            <CheckCircle2 className="mr-2 h-4 w-4" />
+                                            Complete Order
+                                          </>
+                                        )}
+                                      </Button>
+                                    )}
+
+                                    {saleOrder.status === "advance_paid" && saleOrder.order?.status === "confirmed" && (
+                                      <Button
+                                        onClick={() => {
+                                          finishOrderMutation.mutate({
+                                            saleOrderId: saleOrder.id,
+                                            orderId: saleOrder.order.id,
+                                          });
+                                          setIsDetailDialogOpen(false);
+                                        }}
+                                        disabled={finishOrderMutation.isPending}
+                                        variant="default"
+                                        className="flex-1"
+                                      >
+                                        {finishOrderMutation.isPending ? (
+                                          <>
+                                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                            Finishing...
+                                          </>
+                                        ) : (
+                                          <>
+                                            <FileCheck className="mr-2 h-4 w-4" />
+                                            Finish Order
+                                          </>
+                                        )}
+                                      </Button>
+                                    )}
+
+                                    {saleOrder.order?.id && (
+                                      <Button
+                                        asChild
+                                        variant="outline"
+                                        className="flex-1"
+                                      >
+                                        <Link to={`/admin/job-cards?orderId=${saleOrder.order.id}`}>
+                                          <ClipboardList className="mr-2 h-4 w-4" />
+                                          View/Create Job Cards
+                                        </Link>
+                                      </Button>
+                                    )}
+
+                                    {saleOrder.pdf_url && (
+                                      <Button
+                                        asChild
+                                        variant="outline"
+                                        className="flex-1"
+                                      >
+                                        <a href={saleOrder.pdf_url} target="_blank" rel="noopener noreferrer">
+                                          <Eye className="mr-2 h-4 w-4" />
+                                          View PDF
+                                        </a>
+                                      </Button>
+                                    )}
                                   </div>
                                 </div>
                               </DialogContent>

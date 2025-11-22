@@ -72,32 +72,41 @@ const Checkout = () => {
       const subtotal = cartItems.reduce((sum, item) => sum + (item.calculated_price || 0), 0);
 
       // Create order first (for reference and order_items)
+      // Build order data object conditionally to handle optional columns
+      const orderData: any = {
+        order_number: orderNumber,
+        customer_id: user.id,
+        customer_name: user.user_metadata?.full_name || user.email,
+        customer_email: user.email || "",
+        customer_phone: user.user_metadata?.phone || "",
+        delivery_address: deliveryAddress,
+        expected_delivery_date: expectedDeliveryDate?.toISOString().split('T')[0],
+        special_instructions: specialInstructions,
+        subtotal_rs: subtotal,
+        discount_code: null, // No discount at checkout - staff applies it
+        discount_amount_rs: 0,
+        net_total_rs: subtotal,
+        status: "pending",
+        payment_status: "pending",
+        payment_method: paymentMethod,
+        advance_percent: 50,
+        advance_amount_rs: 0, // Will be set after staff review
+        // balance_amount_rs is GENERATED ALWAYS, don't insert it
+        terms_accepted: termsAccepted,
+        terms_accepted_at: new Date().toISOString(),
+      };
+
+      // Add optional columns only if they exist in schema
+      if (buyerGst) {
+        orderData.buyer_gst = buyerGst;
+      }
+      if (dispatchMethod) {
+        orderData.dispatch_method = dispatchMethod || "Safe Express";
+      }
+
       const { data: order, error: orderError } = await supabase
         .from("orders")
-        .insert({
-          order_number: orderNumber,
-          customer_id: user.id,
-          customer_name: user.user_metadata?.full_name || user.email,
-          customer_email: user.email || "",
-          customer_phone: user.user_metadata?.phone || "",
-          delivery_address: deliveryAddress,
-          expected_delivery_date: expectedDeliveryDate?.toISOString().split('T')[0],
-          special_instructions: specialInstructions,
-          subtotal_rs: subtotal,
-          discount_code: null, // No discount at checkout - staff applies it
-          discount_amount_rs: 0,
-          net_total_rs: subtotal,
-          status: "pending",
-          payment_status: "pending",
-          payment_method: paymentMethod,
-          advance_percent: 50,
-          advance_amount_rs: 0, // Will be set after staff review
-          // balance_amount_rs is GENERATED ALWAYS, don't insert it
-          buyer_gst: buyerGst || null,
-          dispatch_method: dispatchMethod || "Safe Express",
-          terms_accepted: termsAccepted,
-          terms_accepted_at: new Date().toISOString(),
-        })
+        .insert(orderData)
         .select()
         .single();
 
