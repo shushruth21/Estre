@@ -14,6 +14,7 @@ import {
   ClipboardList,
   ShoppingCart,
   LogOut,
+  Loader2,
 } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 
@@ -23,9 +24,19 @@ interface StaffLayoutProps {
 
 export function StaffLayout({ children }: StaffLayoutProps) {
   const location = useLocation();
-  const { user, profile, isStaff, isAdmin } = useAuth();
+  const { user, profile, isStaff, isAdmin, loading } = useAuth();
 
   const navigation = [
+    {
+      name: "Dashboard",
+      href: "/staff/dashboard",
+      icon: LayoutDashboard,
+    },
+    {
+      name: "Sale Orders",
+      href: "/staff/sale-orders",
+      icon: ShoppingCart,
+    },
     {
       name: "Orders",
       href: "/staff/orders",
@@ -38,9 +49,27 @@ export function StaffLayout({ children }: StaffLayoutProps) {
     },
   ];
 
+  // Show loading while checking auth
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="text-center">
+          <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto mb-4" />
+          <p className="text-muted-foreground">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
   // Only show layout if user is staff or admin
-  if (!isStaff() && !isAdmin()) {
-    return <>{children}</>;
+  if (!user || (!isStaff() && !isAdmin())) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="text-center">
+          <p className="text-muted-foreground">Access denied. Staff access required.</p>
+        </div>
+      </div>
+    );
   }
 
   return (

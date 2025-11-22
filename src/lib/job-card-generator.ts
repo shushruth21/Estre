@@ -67,6 +67,10 @@ export interface JobCardGeneratedData {
     seatDepth?: number;
     seatWidth?: number;
     seatHeight?: number;
+    frontWidth?: number;
+    leftWidth?: number;
+    rightWidth?: number;
+    totalWidth?: number;
   };
   createdAt: string;
 }
@@ -286,6 +290,9 @@ export async function generateJobCardData(params: GenerateJobCardParams): Promis
     seatHeight: configuration.dimensions?.seatHeight,
   };
 
+  // Calculate sofa dimensions (front, left, right, total width)
+  const calculatedDimensions = calculateSofaDimensions(configuration, dimensions.seatWidth);
+
   return {
     jobCardNumber,
     soNumber,
@@ -305,7 +312,69 @@ export async function generateJobCardData(params: GenerateJobCardParams): Promis
       total: totalPrice,
       breakdown: pricingBreakdown,
     },
-    dimensions,
+    dimensions: {
+      ...dimensions,
+      ...calculatedDimensions,
+    },
     createdAt,
   };
+}
+
+/**
+ * Calculate sofa dimensions (front width, left width, right width, total width)
+ */
+function calculateSofaDimensions(configuration: any, seatWidthInches?: number): {
+  frontWidth?: number;
+  leftWidth?: number;
+  rightWidth?: number;
+  totalWidth?: number;
+} {
+  const seatWidth = seatWidthInches || getNumber(configuration.dimensions?.seatWidth, 24);
+  const shape = (configuration.shape || 'standard').toLowerCase();
+
+  let frontSeats = 0;
+  let leftSeats = 0;
+  let rightSeats = 0;
+
+  // Parse front seats
+  const frontSeatCount = configuration.frontSeatCount || configuration.frontSeats || 2;
+  frontSeats = parseSeatCount(frontSeatCount);
+
+  // Parse left seats (for L-Shape, U-Shape)
+  if (shape.includes('l-shape') || shape.includes('u-shape') || shape.includes('combo')) {
+    const l2Seats = configuration.l2SeatCount || configuration.l2 || 0;
+    leftSeats = parseSeatCount(l2Seats);
+  }
+
+  // Parse right seats (for U-Shape, Combo)
+  if (shape.includes('u-shape') || shape.includes('combo')) {
+    const r2Seats = configuration.r2SeatCount || configuration.r2 || 0;
+    rightSeats = parseSeatCount(r2Seats);
+  }
+
+  // Calculate widths
+  const frontWidth = frontSeats * seatWidth;
+  const leftWidth = leftSeats * seatWidth;
+  const rightWidth = rightSeats * seatWidth;
+  const totalWidth = frontWidth + leftWidth + rightWidth;
+
+  return {
+    frontWidth: frontWidth > 0 ? frontWidth : undefined,
+    leftWidth: leftWidth > 0 ? leftWidth : undefined,
+    rightWidth: rightWidth > 0 ? rightWidth : undefined,
+    totalWidth: totalWidth > 0 ? totalWidth : undefined,
+  };
+}
+
+/**
+ * Parse seat count from various formats (string or number)
+ */
+function parseSeatCount(value: any): number {
+  if (typeof value === 'number') return value;
+  if (typeof value === 'string') {
+    // Extract number from strings like "2-Seater", "2 Seater", "2"
+    const match = value.match(/(\d+)/);
+    return match ? parseInt(match[1], 10) : 0;
+  }
+  return 0;
 }

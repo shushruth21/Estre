@@ -31,7 +31,7 @@ const emptyOrderState = {
 };
 
 const Dashboard = () => {
-  const { user, profile, loading: authLoading } = useAuth();
+  const { user, profile, loading: authLoading, isAdmin, isStaff } = useAuth();
   const [ordersState, setOrdersState] = useState(emptyOrderState);
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -45,83 +45,164 @@ const Dashboard = () => {
   const fetchOrders = useCallback(async (currentUser: any) => {
     setOrdersState((prev) => ({ ...prev, isLoading: true }));
 
-    const { data: orders, error } = await supabase
-      .from("orders")
-      .select(
-        "id, order_number, status, expected_delivery_date, net_total_rs, advance_amount_rs, balance_amount_rs, discount_code, discount_amount_rs, subtotal_rs, created_at, metadata, delivery_method, delivery_date"
-      )
-      .eq("customer_id", currentUser.id)
-      .order("created_at", { ascending: false })
-      .limit(50); // Limit to 50 most recent orders for performance
-
-    if (error) {
-      if (import.meta.env.DEV) {
-        console.error("Error fetching orders:", error);
-      }
-      toast({
-        title: "Unable to load orders",
-        description: "Please try again in a moment.",
-        variant: "destructive",
-      });
-      setOrdersState(emptyOrderState);
-      return;
-    }
-
-    const orderIds = orders?.map((order) => order.id) ?? [];
-    let jobCardsByOrder: Record<string, any[]> = {};
-    let timelineByOrder: Record<string, any[]> = {};
-
-    if (orderIds.length > 0) {
-      const jobCardsPromise = supabase
-        .from("job_cards")
+    try {
+      // Add timeout to prevent hanging (10 seconds)
+      const ordersPromise = supabase
+        .from("orders")
         .select(
-          "id, order_id, order_item_id, job_card_number, status, priority, product_title, product_category, created_at, updated_at, fabric_meters, accessories, dimensions"
+          "id, order_number, status, expected_delivery_date, net_total_rs, advance_amount_rs, balance_amount_rs, discount_code, discount_amount_rs, subtotal_rs, created_at, metadata, delivery_method, delivery_date"
         )
-        .in("order_id", orderIds);
+        .eq("customer_id", currentUser.id)
+        .order("created_at", { ascending: false })
+        .limit(50); // Limit to 50 most recent orders for performance
 
-      const timelinePromise = supabase
-        .from("order_timeline")
-        .select("id, order_id, status, title, description, created_at")
-        .in("order_id", orderIds)
-        .order("created_at", { ascending: false });
+      const timeoutPromise = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error("Orders fetch timeout")), 10000)
+      );
 
-      const [{ data: jobCards }, { data: timeline }] = await Promise.all([
-        jobCardsPromise,
-        timelinePromise,
-      ]);
+      const { data: orders, error } = await Promise.race([ordersPromise, timeoutPromise]);
 
-      jobCardsByOrder =
-        jobCards?.reduce((acc: Record<string, any[]>, card) => {
-          const key = card.order_id || '';
-          if (!acc[key]) acc[key] = [];
-          acc[key].push(card);
-          return acc;
-        }, {}) ?? {};
+      if (error) {
+        throw error;
+      }
 
-      timelineByOrder =
-        timeline?.reduce((acc: Record<string, any[]>, entry) => {
-          const key = entry.order_id;
-          if (!acc[key]) acc[key] = [];
-          acc[key].push(entry);
-          return acc;
-        }, {}) ?? {};
+      const orderIds = orders?.map((order) => order.id) ?? [];
+      let jobCardsByOrder: Record<string, any[]> = {};
+      let timelineByOrder: Record<string, any[]> = {};
+
+      if (orderIds.length > 0) {
+        // Add timeout to job cards and timeline queries (5 seconds each)
+        const jobCardsPromise = supabase
+          .from("job_cards")
+          .select(
+            "id, order_id, order_item_id, job_card_number, status, priority, product_title, product_category, created_at, updated_at, fabric_meters, accessories, dimensions"
+          )
+          .in("order_id", orderIds);
+
+        const timelinePromise = supabase
+          .from("order_timeline")
+          .select("id, order_id, status, title, description, created_at")
+          .in("order_id", orderIds)
+          .order("created_at", { ascending: false });
+
+        const timeoutPromise = new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error("Related data fetch timeout")), 5000)
+        );
+
+        const [{ data: jobCards }, { data: timeline }] = await Promise.race([
+          Promise.all([jobCardsPromise, timelinePromise]),
+          timeoutPromise.then(() => [{ data: null, error: null }, { data: null, error: null }] as any)
+        ]).catch(() => [{ data: null, error: null }, { data: null, error: null }] as any);
+
+        jobCardsByOrder =
+          jobCards?.reduce((acc: Record<string, any[]>, card) => {
+            const key = card.order_id || '';
+            if (!acc[key]) acc[key] = [];
+            acc[key].push(card);
+            return acc;
+          }, {}) ?? {};
+
+        timelineByOrder =
+          timeline?.reduce((acc: Record<string, any[]>, entry) => {
+            const key = entry.order_id;
+            if (!acc[key]) acc[key] = [];
+            acc[key].push(entry);
+            return acc;
+          }, {}) ?? {};
+      }
+
+      const enrichedOrders =
+        orders?.map((order) => ({
+          ...order,
+          jobCards: jobCardsByOrder[order.id] ?? [],
+          timeline: timelineByOrder[order.id] ?? [],
+        })) ?? [];
+
+      setOrdersState({
+        orders: enrichedOrders,
+        isLoading: false,
+      });
+    } catch (error: any) {
+      console.error("Error fetching orders:", error);
+      
+      // Always set loading to false, even on error
+      setOrdersState({
+        orders: [],
+        isLoading: false,
+      });
+
+      // Only show toast for non-timeout errors
+      if (!error?.message?.includes("timeout")) {
+        toast({
+          title: "Unable to load orders",
+          description: error?.message || "Please try again in a moment.",
+          variant: "destructive",
+        });
+      }
     }
-
-    const enrichedOrders =
-      orders?.map((order) => ({
-        ...order,
-        jobCards: jobCardsByOrder[order.id] ?? [],
-        timeline: timelineByOrder[order.id] ?? [],
-      })) ?? [];
-
-    setOrdersState({
-      orders: enrichedOrders,
-      isLoading: false,
-    });
   }, [toast, navigate]);
 
   // Set up realtime subscriptions
   useRealtimeOrders({ orderIds, enabled: orderIds.length > 0 });
+
+  // Redirect admin/staff users to their respective dashboards
+  // Quick check (max 1 second) - customers don't need to wait
+  useEffect(() => {
+    if (!authLoading && user) {
+      // Quick check for admin/staff (customers stay on dashboard)
+      const checkRole = async () => {
+        let attempts = 0;
+        const maxAttempts = 5; // 5 attempts * 200ms = 1 second max
+        
+        while (attempts < maxAttempts) {
+          // Check if admin/staff role is available
+          if (isAdmin()) {
+            console.log('🔄 Dashboard: Redirecting admin to admin dashboard');
+            navigate("/admin/dashboard", { replace: true });
+            return;
+          }
+          if (isStaff()) {
+            console.log('🔄 Dashboard: Redirecting staff to staff dashboard');
+            navigate("/staff/dashboard", { replace: true });
+            return;
+          }
+          
+          // Quick profile check (only if profile not loaded yet)
+          if (attempts === 2 && !profile) {
+            try {
+              const { data: directProfile } = await supabase
+                .from("profiles")
+                .select("role")
+                .eq("user_id", user.id)
+                .single();
+              
+              if (directProfile?.role) {
+                const roleLower = directProfile.role.toLowerCase().trim();
+                if (roleLower === "admin" || roleLower === "super_admin") {
+                  navigate("/admin/dashboard", { replace: true });
+                  return;
+                }
+                if (["staff", "production_manager", "store_manager", "factory_staff", "ops_team"].includes(roleLower)) {
+                  navigate("/staff/dashboard", { replace: true });
+                  return;
+                }
+              }
+            } catch (err) {
+              // Ignore errors - user is likely a customer
+            }
+          }
+          
+          // Wait a bit and check again
+          await new Promise(resolve => setTimeout(resolve, 200));
+          attempts++;
+        }
+        
+        // If we get here, user is a customer - no redirect needed
+      };
+      
+      checkRole();
+    }
+  }, [authLoading, user, isAdmin, isStaff, navigate, profile]);
 
   // Fetch orders when user is available
   useEffect(() => {
@@ -130,9 +211,12 @@ const Dashboard = () => {
         navigate("/login");
         return;
       }
-      fetchOrders(user);
+      // Only fetch orders for customer users (admin/staff are redirected above)
+      if (!isAdmin() && !isStaff()) {
+        fetchOrders(user);
+      }
     }
-  }, [user, authLoading, navigate, fetchOrders]);
+  }, [user, authLoading, navigate, fetchOrders, isAdmin, isStaff]);
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -143,15 +227,29 @@ const Dashboard = () => {
     navigate("/");
   };
 
-  const isLoading = authLoading || ordersState.isLoading;
+  // Add timeout for authLoading (max 5 seconds)
+  const [authLoadingTimeout, setAuthLoadingTimeout] = useState(false);
+  
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      if (authLoading) {
+        setAuthLoadingTimeout(true);
+      }
+    }, 5000);
+    return () => clearTimeout(timeout);
+  }, [authLoading]);
+
+  const isLoading = (authLoading && !authLoadingTimeout) || ordersState.isLoading;
 
   const dashboardHeader = useMemo(() => {
-    if (!user || !profile) return null;
+    if (!user) return null;
+    // Safely access profile with optional chaining
+    const displayName = profile?.full_name || user.email || 'User';
     return (
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
           <h2 className="text-3xl lg:text-4xl font-serif font-bold tracking-tight">
-            Welcome back, {profile.full_name || user.email}!
+            Welcome back, {displayName}!
           </h2>
           <p className="text-muted-foreground text-lg mt-2">
             Track your orders and monitor production updates in real time.

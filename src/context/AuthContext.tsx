@@ -75,14 +75,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Fetch user profile from profiles table
+  // Fetch user profile from profiles table (with timeout)
   const fetchProfile = async (userId: string) => {
     try {
-      const { data, error } = await supabase
+      // Add timeout to profile fetch (5 seconds)
+      const profilePromise = supabase
         .from("profiles")
         .select("*")
         .eq("user_id", userId)
         .single();
+
+      const timeoutPromise = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error("Profile fetch timeout")), 5000)
+      );
+
+      const { data, error } = await Promise.race([profilePromise, timeoutPromise]);
 
       if (error) {
         // If profile doesn't exist, create one with customer role
@@ -116,11 +123,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       setProfile(data as Profile);
-    } catch (error) {
+    } catch (error: any) {
       if (import.meta.env.DEV) {
         console.error("Error in fetchProfile:", error);
       }
-      setProfile(null);
+      // Don't set profile to null on timeout - keep existing state
+      if (!error?.message?.includes("timeout")) {
+        setProfile(null);
+      }
     }
   };
 
@@ -132,10 +142,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   useEffect(() => {
+    let mounted = true;
+
     // Set up auth state listener
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (!mounted) return;
+      
       setSession(session);
       setUser(session?.user ?? null);
 
@@ -145,22 +159,37 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setProfile(null);
       }
 
-      setLoading(false);
+      if (mounted) {
+        setLoading(false);
+      }
     });
 
-    // Check for existing session
+    // Check for existing session (optimized - don't wait for profile on initial load)
     supabase.auth.getSession().then(async ({ data: { session } }) => {
+      if (!mounted) return;
+      
       setSession(session);
       setUser(session?.user ?? null);
 
-      if (session?.user) {
-        await fetchProfile(session.user.id);
+      // Set loading to false immediately after getting session
+      // Profile will load in background
+      if (mounted) {
+        setLoading(false);
       }
 
-      setLoading(false);
+      // Fetch profile in background (non-blocking)
+      if (session?.user) {
+        fetchProfile(session.user.id).catch(() => {
+          // Silently handle profile fetch errors
+          if (import.meta.env.DEV) {
+            console.warn('Profile fetch failed on initial load');
+          }
+        });
+      }
     });
 
     return () => {
+      mounted = false;
       subscription.unsubscribe();
     };
   }, []);

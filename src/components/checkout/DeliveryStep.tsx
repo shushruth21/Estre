@@ -5,6 +5,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { CalendarIcon } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
@@ -24,6 +25,10 @@ interface DeliveryStepProps {
   onDateChange: (date?: Date) => void;
   specialInstructions?: string;
   onInstructionsChange: (instructions: string) => void;
+  buyerGst?: string;
+  onBuyerGstChange?: (gst: string) => void;
+  dispatchMethod?: string;
+  onDispatchMethodChange?: (method: string) => void;
 }
 
 export const DeliveryStep = ({
@@ -33,6 +38,10 @@ export const DeliveryStep = ({
   onDateChange,
   specialInstructions,
   onInstructionsChange,
+  buyerGst,
+  onBuyerGstChange,
+  dispatchMethod,
+  onDispatchMethodChange,
 }: DeliveryStepProps) => {
   return (
     <div className="space-y-6">
@@ -97,6 +106,44 @@ export const DeliveryStep = ({
                 placeholder="Nearby landmark"
               />
             </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Additional Information</CardTitle>
+          <CardDescription>GST and dispatch details</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div>
+            <Label htmlFor="buyerGst">Buyer GST Number (Optional)</Label>
+            <Input
+              id="buyerGst"
+              value={buyerGst || ""}
+              onChange={(e) => onBuyerGstChange?.(e.target.value)}
+              placeholder="GSTIN (e.g., 29ABCDE1234F1Z5)"
+              maxLength={15}
+            />
+            <p className="text-xs text-muted-foreground mt-1">
+              Enter your GST number if you need a GST invoice
+            </p>
+          </div>
+
+          <div>
+            <Label htmlFor="dispatchMethod">Dispatch Method</Label>
+            <Select
+              value={dispatchMethod || "Safe Express"}
+              onValueChange={(value) => onDispatchMethodChange?.(value)}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select dispatch method" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="Safe Express">Safe Express</SelectItem>
+                <SelectItem value="Other">Other</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
         </CardContent>
       </Card>

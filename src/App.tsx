@@ -42,8 +42,12 @@ const AdminSettings = lazy(() => import("./pages/admin/AdminSettings"));
 // Lazy load staff pages
 const StaffDashboard = lazy(() => import("./pages/staff/StaffDashboard"));
 const StaffOrders = lazy(() => import("./pages/staff/StaffOrders"));
+const StaffSaleOrders = lazy(() => import("./pages/staff/StaffSaleOrders"));
 const StaffJobCards = lazy(() => import("./pages/staff/StaffJobCards"));
 const StaffJobCardDetail = lazy(() => import("./pages/staff/StaffJobCardDetail"));
+
+// Lazy load order confirmation and payment pages
+const OrderConfirmation = lazy(() => import("./pages/OrderConfirmation"));
 
 // Configure QueryClient with optimized performance settings
 const queryClient = new QueryClient({
@@ -141,6 +145,13 @@ const App = () => (
               </ProtectedRoute>
             </Suspense>
           } />
+          <Route path="/order-confirmation/:saleOrderId" element={
+            <Suspense fallback={<LoadingSpinner />}>
+              <ProtectedRoute requiredRole="customer">
+                <OrderConfirmation />
+              </ProtectedRoute>
+            </Suspense>
+          } />
           
           {/* Admin Routes - Protected */}
           <Route path="/admin/dashboard" element={
@@ -212,6 +223,13 @@ const App = () => (
             <Suspense fallback={<LoadingSpinner />}>
               <ProtectedRoute requiredRole="staff">
                 <StaffOrders />
+              </ProtectedRoute>
+            </Suspense>
+          } />
+          <Route path="/staff/sale-orders" element={
+            <Suspense fallback={<LoadingSpinner />}>
+              <ProtectedRoute requiredRole="staff">
+                <StaffSaleOrders />
               </ProtectedRoute>
             </Suspense>
           } />

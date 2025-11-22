@@ -22,7 +22,7 @@ const Login = () => {
   const [passwordError, setPasswordError] = useState("");
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { user, loading: authLoading, role, isAdmin, isStaff, isCustomer, refreshProfile } = useAuth();
+  const { user, loading: authLoading, role, isAdmin, isStaff, isCustomer, refreshProfile, profile } = useAuth();
 
   const redirectByRole = useCallback(() => {
     // Use normalized role helpers for secure redirect
@@ -43,22 +43,26 @@ const Login = () => {
     navigate("/dashboard", { replace: true });
   }, [isAdmin, isStaff, isCustomer, navigate]);
 
-  // Add timeout for authLoading to prevent infinite spinner
+  // Add timeout for authLoading to prevent infinite spinner (reduced to 5 seconds)
   useEffect(() => {
     const timeout = setTimeout(() => {
       if (authLoading) {
         setAuthTimeout(true);
       }
-    }, 10000); // 10 second timeout
+    }, 5000); // 5 second timeout (reduced from 10)
 
     return () => clearTimeout(timeout);
   }, [authLoading]);
 
-  // Redirect if already logged in
+  // Redirect if already logged in (optimized)
   useEffect(() => {
-    if (authLoading || !user) return;
+    // If still loading auth, wait
+    if (authLoading) return;
+    
+    // If no user, don't redirect (show login form)
+    if (!user) return;
 
-    // Wait for role to be available before redirecting
+    // If user exists, check role and redirect
     const checkAndRedirect = async () => {
       // If role is already available, redirect immediately
       if (role) {
@@ -115,14 +119,21 @@ const Login = () => {
     setIsLoading(true);
 
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({
+      // Add timeout to login process (10 seconds max)
+      const loginPromise = supabase.auth.signInWithPassword({
         email: email.trim().toLowerCase(),
         password,
       });
 
+      const timeoutPromise = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error("Login timeout: Request took longer than 10 seconds")), 10000)
+      );
+
+      const { data, error } = await Promise.race([loginPromise, timeoutPromise]);
+
       if (error) throw error;
 
-      if (!data.user) {
+      if (!data?.user) {
         throw new Error("Login failed. Please try again.");
       }
 
@@ -131,64 +142,115 @@ const Login = () => {
         description: "Logged in successfully",
       });
 
-      // Force refresh profile in AuthContext to ensure role is loaded
+      // Force refresh profile and wait for it (with timeout)
       if (refreshProfile) {
-        await refreshProfile();
+        try {
+          await Promise.race([
+            refreshProfile(),
+            new Promise((_, reject) => 
+              setTimeout(() => reject(new Error("Profile refresh timeout")), 3000)
+            )
+          ]);
+        } catch (err) {
+          console.warn("Profile refresh failed:", err);
+          // Continue anyway - will use fallback redirect
+        }
       }
 
-      // Wait for AuthContext to update with new profile/role
-      // Poll for role to be available (max 5 seconds)
-      let attempts = 0;
-      const maxAttempts = 25; // 25 attempts * 200ms = 5 seconds max
+      // Get current user for direct profile query if needed
+      const { data: { user: currentUser } } = await supabase.auth.getUser();
       
+      // Quick check for admin/staff roles (max 1 second)
+      // For customers, redirect immediately without waiting
+      let attempts = 0;
+      const maxAttempts = 5; // 5 attempts * 200ms = 1 second max
+      let detectedRole: "admin" | "staff" | "customer" | null = null;
+      
+      // Quick check for admin/staff (customers are default, no need to wait)
       while (attempts < maxAttempts) {
         await new Promise(resolve => setTimeout(resolve, 200));
         
-        // Check if role is now available by fetching fresh profile
-        const { data: { user: currentUser } } = await supabase.auth.getUser();
-        if (currentUser) {
-          const { data: freshProfile } = await supabase
-            .from("profiles")
-            .select("role")
-            .eq("user_id", currentUser.id)
-            .single();
-          
-          if (freshProfile?.role) {
-            // Force another refresh to update AuthContext
-            if (refreshProfile) {
-              await refreshProfile();
-            }
-            // Wait a bit more for context to update
-            await new Promise(resolve => setTimeout(resolve, 300));
-            break;
-          }
+        // Check if admin/staff role is available
+        if (isAdmin()) {
+          detectedRole = "admin";
+          break;
+        }
+        if (isStaff()) {
+          detectedRole = "staff";
+          break;
         }
         attempts++;
       }
 
-      // Brief delay to allow AuthContext to update
-      await new Promise(resolve => setTimeout(resolve, 300));
+      // If admin/staff not detected quickly, check profile directly (only for admin/staff)
+      if (!detectedRole && currentUser?.id) {
+        try {
+          const { data: directProfile, error: profileError } = await supabase
+            .from("profiles")
+            .select("role")
+            .eq("user_id", currentUser.id)
+            .single();
+
+          if (!profileError && directProfile?.role) {
+            const roleLower = directProfile.role.toLowerCase().trim();
+            if (roleLower === "admin" || roleLower === "super_admin") {
+              detectedRole = "admin";
+            } else if (["staff", "production_manager", "store_manager", "factory_staff", "ops_team"].includes(roleLower)) {
+              detectedRole = "staff";
+            }
+            // If role is customer or null, detectedRole stays null (will default to customer)
+            
+            // Force refresh profile in context (non-blocking)
+            if (refreshProfile && detectedRole) {
+              refreshProfile().catch(() => {});
+            }
+          }
+        } catch (err) {
+          console.error('❌ Direct profile query failed:', err);
+        }
+      }
+
+      // If still no admin/staff role detected, default to customer (don't wait)
+      if (!detectedRole) {
+        detectedRole = "customer";
+      }
 
       // Log for debugging
-      console.log('Login redirect check:', {
+      console.log('🔐 Login redirect check:', {
         role,
         isAdmin: isAdmin(),
         isStaff: isStaff(),
-        isCustomer: isCustomer()
+        isCustomer: isCustomer(),
+        userEmail: currentUser?.email,
+        profileExists: !!profile,
+        roleDetected,
+        detectedRole
       });
 
-      // Use normalized role helpers for redirect
-      redirectByRole();
+      // Redirect based on detected role - prioritize admin/staff
+      if (detectedRole === "admin" || isAdmin()) {
+        console.log('✅ Redirecting to admin dashboard');
+        navigate("/admin/dashboard", { replace: true });
+      } else if (detectedRole === "staff" || isStaff()) {
+        console.log('✅ Redirecting to staff dashboard');
+        navigate("/staff/dashboard", { replace: true });
+      } else {
+        // Fallback to customer dashboard
+        console.log('✅ Redirecting to customer dashboard');
+        navigate("/dashboard", { replace: true });
+      }
     } catch (error: any) {
       console.error("Login error:", error);
       
       // Provide user-friendly error messages
       let errorMessage = "Invalid email or password";
-      if (error.message?.includes("Invalid login credentials")) {
+      if (error?.message?.includes("Invalid login credentials") || error?.message?.includes("Invalid login")) {
         errorMessage = "Invalid email or password. Please check your credentials.";
-      } else if (error.message?.includes("Email not confirmed")) {
+      } else if (error?.message?.includes("Email not confirmed")) {
         errorMessage = "Please verify your email before logging in.";
-      } else if (error.message) {
+      } else if (error?.message?.includes("timeout")) {
+        errorMessage = "Login request timed out. Please check your internet connection and try again.";
+      } else if (error?.message) {
         errorMessage = error.message;
       }
 
@@ -198,6 +260,7 @@ const Login = () => {
         variant: "destructive",
       });
     } finally {
+      // Always reset loading state
       setIsLoading(false);
     }
   };
@@ -233,15 +296,15 @@ const Login = () => {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            {authTimeout && (
+            {authTimeout && !user && (
               <Alert variant="destructive" className="mb-6">
                 <AlertCircle className="h-4 w-4" />
                 <AlertDescription>
-                  Authentication is taking longer than expected. The form is available below.
+                  Authentication check is taking longer than expected. You can proceed with login below.
                 </AlertDescription>
               </Alert>
             )}
-            {authLoading && !authTimeout ? (
+            {authLoading && !authTimeout && !user ? (
               <div className="flex flex-col items-center justify-center py-8 space-y-4" role="status" aria-live="polite">
                 <Loader2 className="h-6 w-6 animate-spin text-primary" aria-hidden="true" />
                 <p className="text-sm text-muted-foreground">Checking authentication status...</p>

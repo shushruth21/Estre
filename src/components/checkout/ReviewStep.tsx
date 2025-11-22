@@ -5,8 +5,6 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Package, MapPin, Calendar, Edit } from "lucide-react";
 import { format } from "date-fns";
-import { DiscountCodeSelector } from "@/components/DiscountCodeSelector";
-
 interface ReviewStepProps {
   cartItems: any[];
   deliveryAddress: any;
@@ -20,7 +18,6 @@ interface ReviewStepProps {
   termsAccepted: boolean;
   onTermsChange: (accepted: boolean) => void;
   onEditDelivery: () => void;
-  onApplyDiscount?: (code: string) => void;
 }
 
 export const ReviewStep = ({
@@ -36,7 +33,6 @@ export const ReviewStep = ({
   termsAccepted,
   onTermsChange,
   onEditDelivery,
-  onApplyDiscount,
 }: ReviewStepProps) => {
   return (
     <div className="space-y-6">
@@ -101,21 +97,6 @@ export const ReviewStep = ({
         </CardContent>
       </Card>
 
-      {/* Discount Code Section */}
-      {!discountCode && onApplyDiscount && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Apply Discount Code</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <DiscountCodeSelector
-              onApply={onApplyDiscount}
-              showLabel={false}
-            />
-          </CardContent>
-        </Card>
-      )}
-
       <Card>
         <CardHeader>
           <CardTitle>Payment Summary</CardTitle>
@@ -127,13 +108,6 @@ export const ReviewStep = ({
               <span>₹{Math.round(subtotal).toLocaleString()}</span>
             </div>
             
-            {discountCode && discount > 0 && (
-              <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Discount ({discountCode})</span>
-                <span className="text-green-600 font-semibold">-₹{Math.round(discount).toLocaleString()}</span>
-              </div>
-            )}
-            
             <Separator />
             
             <div className="flex justify-between font-semibold text-lg">
@@ -142,13 +116,9 @@ export const ReviewStep = ({
             </div>
           </div>
           
-          <div className="bg-primary/10 rounded-lg p-4 space-y-2">
-            <div className="flex justify-between">
-              <span className="font-medium">Advance Payment (50%)</span>
-              <span className="font-bold text-primary">₹{Math.round(advanceAmount).toLocaleString()}</span>
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Balance amount of ₹{Math.round(total - advanceAmount).toLocaleString()} to be paid on delivery
+          <div className="bg-muted rounded-lg p-4 space-y-2">
+            <p className="text-sm text-muted-foreground">
+              Your order will be reviewed by Estre Staff. Final pricing and payment details will be shared after review.
             </p>
           </div>
         </CardContent>

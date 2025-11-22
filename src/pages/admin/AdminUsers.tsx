@@ -53,18 +53,23 @@ const AdminUsers = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  // Fetch all users with their roles using edge function (if available) or fallback to profiles
+  // Fetch all users with their roles using admin client or fallback to profiles
   const { data: users, isLoading } = useQuery({
     queryKey: ["admin-users"],
     queryFn: async () => {
-      // Try edge function first (if available)
-      if (isServiceRoleConfigured) {
+      // Use admin client to list all users if service role is configured
+      if (isServiceRoleConfigured && supabaseAdmin) {
         try {
-          const { data, error } = await supabase.functions.invoke('admin-list-users');
+          const { data: { users: authUsers }, error: listError } = await supabaseAdmin.auth.admin.listUsers();
           
-          if (!error && data?.users) {
-            // Map edge function response to include role from profiles
-            const userIds = data.users.map((u: any) => u.id);
+          if (listError) {
+            console.error("Error listing users:", listError);
+            throw listError;
+          }
+
+          if (authUsers && authUsers.length > 0) {
+            // Get profiles for all users
+            const userIds = authUsers.map((u) => u.id);
             const { data: profiles } = await supabase
               .from("profiles")
               .select("user_id, role")
@@ -74,13 +79,18 @@ const AdminUsers = () => {
               (profiles || []).map((p: any) => [p.user_id, p.role])
             );
 
-            return data.users.map((user: any) => ({
-              ...user,
-              roles: profileMap.has(user.id) ? [profileMap.get(user.id)] : ['customer'],
+            // Map auth users to User interface
+            return authUsers.map((user) => ({
+              id: user.id,
+              email: user.email || `user-${user.id.slice(0, 8)}`,
+              created_at: user.created_at,
+              email_confirmed_at: user.email_confirmed_at,
+              roles: profileMap.has(user.id) ? [profileMap.get(user.id) as AppRole] : ['customer' as AppRole],
             })) as User[];
           }
         } catch (e) {
-          console.warn("Edge function not available, falling back to profiles:", e);
+          console.error("Error fetching users with admin client:", e);
+          // Fall through to profiles fallback
         }
       }
 
@@ -96,8 +106,7 @@ const AdminUsers = () => {
       }
 
       // Map profiles to User interface
-      // Note: Without edge function, we can't get email for all users
-      // In production, add email to profiles table or use edge function
+      // Note: Without admin client, we can't get email for all users
       return (profiles || []).map((profile: any) => ({
         id: profile.user_id,
         email: profile.full_name || `User ${profile.user_id.slice(0, 8)}`, // Fallback
@@ -109,72 +118,41 @@ const AdminUsers = () => {
     retry: false,
   });
 
-  // Create new user mutation using edge function (with profile role creation)
+  // Create new user mutation using admin client
   const createUserMutation = useMutation({
     mutationFn: async (userData: { email: string; password: string; role: AppRole }) => {
-      let result;
-      
-      // Try edge function first
-      if (isServiceRoleConfigured) {
-        try {
-          const { data, error } = await supabase.functions.invoke('admin-create-user', {
-            body: userData,
-          });
+      if (!isServiceRoleConfigured || !supabaseAdmin) {
+        throw new Error("Service role key not configured. Cannot create users.");
+      }
 
-          if (error) {
-            throw new Error(error.message || "Failed to create user");
-          }
+      // Create user using admin client
+      const { data: createData, error: createError } = await supabaseAdmin.auth.admin.createUser({
+        email: userData.email,
+        password: userData.password,
+        email_confirm: true, // Auto-confirm email
+      });
 
-          result = data;
-        } catch (e: any) {
-          console.error("Edge function error:", e);
-          throw new Error(e.message || "Failed to create user via edge function");
-        }
-      } else {
-        // Fallback: Create user via signup (requires email confirmation)
-        const { data: signupData, error: signupError } = await supabase.auth.signUp({
-          email: userData.email,
-          password: userData.password,
+      if (createError || !createData.user) {
+        throw new Error(createError?.message || "Failed to create user");
+      }
+
+      // Create profile with role
+      const { error: profileError } = await supabase
+        .from("profiles")
+        .upsert({
+          user_id: createData.user.id,
+          role: userData.role,
+          full_name: userData.email.split("@")[0], // Use email prefix as name
+        }, {
+          onConflict: "user_id",
         });
 
-        if (signupError || !signupData.user) {
-          throw new Error(signupError?.message || "Failed to create user");
-        }
-
-        // Create profile with role
-        const { error: profileError } = await supabase
-          .from("profiles")
-          .insert({
-            user_id: signupData.user.id,
-            role: userData.role,
-            full_name: userData.email.split("@")[0], // Use email prefix as name
-          });
-
-        if (profileError && profileError.code !== "23505") {
-          console.error("Error creating profile:", profileError);
-          // Continue anyway - trigger should handle it
-        }
-
-        result = { user: signupData.user };
+      if (profileError && profileError.code !== "23505") {
+        console.error("Error creating profile:", profileError);
+        // Continue anyway - user is created, profile can be fixed later
       }
 
-      // Ensure profile exists with correct role (upsert to handle edge function case)
-      if (result?.user?.id) {
-        const { error: profileError } = await supabase
-          .from("profiles")
-          .upsert({
-            user_id: result.user.id,
-            role: userData.role,
-          }, {
-            onConflict: "user_id",
-          });
-
-        if (profileError && profileError.code !== "23505") {
-          console.warn("Error updating profile role:", profileError);
-        }
-      }
-
-      return result;
+      return { user: createData.user };
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin-users"] });
@@ -196,18 +174,20 @@ const AdminUsers = () => {
     },
   });
 
-  // Delete user mutation using edge function
+  // Delete user mutation using admin client
   const deleteUserMutation = useMutation({
     mutationFn: async (userId: string) => {
-      const { data, error } = await supabase.functions.invoke('admin-delete-user', {
-        body: { userId },
-      });
+      if (!isServiceRoleConfigured || !supabaseAdmin) {
+        throw new Error("Service role key not configured. Cannot delete users.");
+      }
+
+      const { error } = await supabaseAdmin.auth.admin.deleteUser(userId);
 
       if (error) {
         throw new Error(error.message || "Failed to delete user");
       }
 
-      return data;
+      return { success: true };
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin-users"] });

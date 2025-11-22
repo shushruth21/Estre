@@ -11,7 +11,6 @@ import { ReviewStep } from "@/components/checkout/ReviewStep";
 import { PaymentStep } from "@/components/checkout/PaymentStep";
 import { calculateDynamicPrice } from "@/lib/dynamic-pricing";
 import { generateSaleOrderData } from "@/lib/sale-order-generator";
-import { DiscountCodeSelector } from "@/components/DiscountCodeSelector";
 
 const STEPS = [
   { id: 1, name: "Delivery", description: "Shipping details" },
@@ -35,8 +34,8 @@ const Checkout = () => {
   const [specialInstructions, setSpecialInstructions] = useState("");
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState("card");
-  const [discountCode, setDiscountCode] = useState<string>("");
-  const [discountAmount, setDiscountAmount] = useState<number>(0);
+  const [buyerGst, setBuyerGst] = useState<string>("");
+  const [dispatchMethod, setDispatchMethod] = useState<string>("Safe Express");
 
   const { data: user } = useQuery({
     queryKey: ["user"],
@@ -71,8 +70,8 @@ const Checkout = () => {
 
       const orderNumber = `ORD-${Date.now()}`;
       const subtotal = cartItems.reduce((sum, item) => sum + (item.calculated_price || 0), 0);
-      const netTotal = subtotal - discountAmount;
 
+      // Create order first (for reference and order_items)
       const { data: order, error: orderError } = await supabase
         .from("orders")
         .insert({
@@ -85,15 +84,17 @@ const Checkout = () => {
           expected_delivery_date: expectedDeliveryDate?.toISOString().split('T')[0],
           special_instructions: specialInstructions,
           subtotal_rs: subtotal,
-          discount_code: discountCode || null,
-          discount_amount_rs: discountAmount,
-          net_total_rs: netTotal,
+          discount_code: null, // No discount at checkout - staff applies it
+          discount_amount_rs: 0,
+          net_total_rs: subtotal,
           status: "pending",
           payment_status: "pending",
           payment_method: paymentMethod,
           advance_percent: 50,
-          advance_amount_rs: netTotal * 0.5,
-          balance_amount_rs: netTotal * 0.5,
+          advance_amount_rs: 0, // Will be set after staff review
+          // balance_amount_rs is GENERATED ALWAYS, don't insert it
+          buyer_gst: buyerGst || null,
+          dispatch_method: dispatchMethod || "Safe Express",
           terms_accepted: termsAccepted,
           terms_accepted_at: new Date().toISOString(),
         })
@@ -101,6 +102,22 @@ const Checkout = () => {
         .single();
 
       if (orderError) throw orderError;
+
+      // Create sale_order for staff review workflow
+      const { data: saleOrder, error: saleOrderError } = await supabase
+        .from("sale_orders")
+        .insert({
+          customer_id: user.id,
+          order_id: order.id,
+          status: "pending_staff_review",
+          base_price: subtotal,
+          discount: 0,
+          final_price: subtotal,
+        })
+        .select()
+        .single();
+
+      if (saleOrderError) throw saleOrderError;
 
       const orderItems = cartItems.map((item) => ({
         order_id: order.id,
@@ -216,19 +233,12 @@ const Checkout = () => {
         .eq("id", order.id);
 
       // Create initial timeline entry
+      // Create timeline entry for order submission
       await supabase.from("order_timeline").insert({
         order_id: order.id,
         status: "pending",
-        title: "Order Placed",
-        description: "Your order has been received and is pending approval",
-        created_by: user.id,
-      });
-
-      await supabase.from("order_timeline").insert({
-        order_id: order.id,
-        status: "confirmed",
-        title: "Order Confirmed",
-        description: "Order confirmed and sent for production",
+        title: "Order Submitted",
+        description: "Your order has been submitted and is pending staff review",
         created_by: user.id,
       });
 
@@ -240,12 +250,12 @@ const Checkout = () => {
 
       if (deleteError) throw deleteError;
 
-      return order;
+      return { order, saleOrder };
     },
-    onSuccess: (order) => {
+    onSuccess: () => {
       toast({
-        title: "Order Confirmed!",
-        description: `Order ${order.order_number} is now in production. Track progress from your dashboard.`,
+        title: "Order Submitted!",
+        description: "Your order is being reviewed by Estre Staff. You'll receive a confirmation shortly.",
       });
       queryClient.invalidateQueries({ queryKey: ["cart"] });
       navigate("/dashboard");
@@ -259,78 +269,11 @@ const Checkout = () => {
     },
   });
 
-  // Handle discount code application
-  const handleApplyDiscount = async (code: string) => {
-    try {
-      // Fetch discount code details
-      const { data: discountData, error: discountError } = await supabase
-        .from("discount_codes")
-        .select("*")
-        .eq("code", code)
-        .eq("is_active", true)
-        .single();
-
-      if (discountError || !discountData) {
-        toast({
-          title: "Invalid Discount Code",
-          description: "The discount code is invalid or inactive.",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      // Check if code has expired
-      if (discountData.expires_at && new Date(discountData.expires_at) < new Date()) {
-        toast({
-          title: "Expired Discount Code",
-          description: "This discount code has expired.",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      // Check max usage
-      if (discountData.max_usage && (discountData.usage_count || 0) >= discountData.max_usage) {
-        toast({
-          title: "Discount Code Limit Reached",
-          description: "This discount code has reached its maximum usage limit.",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      // Calculate discount amount
-      const subtotal = cartItems?.reduce((sum, item) => sum + (item.calculated_price || 0), 0) || 0;
-      let calculatedDiscount = 0;
-
-      if (discountData.type === "percent") {
-        calculatedDiscount = (subtotal * discountData.percent) / 100;
-      } else {
-        calculatedDiscount = discountData.value || 0;
-      }
-
-      setDiscountCode(code);
-      setDiscountAmount(calculatedDiscount);
-
-      toast({
-        title: "Discount Applied",
-        description: `Discount code ${code} applied successfully. Discount: ₹${Math.round(calculatedDiscount).toLocaleString()}`,
-      });
-    } catch (error: any) {
-      toast({
-        title: "Error Applying Discount",
-        description: error.message || "Failed to apply discount code",
-        variant: "destructive",
-      });
-    }
-  };
-
   const isDeliveryValid = deliveryAddress.street && deliveryAddress.city && 
                           deliveryAddress.state && deliveryAddress.pincode;
   
   const subtotal = cartItems?.reduce((sum, item) => sum + (item.calculated_price || 0), 0) || 0;
-  const total = subtotal - discountAmount;
-  const advanceAmount = total * 0.5;
+  const total = subtotal; // No discount at checkout
 
   const handleNext = () => {
     if (currentStep === 1 && !isDeliveryValid) {
@@ -399,6 +342,10 @@ const Checkout = () => {
               onDateChange={setExpectedDeliveryDate}
               specialInstructions={specialInstructions}
               onInstructionsChange={setSpecialInstructions}
+              buyerGst={buyerGst}
+              onBuyerGstChange={setBuyerGst}
+              dispatchMethod={dispatchMethod}
+              onDispatchMethodChange={setDispatchMethod}
             />
           )}
 
@@ -409,13 +356,12 @@ const Checkout = () => {
               expectedDeliveryDate={expectedDeliveryDate}
               specialInstructions={specialInstructions}
               subtotal={subtotal}
-              discount={discountAmount}
-              discountCode={discountCode}
+              discount={0}
+              discountCode={undefined}
               total={total}
-              advanceAmount={advanceAmount}
+              advanceAmount={0}
               termsAccepted={termsAccepted}
               onTermsChange={setTermsAccepted}
-              onApplyDiscount={handleApplyDiscount}
               onEditDelivery={() => setCurrentStep(1)}
             />
           )}
@@ -424,7 +370,7 @@ const Checkout = () => {
             <PaymentStep
               paymentMethod={paymentMethod}
               onPaymentMethodChange={setPaymentMethod}
-              advanceAmount={advanceAmount}
+              advanceAmount={0}
             />
           )}
 

@@ -20,7 +20,7 @@
  * ```
  */
 
-import { ReactNode } from "react";
+import { ReactNode, useEffect, useState } from "react";
 import { Navigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import { Loader2 } from "lucide-react";
@@ -34,10 +34,40 @@ export function ProtectedRoute({
   children, 
   requiredRole 
 }: ProtectedRouteProps) {
-  const { loading, role, isAdmin, isStaff, isCustomer } = useAuth();
+  const { loading, role, isAdmin, isStaff, isCustomer, user } = useAuth();
+  const [roleLoading, setRoleLoading] = useState(true);
 
-  // Show loading while checking auth
-  if (loading) {
+  // Wait for role to load (especially for staff/admin routes)
+  useEffect(() => {
+    if (!loading && user) {
+      // For staff/admin routes, wait up to 2 seconds for role to load
+      if (requiredRole === "staff" || requiredRole === "admin") {
+        let attempts = 0;
+        const maxAttempts = 10; // 10 attempts * 200ms = 2 seconds
+        
+        const checkRole = async () => {
+          while (attempts < maxAttempts) {
+            if (role) {
+              setRoleLoading(false);
+              return;
+            }
+            await new Promise(resolve => setTimeout(resolve, 200));
+            attempts++;
+          }
+          setRoleLoading(false);
+        };
+        
+        checkRole();
+      } else {
+        setRoleLoading(false);
+      }
+    } else if (!loading && !user) {
+      setRoleLoading(false);
+    }
+  }, [loading, user, role, requiredRole]);
+
+  // Show loading while checking auth or waiting for role
+  if (loading || roleLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="text-center">
@@ -49,7 +79,7 @@ export function ProtectedRoute({
   }
 
   // No session present → redirect to login
-  if (!role) {
+  if (!role || !user) {
     return <Navigate to="/login" replace />;
   }
 

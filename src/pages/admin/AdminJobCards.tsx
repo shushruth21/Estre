@@ -200,6 +200,12 @@ const AdminJobCards = () => {
           pricing: generatedJobCard.pricing,
         })),
         dimensions: JSON.parse(JSON.stringify(generatedJobCard.dimensions)),
+        calculated_dimensions: JSON.parse(JSON.stringify({
+          frontWidth: generatedJobCard.dimensions.frontWidth,
+          leftWidth: generatedJobCard.dimensions.leftWidth,
+          rightWidth: generatedJobCard.dimensions.rightWidth,
+          totalWidth: generatedJobCard.dimensions.totalWidth,
+        })),
         status: "pending" as any,
         priority: (data.priority || "normal") as any,
         expected_completion_date: data.expected_completion_date || null,

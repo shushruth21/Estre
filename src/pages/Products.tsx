@@ -110,7 +110,7 @@ const Products = () => {
     // Query will automatically fetch in background due to placeholderData
   };
 
-  const { data: products, isLoading, error, isPlaceholderData } = useQuery({
+  const { data: products, isLoading, error, isPlaceholderData, isError } = useQuery({
     queryKey: ["products", category],
     enabled: !!category,
     queryFn: async () => {
@@ -144,7 +144,7 @@ const Products = () => {
           selectFields = `id, title, image, ${columns.netPrice}, ${columns.strikePrice}, discount_percent, discount_rs`;
         }
         
-        // Execute query
+        // Execute query with timeout (15 seconds)
         let query = supabase
           .from(tableName as any)
           .select(selectFields);
@@ -154,7 +154,14 @@ const Products = () => {
           query = query.eq("is_active", true);
         }
         
-        const { data, error } = await query.order("title", { ascending: true }) as any;
+        // Add timeout to prevent hanging queries (15 seconds)
+        const queryPromise = query.order("title", { ascending: true });
+        const timeoutPromise = new Promise<never>((_, reject) => 
+          setTimeout(() => reject(new Error('Query timeout: Request took longer than 15 seconds')), 15000)
+        );
+        
+        const result = await Promise.race([queryPromise, timeoutPromise]);
+        const { data, error } = result as any;
         
         if (error) {
           console.error('❌ Supabase query error:', {
@@ -248,7 +255,15 @@ const Products = () => {
         throw err;
       }
     },
-    retry: 1,
+    retry: (failureCount, error: any) => {
+      // Don't retry on timeout or permission errors
+      if (error?.message?.includes('timeout') || error?.code === 'PGRST301') {
+        return false;
+      }
+      // Retry once for other errors
+      return failureCount < 1;
+    },
+    retryDelay: 1000,
     staleTime: 10 * 60 * 1000, // Cache for 10 minutes (increased for better performance)
     gcTime: 30 * 60 * 1000, // Keep in cache for 30 minutes (increased)
     placeholderData: (previousData) => previousData, // Keep old data while fetching new
@@ -301,7 +316,7 @@ const Products = () => {
         </Tabs>
 
         {/* Products Grid */}
-        {error && (
+        {isError && error && (
           <div className="text-center py-20 max-w-2xl mx-auto">
             <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-6 mb-4">
               <p className="text-destructive text-lg font-semibold mb-2">Error loading products</p>
@@ -327,7 +342,7 @@ const Products = () => {
           </div>
         )}
         
-        {(isLoading && !products) ? (
+        {isLoading && !products && !isError ? (
           <div className="space-y-6">
             <div className="text-center">
               <div className="inline-flex items-center gap-2 px-4 py-2 bg-primary/10 rounded-full">
@@ -350,7 +365,7 @@ const Products = () => {
               ))}
             </div>
           </div>
-        ) : !error && products && products.length > 0 ? (
+        ) : !isError && products && products.length > 0 ? (
           <div className="space-y-6">
             {isPlaceholderData && (
               <div className="bg-blue-50 dark:bg-blue-950/50 border border-blue-200 dark:border-blue-800 rounded-lg p-4 text-center shadow-sm">
@@ -425,7 +440,7 @@ const Products = () => {
             ))}
             </div>
           </div>
-        ) : !error && !isLoading && (!products || products.length === 0) ? (
+        ) : !isError && !isLoading && (!products || products.length === 0) ? (
           <div className="text-center py-20">
             <div className="bg-muted/50 border border-muted rounded-lg p-6 max-w-md mx-auto">
               <p className="text-lg font-semibold mb-2">No products found</p>
