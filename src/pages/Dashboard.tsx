@@ -22,6 +22,7 @@ import {
   AlertCircle,
   CheckCircle2,
   CreditCard,
+  Download,
 } from "lucide-react";
 
 const formatCurrency = (value: number | null | undefined) => {
@@ -168,7 +169,7 @@ const Dashboard = () => {
             )
           `)
           .eq("customer_id", user.id)
-          .in("status", ["awaiting_customer_otp", "confirmed_by_customer", "pending_staff_review"])
+          .in("status", ["awaiting_customer_otp", "awaiting_customer_confirmation", "confirmed_by_customer", "pending_staff_review"])
           .order("created_at", { ascending: false });
 
         if (error) {
@@ -360,7 +361,8 @@ const Dashboard = () => {
                       className={`uppercase tracking-wide ${
                         saleOrder.status === 'confirmed_by_customer' ? 'bg-green-500/10 text-green-600 border-green-500/30' :
                         saleOrder.status === 'awaiting_customer_otp' ? 'bg-yellow-500/10 text-yellow-600 border-yellow-500/30' :
-                        'bg-blue-500/10 text-blue-600 border-blue-500/30'
+                        saleOrder.status === 'awaiting_customer_confirmation' ? 'bg-blue-500/10 text-blue-600 border-blue-500/30' :
+                        'bg-gray-500/10 text-gray-600 border-gray-500/30'
                       }`}
                     >
                       {saleOrder.status?.replace(/_/g, " ") || "PENDING"}
@@ -398,6 +400,42 @@ const Dashboard = () => {
                   </div>
 
                   <Separator />
+
+                  {saleOrder.status === "awaiting_customer_confirmation" && (
+                    <div className="space-y-3">
+                      <div className="flex items-start gap-3 p-4 bg-blue-500/10 rounded-lg border border-blue-500/30">
+                        <CheckCircle2 className="h-5 w-5 text-blue-600 mt-0.5" />
+                        <div className="flex-1">
+                          <p className="font-semibold text-blue-600 mb-1">
+                            Awaiting Your Confirmation
+                          </p>
+                          <p className="text-sm text-muted-foreground">
+                            Staff has reviewed and approved your order. Please review the sale order PDF and confirm to proceed.
+                          </p>
+                        </div>
+                      </div>
+                      {saleOrder.pdf_url && (
+                        <Button 
+                          asChild
+                          variant="outline"
+                          className="w-full"
+                        >
+                          <a href={saleOrder.pdf_url} target="_blank" rel="noopener noreferrer">
+                            <Download className="mr-2 h-4 w-4" />
+                            Download Sale Order PDF
+                          </a>
+                        </Button>
+                      )}
+                      <Button 
+                        onClick={() => navigate(`/order-confirmation/${saleOrder.id}`)}
+                        className="w-full bg-gradient-gold text-white border-gold hover:shadow-gold-glow transition-premium"
+                        size="lg"
+                      >
+                        <CheckCircle2 className="mr-2 h-5 w-5" />
+                        Review & Confirm Order
+                      </Button>
+                    </div>
+                  )}
 
                   {saleOrder.status === "awaiting_customer_otp" && (
                     <div className="space-y-3">

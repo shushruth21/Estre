@@ -190,7 +190,7 @@ export default function StaffSaleOrders() {
         .update({
           discount: discountAmount,
           final_price: finalPrice,
-          status: "awaiting_pdf_generation",
+          status: "awaiting_customer_confirmation",
           updated_at: new Date().toISOString(),
         })
         .eq("id", saleOrderId);
@@ -236,7 +236,7 @@ export default function StaffSaleOrders() {
       setSelectedSaleOrder(null);
       toast({
         title: "Discount Applied",
-        description: "Sale order approved and PDF generation initiated.",
+        description: "Sale order approved. PDF generated and sent to customer for confirmation.",
       });
     },
     onError: (error: any) => {
@@ -276,7 +276,7 @@ export default function StaffSaleOrders() {
         .update({
           discount: discountAmount,
           final_price: finalPrice,
-          status: "awaiting_pdf_generation",
+          status: "awaiting_customer_confirmation",
           updated_at: new Date().toISOString(),
         })
         .eq("id", saleOrderId);
@@ -316,7 +316,7 @@ export default function StaffSaleOrders() {
       setManualDiscount("");
       toast({
         title: "Discount Applied",
-        description: "Sale order approved and PDF generation initiated.",
+        description: "Sale order approved. PDF generated and sent to customer for confirmation.",
       });
     },
     onError: (error: any) => {

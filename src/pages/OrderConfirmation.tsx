@@ -10,14 +10,14 @@
 
 import { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, CheckCircle2, AlertCircle } from "lucide-react";
+import { Loader2, CheckCircle2, AlertCircle, Download } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
 export default function OrderConfirmation() {
@@ -40,7 +40,8 @@ export default function OrderConfirmation() {
             id,
             order_number,
             customer_name,
-            customer_email
+            customer_email,
+            payment_method
           )
         `)
         .eq("id", saleOrderId)
@@ -182,6 +183,62 @@ export default function OrderConfirmation() {
                 Proceed to Payment
               </Button>
             </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // Handle awaiting_customer_confirmation status - show PDF and confirm button
+  if (saleOrder.status === "awaiting_customer_confirmation") {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background p-4">
+        <Card className="max-w-md w-full">
+          <CardHeader>
+            <CardTitle>Order Confirmation</CardTitle>
+            <CardDescription>
+              Order: {saleOrder.order?.order_number || saleOrderId?.slice(0, 8)}
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <Alert>
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>
+                Please review the sale order PDF and confirm your order.
+              </AlertDescription>
+            </Alert>
+
+            {saleOrder.pdf_url && (
+              <Button
+                asChild
+                variant="outline"
+                className="w-full"
+              >
+                <a href={saleOrder.pdf_url} target="_blank" rel="noopener noreferrer">
+                  <Download className="mr-2 h-4 w-4" />
+                  Download Sale Order PDF
+                </a>
+              </Button>
+            )}
+
+            <div className="border-t pt-4 space-y-2">
+              <div className="flex justify-between">
+                <span>Base Price:</span>
+                <span>₹{Math.round(saleOrder.base_price).toLocaleString()}</span>
+              </div>
+              {saleOrder.discount > 0 && (
+                <div className="flex justify-between text-green-600">
+                  <span>Discount:</span>
+                  <span>-₹{Math.round(saleOrder.discount).toLocaleString()}</span>
+                </div>
+              )}
+              <div className="flex justify-between font-semibold text-lg border-t pt-2">
+                <span>Final Price:</span>
+                <span>₹{Math.round(saleOrder.final_price).toLocaleString()}</span>
+              </div>
+            </div>
+
+            <ConfirmOrderButton saleOrderId={saleOrderId!} saleOrder={saleOrder} />
           </CardContent>
         </Card>
       </div>

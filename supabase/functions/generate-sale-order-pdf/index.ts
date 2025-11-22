@@ -223,14 +223,19 @@ serve(async (req) => {
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
     const otpExpiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
 
-    // Update sale_order with PDF URL and OTP
+    // Update sale_order with PDF URL
+    // Note: Status should already be "awaiting_customer_confirmation" from staff approval
+    // We keep it as is, or set it if not already set
     const { error: updateError } = await supabase
       .from("sale_orders")
       .update({
         pdf_url: urlData.publicUrl,
+        // Generate OTP for backup verification (optional)
         otp_code: otp,
         otp_expires_at: otpExpiresAt.toISOString(),
-        status: "awaiting_customer_otp",
+        // Keep status as awaiting_customer_confirmation (set by staff approval)
+        // Only update if status is still awaiting_pdf_generation
+        status: "awaiting_customer_confirmation",
         updated_at: new Date().toISOString(),
       })
       .eq("id", saleOrderId);
@@ -282,7 +287,7 @@ serve(async (req) => {
           console.error("PDF email failed:", await pdfEmailResponse.text());
         }
 
-        // Send OTP email
+        // Send confirmation email (OTP included but not required for confirmation)
         const otpEmailResponse = await fetch("https://api.resend.com/emails", {
           method: "POST",
           headers: {
@@ -292,12 +297,15 @@ serve(async (req) => {
           body: JSON.stringify({
             from: "Estre <orders@estre.in>",
             to: saleOrder.order.customer_email,
-            subject: "Your Estre Order Confirmation OTP",
+            subject: "Your Estre Sale Order is Ready for Confirmation",
             html: `
               <h2>Dear ${saleOrder.order.customer_name},</h2>
-              <p>Your Estre Order Confirmation OTP: <strong>${otp}</strong></p>
-              <p>Valid for 10 minutes.</p>
-              <p>Please enter this OTP to confirm your order.</p>
+              <p>Your Sale Order has been reviewed and approved by Estre Staff.</p>
+              <p>Please review the attached PDF and confirm your order.</p>
+              <p>You can confirm your order directly from your dashboard.</p>
+              <p style="margin-top: 20px; color: #666; font-size: 12px;">
+                Order Number: ${saleOrder.order.order_number}
+              </p>
             `,
           }),
         });

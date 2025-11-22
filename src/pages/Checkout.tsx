@@ -15,7 +15,7 @@ import { generateSaleOrderData } from "@/lib/sale-order-generator";
 const STEPS = [
   { id: 1, name: "Delivery", description: "Shipping details" },
   { id: 2, name: "Review", description: "Confirm order" },
-  { id: 3, name: "Payment", description: "Complete payment" },
+  // Payment step removed - payment happens after staff review
 ];
 
 const Checkout = () => {
@@ -268,8 +268,8 @@ const Checkout = () => {
     },
     onSuccess: () => {
       toast({
-        title: "Order Submitted!",
-        description: "Your order is being reviewed by Estre Staff. You'll receive a confirmation shortly.",
+        title: "Review Requested!",
+        description: "Your order has been sent for staff review. You'll receive a confirmation shortly.",
       });
       queryClient.invalidateQueries({ queryKey: ["cart"] });
       navigate("/dashboard");
@@ -377,14 +377,8 @@ const Checkout = () => {
               termsAccepted={termsAccepted}
               onTermsChange={setTermsAccepted}
               onEditDelivery={() => setCurrentStep(1)}
-            />
-          )}
-
-          {currentStep === 3 && (
-            <PaymentStep
-              paymentMethod={paymentMethod}
-              onPaymentMethodChange={setPaymentMethod}
-              advanceAmount={0}
+              onRequestReview={() => placeOrder.mutate()}
+              isSubmitting={placeOrder.isPending}
             />
           )}
 
@@ -394,23 +388,13 @@ const Checkout = () => {
               {currentStep === 1 ? "Back to Cart" : "Previous"}
             </Button>
 
-            {currentStep < STEPS.length ? (
+            {currentStep < STEPS.length && (
               <Button onClick={handleNext}>
                 Next
                 <ArrowRight className="ml-2 h-4 w-4" />
               </Button>
-            ) : (
-              <Button 
-                onClick={() => placeOrder.mutate()}
-                disabled={placeOrder.isPending || !termsAccepted}
-                size="lg"
-              >
-                {placeOrder.isPending && (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                )}
-                Place Order
-              </Button>
             )}
+            {/* "Request Staff Review" button is now in ReviewStep component */}
           </div>
         </div>
       </div>

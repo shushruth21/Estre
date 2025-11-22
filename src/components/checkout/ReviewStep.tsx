@@ -3,7 +3,7 @@ import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Package, MapPin, Calendar, Edit } from "lucide-react";
+import { Package, MapPin, Calendar, Edit, Loader2, Send } from "lucide-react";
 import { format } from "date-fns";
 interface ReviewStepProps {
   cartItems: any[];
@@ -18,6 +18,8 @@ interface ReviewStepProps {
   termsAccepted: boolean;
   onTermsChange: (accepted: boolean) => void;
   onEditDelivery: () => void;
+  onRequestReview?: () => void;
+  isSubmitting?: boolean;
 }
 
 export const ReviewStep = ({
@@ -33,6 +35,8 @@ export const ReviewStep = ({
   termsAccepted,
   onTermsChange,
   onEditDelivery,
+  onRequestReview,
+  isSubmitting,
 }: ReviewStepProps) => {
   return (
     <div className="space-y-6">
@@ -121,6 +125,27 @@ export const ReviewStep = ({
               Your order will be reviewed by Estre Staff. Final pricing and payment details will be shared after review.
             </p>
           </div>
+
+          {onRequestReview && (
+            <Button
+              onClick={onRequestReview}
+              disabled={!termsAccepted || isSubmitting}
+              className="w-full mt-4"
+              size="lg"
+            >
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Submitting...
+                </>
+              ) : (
+                <>
+                  <Send className="mr-2 h-4 w-4" />
+                  Request Staff Review
+                </>
+              )}
+            </Button>
+          )}
         </CardContent>
       </Card>
 
