@@ -1,7 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
-import { CreditCard, Smartphone, Building2, Wallet } from "lucide-react";
+import { CreditCard, Smartphone, Building2, Wallet, Banknote } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
 interface PaymentStepProps {
@@ -73,6 +73,17 @@ export const PaymentStep = ({
                   <div>
                     <p className="font-medium">Wallets</p>
                     <p className="text-xs text-muted-foreground">Paytm, Mobikwik, Freecharge</p>
+                  </div>
+                </Label>
+              </div>
+
+              <div className="flex items-center space-x-3 p-4 rounded-lg border hover:bg-muted cursor-pointer transition-smooth">
+                <RadioGroupItem value="cash" id="cash" />
+                <Label htmlFor="cash" className="flex items-center gap-3 cursor-pointer flex-1">
+                  <Banknote className="h-5 w-5 text-muted-foreground" />
+                  <div>
+                    <p className="font-medium">Cash on Delivery</p>
+                    <p className="text-xs text-muted-foreground">Pay cash when product is delivered</p>
                   </div>
                 </Label>
               </div>

@@ -33,7 +33,7 @@ const Checkout = () => {
   const [expectedDeliveryDate, setExpectedDeliveryDate] = useState<Date>();
   const [specialInstructions, setSpecialInstructions] = useState("");
   const [termsAccepted, setTermsAccepted] = useState(false);
-  const [paymentMethod, setPaymentMethod] = useState("card");
+  const [paymentMethod, setPaymentMethod] = useState("cash");
   const [buyerGst, setBuyerGst] = useState<string>("");
   const [dispatchMethod, setDispatchMethod] = useState<string>("Safe Express");
 

@@ -67,6 +67,17 @@ export default function StaffSaleOrders() {
         userId: user?.id,
       });
 
+      // First, verify we can access the table at all (test query)
+      const testQuery = await supabase
+        .from("sale_orders")
+        .select("id")
+        .limit(1);
+
+      if (testQuery.error) {
+        console.error("❌ Cannot access sale_orders table:", testQuery.error);
+        throw new Error(`RLS Policy Error: ${testQuery.error.message}. Please ensure RLS policies are configured correctly.`);
+      }
+
       // Add timeout to prevent hanging
       const queryPromise = supabase
         .from("sale_orders")

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, useCallback } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
+import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -18,6 +19,9 @@ import {
   Truck,
   Tag,
   Eye,
+  AlertCircle,
+  CheckCircle2,
+  CreditCard,
 } from "lucide-react";
 
 const formatCurrency = (value: number | null | undefined) => {
@@ -144,6 +148,42 @@ const Dashboard = () => {
 
   // Set up realtime subscriptions
   useRealtimeOrders({ orderIds, enabled: orderIds.length > 0 });
+
+  // Fetch sale orders for customer (orders needing action)
+  const { data: saleOrders } = useQuery({
+    queryKey: ["customer-sale-orders", user?.id],
+    queryFn: async () => {
+      if (!user) return [];
+      
+      try {
+        const { data, error } = await supabase
+          .from("sale_orders")
+          .select(`
+            *,
+            order:orders(
+              id,
+              order_number,
+              customer_name,
+              customer_email
+            )
+          `)
+          .eq("customer_id", user.id)
+          .in("status", ["awaiting_customer_otp", "confirmed_by_customer", "pending_staff_review"])
+          .order("created_at", { ascending: false });
+
+        if (error) {
+          console.error("Sale orders error:", error);
+          return [];
+        }
+        return data || [];
+      } catch (error) {
+        console.error("Error fetching sale orders:", error);
+        return [];
+      }
+    },
+    enabled: !!user && !isAdmin() && !isStaff(),
+    refetchOnWindowFocus: true,
+  });
 
   // Redirect admin/staff users to their respective dashboards
   // Quick check (max 1 second) - customers don't need to wait
@@ -297,7 +337,147 @@ const Dashboard = () => {
       <div className="container mx-auto px-4 py-10 space-y-10">
         {dashboardHeader}
 
-        {ordersState.orders.length === 0 ? (
+        {/* Sale Orders Needing Action */}
+        {saleOrders && saleOrders.length > 0 && (
+          <div className="space-y-4">
+            <h2 className="text-2xl font-bold font-serif">Orders Needing Your Action</h2>
+            {saleOrders.map((saleOrder: any) => (
+              <Card key={saleOrder.id} className="luxury-card-glass border-yellow-500/30 hover:border-yellow-500/50 transition-premium">
+                <CardHeader>
+                  <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                    <div>
+                      <CardTitle className="text-xl font-serif">
+                        Sale Order: {saleOrder.order?.order_number || `SO-${saleOrder.id.slice(0, 8).toUpperCase()}`}
+                      </CardTitle>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        Created on{" "}
+                        {saleOrder.created_at
+                          ? new Date(saleOrder.created_at).toLocaleDateString()
+                          : "N/A"}
+                      </p>
+                    </div>
+                    <Badge 
+                      className={`uppercase tracking-wide ${
+                        saleOrder.status === 'confirmed_by_customer' ? 'bg-green-500/10 text-green-600 border-green-500/30' :
+                        saleOrder.status === 'awaiting_customer_otp' ? 'bg-yellow-500/10 text-yellow-600 border-yellow-500/30' :
+                        'bg-blue-500/10 text-blue-600 border-blue-500/30'
+                      }`}
+                    >
+                      {saleOrder.status?.replace(/_/g, " ") || "PENDING"}
+                    </Badge>
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid gap-4 md:grid-cols-3">
+                    <div>
+                      <p className="text-xs font-semibold uppercase text-muted-foreground">
+                        Base Price
+                      </p>
+                      <p className="text-lg font-semibold">
+                        {formatCurrency(saleOrder.base_price)}
+                      </p>
+                    </div>
+                    {saleOrder.discount > 0 && (
+                      <div>
+                        <p className="text-xs font-semibold uppercase text-muted-foreground">
+                          Discount
+                        </p>
+                        <p className="text-lg font-semibold text-green-600">
+                          -{formatCurrency(saleOrder.discount)}
+                        </p>
+                      </div>
+                    )}
+                    <div>
+                      <p className="text-xs font-semibold uppercase text-muted-foreground">
+                        Final Price
+                      </p>
+                      <p className="text-lg font-semibold text-gold">
+                        {formatCurrency(saleOrder.final_price)}
+                      </p>
+                    </div>
+                  </div>
+
+                  <Separator />
+
+                  {saleOrder.status === "awaiting_customer_otp" && (
+                    <div className="space-y-3">
+                      <div className="flex items-start gap-3 p-4 bg-yellow-500/10 rounded-lg border border-yellow-500/30">
+                        <AlertCircle className="h-5 w-5 text-yellow-600 mt-0.5" />
+                        <div className="flex-1">
+                          <p className="font-semibold text-yellow-600 mb-1">
+                            OTP Verification Required
+                          </p>
+                          <p className="text-sm text-muted-foreground">
+                            Please check your email for the OTP code to confirm your order. The OTP is valid for 10 minutes.
+                          </p>
+                        </div>
+                      </div>
+                      <Button 
+                        onClick={() => navigate(`/order-confirmation/${saleOrder.id}`)}
+                        className="w-full bg-gradient-gold text-white border-gold hover:shadow-gold-glow transition-premium"
+                        size="lg"
+                      >
+                        <CheckCircle2 className="mr-2 h-5 w-5" />
+                        Enter OTP to Confirm Order
+                      </Button>
+                    </div>
+                  )}
+
+                  {saleOrder.status === "confirmed_by_customer" && (
+                    <div className="space-y-3">
+                      <div className="flex items-start gap-3 p-4 bg-green-500/10 rounded-lg border border-green-500/30">
+                        <CheckCircle2 className="h-5 w-5 text-green-600 mt-0.5" />
+                        <div className="flex-1">
+                          <p className="font-semibold text-green-600 mb-1">
+                            Order Confirmed
+                          </p>
+                          <p className="text-sm text-muted-foreground">
+                            Your order has been confirmed. Please proceed to payment to start production.
+                          </p>
+                        </div>
+                      </div>
+                      <div className="bg-muted rounded-lg p-4 space-y-2">
+                        <div className="flex justify-between text-sm">
+                          <span className="text-muted-foreground">Advance Payment (50%)</span>
+                          <span className="font-semibold">{formatCurrency((saleOrder.final_price || 0) * 0.5)}</span>
+                        </div>
+                        <div className="flex justify-between text-sm">
+                          <span className="text-muted-foreground">Balance on Delivery</span>
+                          <span className="font-semibold">{formatCurrency((saleOrder.final_price || 0) * 0.5)}</span>
+                        </div>
+                      </div>
+                      <Button 
+                        onClick={() => navigate(`/payment/${saleOrder.id}`)}
+                        className="w-full bg-gradient-gold text-white border-gold hover:shadow-gold-glow transition-premium"
+                        size="lg"
+                      >
+                        <CreditCard className="mr-2 h-5 w-5" />
+                        Proceed to Payment (50% Advance)
+                      </Button>
+                    </div>
+                  )}
+
+                  {saleOrder.status === "pending_staff_review" && (
+                    <div className="flex items-start gap-3 p-4 bg-blue-500/10 rounded-lg border border-blue-500/30">
+                      <Clock className="h-5 w-5 text-blue-600 mt-0.5" />
+                      <div className="flex-1">
+                        <p className="font-semibold text-blue-600 mb-1">
+                          Under Review
+                        </p>
+                        <p className="text-sm text-muted-foreground">
+                          Your order is being reviewed by Estre Staff. You'll receive a confirmation email with PDF and OTP shortly.
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )}
+
+        {/* Existing Orders Section */}
+        {ordersState.orders.length === 0 && (!saleOrders || saleOrders.length === 0) ? (
           <Card className="luxury-card-glass border-gold/20">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-2xl font-serif">
