@@ -11,7 +11,7 @@
 
 #### Variable 1: VITE_SUPABASE_URL
 ```
-Key: VITE_SUPABASE_SERVICE_ROLE_KEY
+Key: VITE_SUPABASE_URL
 Value: https://ljgmqwnamffvvrwgprsd.supabase.co
 Environment: Production, Preview, Development
 ```
