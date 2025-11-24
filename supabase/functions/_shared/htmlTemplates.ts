@@ -3,8 +3,7 @@
  * Uses simple string replacement for template rendering
  */
 
-import { PricingBreakdownData } from "../../../src/lib/pricing-breakdown-generator";
-import { TechnicalSpecifications } from "../../../src/lib/technical-specifications-generator";
+import { PricingBreakdownData, TechnicalSpecifications } from "./types.ts";
 
 // Sale Order HTML Template
 const SALE_ORDER_TEMPLATE = `<!DOCTYPE html>
