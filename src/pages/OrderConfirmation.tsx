@@ -406,11 +406,11 @@ export default function OrderConfirmation() {
               <AlertCircle className="h-12 w-12 mx-auto text-yellow-600" />
               <h2 className="text-2xl font-bold">OTP Not Available</h2>
               <p className="text-muted-foreground">
-                {saleOrder.status === "pending_staff_review"
+                {saleOrder.status === "pending_review" || saleOrder.status === "staff_editing"
                   ? "Your order is still being reviewed by staff."
-                  : saleOrder.status === "awaiting_pdf_generation"
+                  : saleOrder.status === "staff_pdf_generated"
                   ? "PDF is being generated. You'll receive an email shortly."
-                  : saleOrder.status === "pdf_ready"
+                  : saleOrder.status === "staff_approved"
                   ? "PDF is ready. Please check your email for the OTP."
                   : "Please wait for the OTP to be sent to your email."}
               </p>

@@ -100,7 +100,7 @@ export default function StaffSaleOrders() {
             order_items:order_items(*)
           )
         `)
-        .eq("status", "pending_staff_review")
+        .eq("status", "pending_review")
         .order("created_at", { ascending: false });
 
       const timeoutPromise = new Promise<never>((_, reject) =>
@@ -680,7 +680,7 @@ export default function StaffSaleOrders() {
 
                                   {/* Action Buttons */}
                                   <div className="flex flex-wrap gap-2 pt-4 border-t">
-                                    {saleOrder.status === "confirmed_by_customer" && (
+                                    {(saleOrder.status === "confirmed_by_customer" || saleOrder.status === "customer_confirmed") && (
                                       <Button
                                         onClick={() => {
                                           completeOrderMutation.mutate(saleOrder.id);

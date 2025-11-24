@@ -253,7 +253,7 @@ export default function StaffSaleOrderDetail() {
               Customer: {saleOrder.order?.customer_name}
             </p>
             <Badge className="mt-2" variant={
-              saleOrder.status === "pending_review" || saleOrder.status === "pending_staff_review" 
+              saleOrder.status === "pending_review" || saleOrder.status === "staff_editing" 
                 ? "default" 
                 : saleOrder.status === "staff_approved" || saleOrder.status === "staff_pdf_generated"
                 ? "default" 
@@ -497,7 +497,7 @@ export default function StaffSaleOrderDetail() {
         {/* SECTION 4: Actions */}
         <Card>
           <CardContent className="pt-6 space-y-4">
-            {(saleOrder.status === "pending_review" || saleOrder.status === "pending_staff_review" || saleOrder.status === "staff_editing") && (
+            {(saleOrder.status === "pending_review" || saleOrder.status === "staff_editing") && (
               <>
                 <div className="flex gap-2">
                   <Button

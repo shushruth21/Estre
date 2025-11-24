@@ -119,70 +119,87 @@ const Checkout = () => {
         throw orderError;
       }
 
-      // Generate sale order number (format: "001", "002", etc.)
-      // Get the latest sale order number with error handling
-      let saleOrderNumber = "001";
-      try {
-        const { data: latestSaleOrder, error: saleOrderQueryError } = await supabase
-          .from("sale_orders")
-          .select("order_number")
-          .order("created_at", { ascending: false })
-          .limit(1)
-          .maybeSingle(); // Use maybeSingle() instead of single() to handle empty table
+      // Generate unique sale order number using timestamp + random to prevent duplicates
+      const generateUniqueOrderNumber = () => {
+        const timestamp = Date.now();
+        const random = Math.floor(Math.random() * 10000);
+        return `${timestamp}${random}`.slice(-10); // 10-digit unique number
+      };
 
-        if (!saleOrderQueryError && latestSaleOrder?.order_number) {
-          const lastNum = parseInt(latestSaleOrder.order_number, 10);
-          if (!isNaN(lastNum)) {
-            saleOrderNumber = String(lastNum + 1).padStart(3, "0");
+      let saleOrderNumber = generateUniqueOrderNumber();
+      let attempts = 0;
+      const maxAttempts = 3;
+      let saleOrder: any = null;
+
+      // Retry logic in case of duplicate (very unlikely with timestamp + random)
+      while (attempts < maxAttempts) {
+        try {
+          const { data, error: saleOrderError } = await supabase
+            .from("sale_orders")
+            .insert({
+              customer_id: user.id,
+              order_id: order.id,
+              order_number: saleOrderNumber,
+              status: "pending_review",
+              base_price: subtotal,
+              discount: 0,
+              final_price: subtotal,
+              payment_mode: paymentMethod || "cash",
+              payment_status: "pending",
+              customer_name: order.customer_name,
+              customer_email: order.customer_email,
+              customer_phone: order.customer_phone,
+              customer_address: order.delivery_address,
+            })
+            .select()
+            .single();
+
+          if (!saleOrderError) {
+            // Success! Break out of retry loop
+            saleOrder = data;
+            break;
           }
+
+          // If duplicate key error, generate new number and retry
+          if (saleOrderError.code === '23505' && attempts < maxAttempts - 1) {
+            console.warn(`Duplicate order number detected (attempt ${attempts + 1}/${maxAttempts}), generating new number...`);
+            saleOrderNumber = generateUniqueOrderNumber();
+            attempts++;
+            continue;
+          }
+
+          // For other errors, check if they're schema-related
+          if (saleOrderError.message?.includes("payment_mode") || 
+              saleOrderError.message?.includes("payment_status") || 
+              saleOrderError.message?.includes("schema cache") ||
+              saleOrderError.message?.includes("column")) {
+            console.error("Schema cache error - payment_mode/payment_status columns may not exist yet");
+            console.error("Run migration: 20251124000004_fix_payment_fields_constraints.sql");
+            throw new Error("Database schema needs to be updated. Please run migration 20251124000004_fix_payment_fields_constraints.sql in Supabase and refresh the schema cache.");
+          }
+          
+          // If error is about RLS or permissions
+          if (saleOrderError.message?.includes("permission") || 
+              saleOrderError.message?.includes("policy") ||
+              saleOrderError.code === "42501") {
+            console.error("RLS policy error - customer may not have permission to insert sale_orders");
+            throw new Error("Permission denied. Please contact support if this issue persists.");
+          }
+          
+          // Log full error for debugging
+          console.error("Sale order creation error:", saleOrderError);
+          throw saleOrderError;
+        } catch (err: any) {
+          if (attempts >= maxAttempts - 1) {
+            throw err; // Max retries reached, throw error
+          }
+          attempts++;
+          saleOrderNumber = generateUniqueOrderNumber(); // Generate new number for retry
         }
-      } catch (err) {
-        // If query fails (e.g., RLS issue or table doesn't exist), default to "001"
-        console.warn("Could not fetch latest sale order number, defaulting to 001:", err);
-        saleOrderNumber = "001";
       }
 
-      // Create sale_order for staff review workflow
-      const { data: saleOrder, error: saleOrderError } = await supabase
-        .from("sale_orders")
-        .insert({
-          customer_id: user.id,
-          order_id: order.id,
-          order_number: saleOrderNumber,
-          status: "pending_review",
-          base_price: subtotal,
-          discount: 0,
-          final_price: subtotal,
-          payment_mode: paymentMethod || "cash",
-          payment_status: "pending",
-          customer_name: order.customer_name,
-          customer_email: order.customer_email,
-          customer_phone: order.customer_phone,
-          customer_address: order.delivery_address,
-        })
-        .select()
-        .single();
-
-      if (saleOrderError) {
-        // If error is about payment_mode or payment_status, provide helpful message
-        if (saleOrderError.message?.includes("payment_mode") || 
-            saleOrderError.message?.includes("payment_status") || 
-            saleOrderError.message?.includes("schema cache") ||
-            saleOrderError.message?.includes("column")) {
-          console.error("Schema cache error - payment_mode/payment_status columns may not exist yet");
-          console.error("Run migration: 20251124000004_fix_payment_fields_constraints.sql");
-          throw new Error("Database schema needs to be updated. Please run migration 20251124000004_fix_payment_fields_constraints.sql in Supabase and refresh the schema cache.");
-        }
-        // If error is about RLS or permissions
-        if (saleOrderError.message?.includes("permission") || 
-            saleOrderError.message?.includes("policy") ||
-            saleOrderError.code === "42501") {
-          console.error("RLS policy error - customer may not have permission to insert sale_orders");
-          throw new Error("Permission denied. Please contact support if this issue persists.");
-        }
-        // Log full error for debugging
-        console.error("Sale order creation error:", saleOrderError);
-        throw saleOrderError;
+      if (!saleOrder) {
+        throw new Error("Failed to create sale order after multiple attempts");
       }
 
       const orderItems = cartItems.map((item) => ({
