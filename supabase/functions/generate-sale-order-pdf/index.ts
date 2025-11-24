@@ -4,7 +4,7 @@
  * This function:
  * 1. Fetches sale order data with customer and order details
  * 2. Generates HTML using template
- * 3. Converts HTML to PDF using Browserless API (or Playwright)
+ * 3. Converts HTML to PDF using PDFGeneratorAPI (primary) or Browserless API (fallback)
  * 4. Uploads PDF to Supabase Storage (draft or final)
  * 5. Updates sale_order with PDF URL and HTML (draft_html/final_html, draft_pdf_url/final_pdf_url)
  * 6. Sends email to customer with PDF attachment (final mode only)
@@ -121,48 +121,102 @@ serve(async (req) => {
     // Generate HTML
     const htmlContent = generateSaleOrderHTML(templateData);
 
-    // Convert HTML to PDF using Browserless API (recommended) or Playwright
+    // Convert HTML to PDF using PDFGeneratorAPI (primary) or Browserless API (fallback)
+    const pdfGeneratorApiKey = Deno.env.get("PDF_GENERATOR_API_KEY");
     const browserlessApiKey = Deno.env.get("BROWSERLESS_API_KEY");
+    const pdfGeneratorUrl = "https://us1.pdfgeneratorapi.com/api/v4/documents/generate";
     const browserlessUrl = Deno.env.get("BROWSERLESS_URL") || "https://chrome.browserless.io";
 
-    let pdfBytes: Uint8Array;
+    let pdfBytes: Uint8Array | null = null;
 
-    if (browserlessApiKey) {
-      // Use Browserless API
-      const htmlBase64 = btoa(unescape(encodeURIComponent(htmlContent)));
-      
-      const browserlessResponse = await fetch(`${browserlessUrl}/pdf?token=${browserlessApiKey}`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          html: htmlContent,
-          options: {
-            format: "A4",
-            printBackground: true,
-            margin: {
-              top: "10mm",
-              right: "10mm",
-              bottom: "10mm",
-              left: "10mm",
-            },
+    // Try PDFGeneratorAPI first, fallback to Browserless if not available
+    if (pdfGeneratorApiKey) {
+      try {
+        // Use PDFGeneratorAPI with HTML
+        const pdfResponse = await fetch(pdfGeneratorUrl, {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${pdfGeneratorApiKey}`,
+            "Content-Type": "application/json",
           },
-        }),
-      });
+          body: JSON.stringify({
+            html: htmlContent,
+            format: "pdf",
+            output: "base64", // Get PDF as base64
+            name: `Sale-Order-${templateData.so_number}`,
+          }),
+        });
 
-      if (!browserlessResponse.ok) {
-        throw new Error(`Browserless API error: ${browserlessResponse.statusText}`);
+        if (!pdfResponse.ok) {
+          const errorText = await pdfResponse.text();
+          console.error(`PDFGeneratorAPI error: ${pdfResponse.status} ${errorText}`);
+          throw new Error(`PDFGeneratorAPI error: ${pdfResponse.status} ${errorText}`);
+        }
+
+        const result = await pdfResponse.json();
+        // Handle different response formats from PDFGeneratorAPI
+        const base64Data = result.response || result.data || result.pdf || result.body;
+        
+        if (!base64Data) {
+          console.error("PDFGeneratorAPI response:", result);
+          throw new Error("PDFGeneratorAPI response missing PDF data. Check API response format.");
+        }
+
+        // Convert base64 to Uint8Array
+        pdfBytes = Uint8Array.from(atob(base64Data), (c) => c.charCodeAt(0));
+        console.log(`PDF generated successfully using PDFGeneratorAPI (${pdfBytes.length} bytes)`);
+      } catch (pdfGenError: any) {
+        console.error("PDFGeneratorAPI failed, trying Browserless fallback:", pdfGenError);
+        // Fall through to Browserless if PDFGeneratorAPI fails
       }
+    }
 
-      pdfBytes = new Uint8Array(await browserlessResponse.arrayBuffer());
-    } else {
-      // Fallback: Use Playwright in Deno (if available)
-      // For now, return error if Browserless is not configured
+    // Fallback to Browserless API if PDFGeneratorAPI not configured or failed
+    if (!pdfBytes && browserlessApiKey) {
+      try {
+        const browserlessResponse = await fetch(`${browserlessUrl}/pdf?token=${browserlessApiKey}`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            html: htmlContent,
+            options: {
+              format: "A4",
+              printBackground: true,
+              margin: {
+                top: "10mm",
+                right: "10mm",
+                bottom: "10mm",
+                left: "10mm",
+              },
+            },
+          }),
+        });
+
+        if (!browserlessResponse.ok) {
+          throw new Error(`Browserless API error: ${browserlessResponse.statusText}`);
+        }
+
+        pdfBytes = new Uint8Array(await browserlessResponse.arrayBuffer());
+        console.log(`PDF generated successfully using Browserless API (${pdfBytes.length} bytes)`);
+      } catch (browserlessError: any) {
+        console.error("Browserless API also failed:", browserlessError);
+        throw new Error(
+          `PDF generation failed. PDFGeneratorAPI: ${pdfGeneratorApiKey ? "failed" : "not configured"}. Browserless: ${browserlessError.message}`
+        );
+      }
+    }
+
+    // If neither API is configured or both failed
+    if (!pdfBytes) {
       throw new Error(
-        "PDF generation requires Browserless API. Please set BROWSERLESS_API_KEY environment variable."
+        "PDF generation requires either PDF_GENERATOR_API_KEY or BROWSERLESS_API_KEY. Please set at least one in Supabase secrets."
       );
     }
+
+    // At this point, pdfBytes is guaranteed to be Uint8Array
+    const finalPdfBytes: Uint8Array = pdfBytes;
 
     // Upload to Supabase Storage - different paths for draft vs final
     const fileName = mode === "draft" 
@@ -171,7 +225,7 @@ serve(async (req) => {
     
     const { data: uploadData, error: uploadError } = await supabase.storage
       .from("documents")
-      .upload(fileName, pdfBytes, {
+      .upload(fileName, finalPdfBytes, {
         contentType: "application/pdf",
         upsert: true,
       });
@@ -238,9 +292,14 @@ serve(async (req) => {
       updateData.require_otp = true;
     }
 
-    // Only update status if it's not already staff_approved (preserve existing status)
-    if (saleOrder.status === "pending_review" || saleOrder.status === "staff_editing") {
-      updateData.status = "staff_pdf_generated";
+    // Automatically transition to appropriate status after final PDF generation
+    // This ensures customers can see the PDF immediately after staff generates it
+    if (saleOrder.status === "pending_review" || saleOrder.status === "staff_editing" || saleOrder.status === "staff_pdf_generated") {
+      if (requireOTP) {
+        updateData.status = "staff_approved"; // Customer needs to enter OTP
+      } else {
+        updateData.status = "customer_confirmation_pending"; // Customer can confirm directly
+      }
     }
 
     const { error: updateError } = await supabase
@@ -259,7 +318,7 @@ serve(async (req) => {
       try {
         // Convert PDF bytes to base64 for email attachment
         const base64Pdf = btoa(
-          Array.from(pdfBytes)
+          Array.from(finalPdfBytes)
             .map((byte: number) => String.fromCharCode(byte))
             .join("")
         );

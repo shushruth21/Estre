@@ -55,7 +55,7 @@ const Dashboard = () => {
       const ordersPromise = supabase
         .from("orders")
         .select(
-          "id, order_number, status, expected_delivery_date, net_total_rs, advance_amount_rs, balance_amount_rs, discount_code, discount_amount_rs, subtotal_rs, created_at, metadata, delivery_method, delivery_date"
+          "id, order_number, status, expected_delivery_date, net_total_rs, advance_amount_rs, balance_amount_rs, discount_code, discount_amount_rs, subtotal_rs, created_at, metadata"
         )
         .eq("customer_id", currentUser.id)
         .order("created_at", { ascending: false })
@@ -412,78 +412,88 @@ const Dashboard = () => {
 
                   <Separator />
 
-                  {(saleOrder.status === "staff_approved" || saleOrder.status === "customer_confirmation_pending") && (
+                  {/* Show PDF and confirmation options for approved/ready statuses */}
+                  {(saleOrder.status === "staff_approved" || saleOrder.status === "customer_confirmation_pending" || saleOrder.status === "staff_pdf_generated") && (
                     <div className="space-y-3">
                       <div className="flex items-start gap-3 p-4 bg-blue-500/10 rounded-lg border border-blue-500/30">
                         <CheckCircle2 className="h-5 w-5 text-blue-600 mt-0.5" />
                         <div className="flex-1">
                           <p className="font-semibold text-blue-600 mb-1">
-                            Approved by Estre Staff
+                            {saleOrder.status === "staff_pdf_generated" 
+                              ? "PDF Generated - Ready for Review" 
+                              : "Approved by Estre Staff"}
                           </p>
                           <p className="text-sm text-muted-foreground">
-                            Staff has reviewed and approved your order. Please review the sale order PDF and confirm to proceed.
+                            {saleOrder.status === "staff_pdf_generated"
+                              ? "Your sale order PDF has been generated. Please review and confirm to proceed."
+                              : "Staff has reviewed and approved your order. Please review the sale order PDF and confirm to proceed."}
                           </p>
                         </div>
                       </div>
-                      {(saleOrder.final_pdf_url || saleOrder.pdf_url) && (
+                      {(saleOrder.final_pdf_url || saleOrder.draft_pdf_url || saleOrder.pdf_url) && (
                         <Button 
                           asChild
                           variant="outline"
                           className="w-full"
                         >
-                          <a href={saleOrder.final_pdf_url || saleOrder.pdf_url} target="_blank" rel="noopener noreferrer">
+                          <a href={saleOrder.final_pdf_url || saleOrder.draft_pdf_url || saleOrder.pdf_url} target="_blank" rel="noopener noreferrer">
                             <Download className="mr-2 h-4 w-4" />
-                            Download Sale Order PDF
+                            {saleOrder.status === "staff_pdf_generated" ? "Preview Sale Order PDF" : "Download Sale Order PDF"}
                           </a>
                         </Button>
                       )}
-                      {saleOrder.require_otp ? (
-                        <Button 
-                          onClick={() => navigate(`/order-confirmation/${saleOrder.id}`)}
-                          className="w-full bg-gradient-gold text-white border-gold hover:shadow-gold-glow transition-premium"
-                          size="lg"
-                        >
-                          <CheckCircle2 className="mr-2 h-5 w-5" />
-                          Enter OTP to Confirm Order
-                        </Button>
-                      ) : (
-                        <Button 
-                          onClick={async () => {
-                            // Confirm order without OTP
-                            const { error } = await supabase
-                              .from("sale_orders")
-                              .update({
-                                status: "customer_confirmed",
-                                updated_at: new Date().toISOString(),
-                              })
-                              .eq("id", saleOrder.id);
-                            
-                            if (error) {
-                              toast({
-                                title: "Error",
-                                description: error.message,
-                                variant: "destructive",
-                              });
-                            } else {
-                              // Update job cards status to ready_for_production
-                              await supabase
-                                .from("job_cards")
-                                .update({ status: "ready_for_production" })
-                                .eq("sale_order_id", saleOrder.id);
-                              
-                              queryClient.invalidateQueries({ queryKey: ["customer-sale-orders", user?.id] });
-                              toast({
-                                title: "Order Confirmed",
-                                description: "Your order has been confirmed. Production will begin shortly.",
-                              });
-                            }
-                          }}
-                          className="w-full bg-gradient-gold text-white border-gold hover:shadow-gold-glow transition-premium"
-                          size="lg"
-                        >
-                          <CheckCircle2 className="mr-2 h-5 w-5" />
-                          Confirm Order
-                        </Button>
+                      {/* Only show confirmation buttons if status is approved or pending confirmation, not staff_pdf_generated */}
+                      {(saleOrder.status === "staff_approved" || saleOrder.status === "customer_confirmation_pending") && (
+                        <>
+                          {saleOrder.require_otp ? (
+                            <Button 
+                              onClick={() => navigate(`/order-confirmation/${saleOrder.id}`)}
+                              className="w-full bg-gradient-gold text-white border-gold hover:shadow-gold-glow transition-premium"
+                              size="lg"
+                            >
+                              <CheckCircle2 className="mr-2 h-5 w-5" />
+                              Enter OTP to Confirm Order
+                            </Button>
+                          ) : (
+                            <Button 
+                              onClick={async () => {
+                                // Confirm order without OTP
+                                const { error } = await supabase
+                                  .from("sale_orders")
+                                  .update({
+                                    status: "customer_confirmed",
+                                    updated_at: new Date().toISOString(),
+                                  })
+                                  .eq("id", saleOrder.id);
+                                
+                                if (error) {
+                                  toast({
+                                    title: "Error",
+                                    description: error.message,
+                                    variant: "destructive",
+                                  });
+                                } else {
+                                  // Update job cards status to ready_for_production
+                                  await supabase
+                                    .from("job_cards")
+                                    .update({ status: "ready_for_production" })
+                                    .eq("sale_order_id", saleOrder.id);
+                                  
+                                  queryClient.invalidateQueries({ queryKey: ["customer-sale-orders", user?.id] });
+                                  toast({
+                                    title: "Order Confirmed",
+                                    description: "Your order has been confirmed. Production will begin shortly.",
+                                  });
+                                }
+                              }}
+                              className="w-full bg-gradient-gold text-white border-gold hover:shadow-gold-glow transition-premium"
+                              size="lg"
+                            >
+                              <CheckCircle2 className="mr-2 h-5 w-5" />
+                              Confirm Order
+                            </Button>
+                          )}
+                        </>
                       )}
                     </div>
                   )}
@@ -522,7 +532,8 @@ const Dashboard = () => {
                     </div>
                   )}
 
-                  {(saleOrder.status === "pending_review" || saleOrder.status === "staff_editing" || saleOrder.status === "staff_pdf_generated") && (
+                  {/* Show "Under Review" only for pending/editing statuses, not staff_pdf_generated (handled above) */}
+                  {(saleOrder.status === "pending_review" || saleOrder.status === "staff_editing") && (
                     <div className="flex items-start gap-3 p-4 bg-blue-500/10 rounded-lg border border-blue-500/30">
                       <Clock className="h-5 w-5 text-blue-600 mt-0.5" />
                       <div className="flex-1">

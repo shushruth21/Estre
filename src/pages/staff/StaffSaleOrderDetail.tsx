@@ -572,7 +572,10 @@ export default function StaffSaleOrderDetail() {
                 )}
               </>
             )}
-            {saleOrder.status === "staff_pdf_generated" && (
+            {/* Show approve button only if PDF exists and status is staff_pdf_generated */}
+            {/* Note: This button is now mostly redundant since PDF generation auto-transitions status,
+                but keeping it for edge cases where manual approval might be needed */}
+            {saleOrder.status === "staff_pdf_generated" && (saleOrder.final_pdf_url || saleOrder.draft_pdf_url) && (
               <Button
                 onClick={() => {
                   supabase
@@ -581,9 +584,10 @@ export default function StaffSaleOrderDetail() {
                     .eq("id", id)
                     .then(() => {
                       queryClient.invalidateQueries({ queryKey: ["staff-sale-order-detail", id] });
+                      queryClient.invalidateQueries({ queryKey: ["customer-sale-orders"] });
                       toast({
                         title: "Order Approved",
-                        description: "Sale order status updated to approved.",
+                        description: "Sale order status updated to approved. Customer can now confirm their order.",
                       });
                     });
                 }}

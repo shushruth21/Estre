@@ -81,7 +81,7 @@ const StaffOrders = () => {
       let query = supabase
         .from("orders")
         .select(
-          "id, order_number, status, customer_name, customer_email, customer_phone, net_total_rs, discount_code, discount_amount_rs, subtotal_rs, delivery_method, expected_delivery_date, delivery_date, created_at, payment_status"
+          "id, order_number, status, customer_name, customer_email, customer_phone, net_total_rs, discount_code, discount_amount_rs, subtotal_rs, expected_delivery_date, created_at, payment_status"
         )
         .order("created_at", { ascending: false });
 

@@ -120,20 +120,26 @@ const Checkout = () => {
       }
 
       // Generate sale order number (format: "001", "002", etc.)
-      // Get the latest sale order number
-      const { data: latestSaleOrder } = await supabase
-        .from("sale_orders")
-        .select("order_number")
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .single();
-
+      // Get the latest sale order number with error handling
       let saleOrderNumber = "001";
-      if (latestSaleOrder?.order_number) {
-        const lastNum = parseInt(latestSaleOrder.order_number, 10);
-        if (!isNaN(lastNum)) {
-          saleOrderNumber = String(lastNum + 1).padStart(3, "0");
+      try {
+        const { data: latestSaleOrder, error: saleOrderQueryError } = await supabase
+          .from("sale_orders")
+          .select("order_number")
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle(); // Use maybeSingle() instead of single() to handle empty table
+
+        if (!saleOrderQueryError && latestSaleOrder?.order_number) {
+          const lastNum = parseInt(latestSaleOrder.order_number, 10);
+          if (!isNaN(lastNum)) {
+            saleOrderNumber = String(lastNum + 1).padStart(3, "0");
+          }
         }
+      } catch (err) {
+        // If query fails (e.g., RLS issue or table doesn't exist), default to "001"
+        console.warn("Could not fetch latest sale order number, defaulting to 001:", err);
+        saleOrderNumber = "001";
       }
 
       // Create sale_order for staff review workflow
@@ -157,7 +163,27 @@ const Checkout = () => {
         .select()
         .single();
 
-      if (saleOrderError) throw saleOrderError;
+      if (saleOrderError) {
+        // If error is about payment_mode or payment_status, provide helpful message
+        if (saleOrderError.message?.includes("payment_mode") || 
+            saleOrderError.message?.includes("payment_status") || 
+            saleOrderError.message?.includes("schema cache") ||
+            saleOrderError.message?.includes("column")) {
+          console.error("Schema cache error - payment_mode/payment_status columns may not exist yet");
+          console.error("Run migration: 20251124000004_fix_payment_fields_constraints.sql");
+          throw new Error("Database schema needs to be updated. Please run migration 20251124000004_fix_payment_fields_constraints.sql in Supabase and refresh the schema cache.");
+        }
+        // If error is about RLS or permissions
+        if (saleOrderError.message?.includes("permission") || 
+            saleOrderError.message?.includes("policy") ||
+            saleOrderError.code === "42501") {
+          console.error("RLS policy error - customer may not have permission to insert sale_orders");
+          throw new Error("Permission denied. Please contact support if this issue persists.");
+        }
+        // Log full error for debugging
+        console.error("Sale order creation error:", saleOrderError);
+        throw saleOrderError;
+      }
 
       const orderItems = cartItems.map((item) => ({
         order_id: order.id,

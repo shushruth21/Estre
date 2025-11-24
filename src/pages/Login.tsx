@@ -223,7 +223,6 @@ const Login = () => {
         isCustomer: isCustomer(),
         userEmail: currentUser?.email,
         profileExists: !!profile,
-        roleDetected,
         detectedRole
       });
 

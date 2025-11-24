@@ -266,8 +266,8 @@ export default function OrderConfirmation() {
     );
   }
 
-  // Handle staff_approved status - show PDF and confirm button (with or without OTP)
-  if (saleOrder.status === "staff_approved") {
+  // Handle staff_approved and customer_confirmation_pending statuses - show PDF and confirm button (with or without OTP)
+  if (saleOrder.status === "staff_approved" || saleOrder.status === "customer_confirmation_pending") {
     // If OTP is required, show OTP input
     if (saleOrder.require_otp) {
       // Continue to OTP input below
@@ -396,8 +396,8 @@ export default function OrderConfirmation() {
     );
   }
 
-  // Check if OTP is available (for staff_approved with require_otp or awaiting_customer_otp)
-  if (saleOrder.status !== "awaiting_customer_otp" && !(saleOrder.status === "staff_approved" && saleOrder.require_otp)) {
+  // Check if OTP is available (for staff_approved/customer_confirmation_pending with require_otp or awaiting_customer_otp)
+  if (saleOrder.status !== "awaiting_customer_otp" && !((saleOrder.status === "staff_approved" || saleOrder.status === "customer_confirmation_pending") && saleOrder.require_otp)) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <Card className="max-w-md">
