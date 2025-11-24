@@ -74,9 +74,10 @@ const Dashboard = () => {
       const orderIds = orders?.map((order) => order.id) ?? [];
       let jobCardsByOrder: Record<string, any[]> = {};
       let timelineByOrder: Record<string, any[]> = {};
+      let saleOrdersByOrder: Record<string, any> = {};
 
       if (orderIds.length > 0) {
-        // Add timeout to job cards and timeline queries (5 seconds each)
+        // Add timeout to job cards, timeline, and sale orders queries (5 seconds each)
         const jobCardsPromise = supabase
           .from("job_cards")
           .select(
@@ -90,14 +91,19 @@ const Dashboard = () => {
           .in("order_id", orderIds)
           .order("created_at", { ascending: false });
 
+        const saleOrdersPromise = supabase
+          .from("sale_orders")
+          .select("id, order_id, final_pdf_url, draft_pdf_url, pdf_url, status")
+          .in("order_id", orderIds);
+
         const timeoutPromise = new Promise<never>((_, reject) =>
           setTimeout(() => reject(new Error("Related data fetch timeout")), 5000)
         );
 
-        const [{ data: jobCards }, { data: timeline }] = await Promise.race([
-          Promise.all([jobCardsPromise, timelinePromise]),
-          timeoutPromise.then(() => [{ data: null, error: null }, { data: null, error: null }] as any)
-        ]).catch(() => [{ data: null, error: null }, { data: null, error: null }] as any);
+        const [{ data: jobCards }, { data: timeline }, { data: saleOrders }] = await Promise.race([
+          Promise.all([jobCardsPromise, timelinePromise, saleOrdersPromise]),
+          timeoutPromise.then(() => [{ data: null, error: null }, { data: null, error: null }, { data: null, error: null }] as any)
+        ]).catch(() => [{ data: null, error: null }, { data: null, error: null }, { data: null, error: null }] as any);
 
         jobCardsByOrder =
           jobCards?.reduce((acc: Record<string, any[]>, card) => {
@@ -114,6 +120,13 @@ const Dashboard = () => {
             acc[key].push(entry);
             return acc;
           }, {}) ?? {};
+
+        saleOrdersByOrder =
+          saleOrders?.reduce((acc: Record<string, any>, saleOrder) => {
+            const key = saleOrder.order_id || '';
+            if (!acc[key]) acc[key] = saleOrder;
+            return acc;
+          }, {}) ?? {};
       }
 
       const enrichedOrders =
@@ -121,6 +134,7 @@ const Dashboard = () => {
           ...order,
           jobCards: jobCardsByOrder[order.id] ?? [],
           timeline: timelineByOrder[order.id] ?? [],
+          saleOrder: saleOrdersByOrder[order.id] ?? null,
         })) ?? [];
 
       setOrdersState({
@@ -412,6 +426,32 @@ const Dashboard = () => {
 
                   <Separator />
 
+                  {/* PDF Download Section - Show for ALL orders that have a PDF */}
+                  {(saleOrder.final_pdf_url || saleOrder.draft_pdf_url || saleOrder.pdf_url) && (
+                    <div className="flex gap-2">
+                      <Button 
+                        asChild
+                        variant="default"
+                        className="flex-1 bg-gradient-gold text-white border-gold hover:shadow-gold-glow"
+                      >
+                        <a href={saleOrder.final_pdf_url || saleOrder.draft_pdf_url || saleOrder.pdf_url} target="_blank" rel="noopener noreferrer">
+                          <Eye className="mr-2 h-4 w-4" />
+                          View PDF
+                        </a>
+                      </Button>
+                      <Button 
+                        asChild
+                        variant="outline"
+                        className="flex-1"
+                      >
+                        <a href={saleOrder.final_pdf_url || saleOrder.draft_pdf_url || saleOrder.pdf_url} download target="_blank" rel="noopener noreferrer">
+                          <Download className="mr-2 h-4 w-4" />
+                          Download PDF
+                        </a>
+                      </Button>
+                    </div>
+                  )}
+
                   {/* Show PDF and confirmation options for approved/ready statuses */}
                   {(saleOrder.status === "staff_approved" || saleOrder.status === "customer_confirmation_pending" || saleOrder.status === "staff_pdf_generated") && (
                     <div className="space-y-3">
@@ -430,18 +470,6 @@ const Dashboard = () => {
                           </p>
                         </div>
                       </div>
-                      {(saleOrder.final_pdf_url || saleOrder.draft_pdf_url || saleOrder.pdf_url) && (
-                        <Button 
-                          asChild
-                          variant="outline"
-                          className="w-full"
-                        >
-                          <a href={saleOrder.final_pdf_url || saleOrder.draft_pdf_url || saleOrder.pdf_url} target="_blank" rel="noopener noreferrer">
-                            <Download className="mr-2 h-4 w-4" />
-                            {saleOrder.status === "staff_pdf_generated" ? "Preview Sale Order PDF" : "Download Sale Order PDF"}
-                          </a>
-                        </Button>
-                      )}
                       {/* Only show confirmation buttons if status is approved or pending confirmation, not staff_pdf_generated */}
                       {(saleOrder.status === "staff_approved" || saleOrder.status === "customer_confirmation_pending") && (
                         <>
@@ -685,6 +713,32 @@ const Dashboard = () => {
                   </div>
 
                   <Separator />
+
+                  {/* PDF Download Section for Orders */}
+                  {order.saleOrder && (order.saleOrder.final_pdf_url || order.saleOrder.draft_pdf_url || order.saleOrder.pdf_url) && (
+                    <div className="flex gap-2 mb-4">
+                      <Button 
+                        asChild
+                        variant="default"
+                        className="flex-1 bg-gradient-gold text-white border-gold hover:shadow-gold-glow"
+                      >
+                        <a href={order.saleOrder.final_pdf_url || order.saleOrder.draft_pdf_url || order.saleOrder.pdf_url} target="_blank" rel="noopener noreferrer">
+                          <Eye className="mr-2 h-4 w-4" />
+                          View Sale Order PDF
+                        </a>
+                      </Button>
+                      <Button 
+                        asChild
+                        variant="outline"
+                        className="flex-1"
+                      >
+                        <a href={order.saleOrder.final_pdf_url || order.saleOrder.draft_pdf_url || order.saleOrder.pdf_url} download target="_blank" rel="noopener noreferrer">
+                          <Download className="mr-2 h-4 w-4" />
+                          Download PDF
+                        </a>
+                      </Button>
+                    </div>
+                  )}
 
                   <div className="space-y-4">
                     <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">

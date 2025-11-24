@@ -39,7 +39,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Loader2, Tag, Eye, CheckCircle2, AlertCircle, ClipboardList, FileCheck } from "lucide-react";
+import { Loader2, Tag, Eye, CheckCircle2, AlertCircle, ClipboardList, FileCheck, Download } from "lucide-react";
 import { format } from "date-fns";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Link } from "react-router-dom";
@@ -524,6 +524,18 @@ export default function StaffSaleOrders() {
                         </TableCell>
                         <TableCell className="text-right">
                           <div className="flex items-center justify-end gap-2">
+                            {(saleOrder.final_pdf_url || saleOrder.draft_pdf_url || saleOrder.pdf_url) && (
+                              <Button 
+                                variant="outline" 
+                                size="sm"
+                                asChild
+                                title="View PDF"
+                              >
+                                <a href={saleOrder.final_pdf_url || saleOrder.draft_pdf_url || saleOrder.pdf_url} target="_blank" rel="noopener noreferrer">
+                                  <Download className="h-4 w-4" />
+                                </a>
+                              </Button>
+                            )}
                             <Button 
                               variant="outline" 
                               size="sm"
@@ -731,17 +743,29 @@ export default function StaffSaleOrders() {
                                       </Button>
                                     )}
 
-                                    {saleOrder.pdf_url && (
-                                      <Button
-                                        asChild
-                                        variant="outline"
-                                        className="flex-1"
-                                      >
-                                        <a href={saleOrder.pdf_url} target="_blank" rel="noopener noreferrer">
-                                          <Eye className="mr-2 h-4 w-4" />
-                                          View PDF
-                                        </a>
-                                      </Button>
+                                    {(saleOrder.final_pdf_url || saleOrder.draft_pdf_url || saleOrder.pdf_url) && (
+                                      <div className="flex gap-2 w-full">
+                                        <Button
+                                          asChild
+                                          variant="default"
+                                          className="flex-1 bg-gradient-gold text-white border-gold hover:shadow-gold-glow"
+                                        >
+                                          <a href={saleOrder.final_pdf_url || saleOrder.draft_pdf_url || saleOrder.pdf_url} target="_blank" rel="noopener noreferrer">
+                                            <Eye className="mr-2 h-4 w-4" />
+                                            View PDF
+                                          </a>
+                                        </Button>
+                                        <Button
+                                          asChild
+                                          variant="outline"
+                                          className="flex-1"
+                                        >
+                                          <a href={saleOrder.final_pdf_url || saleOrder.draft_pdf_url || saleOrder.pdf_url} download target="_blank" rel="noopener noreferrer">
+                                            <Download className="mr-2 h-4 w-4" />
+                                            Download
+                                          </a>
+                                        </Button>
+                                      </div>
                                     )}
                                   </div>
                                 </div>
