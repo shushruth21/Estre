@@ -128,11 +128,11 @@ const Checkout = () => {
         .limit(1)
         .single();
 
-      let orderNumber = "001";
+      let saleOrderNumber = "001";
       if (latestSaleOrder?.order_number) {
         const lastNum = parseInt(latestSaleOrder.order_number, 10);
         if (!isNaN(lastNum)) {
-          orderNumber = String(lastNum + 1).padStart(3, "0");
+          saleOrderNumber = String(lastNum + 1).padStart(3, "0");
         }
       }
 
@@ -142,7 +142,7 @@ const Checkout = () => {
         .insert({
           customer_id: user.id,
           order_id: order.id,
-          order_number: orderNumber,
+          order_number: saleOrderNumber,
           status: "pending_review",
           base_price: subtotal,
           discount: 0,
