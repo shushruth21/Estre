@@ -4,10 +4,15 @@
  * This function:
  * 1. Fetches sale order data with customer and order details
  * 2. Generates a PDF using pdf-lib (Deno-compatible)
- * 3. Uploads PDF to Supabase Storage
- * 4. Updates sale_order with PDF URL
- * 5. Sends email to customer with PDF attachment
- * 6. Generates and sends OTP to customer
+ * 3. Uploads PDF to Supabase Storage (draft or final)
+ * 4. Updates sale_order with PDF URL (draft_pdf_url or final_pdf_url)
+ * 5. Sends email to customer with PDF attachment (final mode only)
+ * 6. Generates and sends OTP to customer (if requireOTP = true)
+ * 
+ * Parameters:
+ * - saleOrderId: Required - ID of the sale order
+ * - mode: Optional - "draft" (preview) or "final" (send to customer), default: "final"
+ * - requireOTP: Optional - Generate OTP for customer confirmation, default: false
  */
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
@@ -15,6 +20,9 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 // pdf-lib for Deno - Deno-compatible PDF library
 import { PDFDocument, rgb, StandardFonts } from "https://esm.sh/pdf-lib@1.17.1";
+
+// Import email template
+import { saleOrderApprovedEmailHTML } from "../_shared/emailTemplates.ts";
 
 serve(async (req) => {
   // Handle CORS
@@ -30,11 +38,18 @@ serve(async (req) => {
   }
 
   try {
-    const { saleOrderId } = await req.json();
+    const { saleOrderId, mode = "final", requireOTP = false } = await req.json();
 
     if (!saleOrderId) {
       return new Response(
         JSON.stringify({ error: "saleOrderId is required" }),
+        { status: 400, headers: { "Content-Type": "application/json" } }
+      );
+    }
+
+    if (mode !== "draft" && mode !== "final") {
+      return new Response(
+        JSON.stringify({ error: "mode must be 'draft' or 'final'" }),
         { status: 400, headers: { "Content-Type": "application/json" } }
       );
     }
@@ -200,8 +215,11 @@ serve(async (req) => {
     // Generate PDF bytes
     const pdfBytes = await pdfDoc.save();
 
-    // Upload to Supabase Storage
-    const fileName = `sale-orders/${saleOrderId}.pdf`;
+    // Upload to Supabase Storage - different paths for draft vs final
+    const fileName = mode === "draft" 
+      ? `sale-orders/draft/${saleOrderId}.pdf`
+      : `sale-orders/final/${saleOrderId}.pdf`;
+    
     const { data: uploadData, error: uploadError } = await supabase.storage
       .from("documents")
       .upload(fileName, pdfBytes, {
@@ -219,21 +237,53 @@ serve(async (req) => {
       .from("documents")
       .getPublicUrl(fileName);
 
-    // Generate OTP
-    const otp = Math.floor(100000 + Math.random() * 900000).toString();
-    const otpExpiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+    // Handle draft vs final mode
+    if (mode === "draft") {
+      // Draft mode: Only update draft_pdf_url, don't send email
+      const { error: updateError } = await supabase
+        .from("sale_orders")
+        .update({
+          draft_pdf_url: urlData.publicUrl,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", saleOrderId);
 
-    // Update sale_order with PDF URL
-    // Don't change status here - let staff approval set it to staff_approved
-    // PDF generation happens before or after approval
+      if (updateError) {
+        console.error("Update error:", updateError);
+        throw updateError;
+      }
+
+      return new Response(
+        JSON.stringify({
+          success: true,
+          message: "Draft PDF generated successfully",
+          saleOrderId,
+          pdfUrl: urlData.publicUrl,
+          mode: "draft",
+        }),
+        {
+          status: 200,
+          headers: {
+            "Content-Type": "application/json",
+            "Access-Control-Allow-Origin": "*",
+          },
+        }
+      );
+    }
+
+    // Final mode: Generate OTP if required, update final_pdf_url, send email
+    const otp = requireOTP ? Math.floor(100000 + Math.random() * 900000).toString() : null;
+    const otpExpiresAt = requireOTP ? new Date(Date.now() + 10 * 60 * 1000).toISOString() : null;
+
+    // Update sale_order with final PDF URL, OTP (if required), and status
     const { error: updateError } = await supabase
       .from("sale_orders")
       .update({
-        pdf_url: urlData.publicUrl,
-        // Generate OTP for backup verification (optional)
+        final_pdf_url: urlData.publicUrl,
         otp_code: otp,
-        otp_expires_at: otpExpiresAt.toISOString(),
-        // Don't change status - keep existing status (staff_approved or pending_review)
+        otp_expires_at: otpExpiresAt,
+        require_otp: requireOTP,
+        status: "staff_approved", // Auto-approve on final PDF generation
         updated_at: new Date().toISOString(),
       })
       .eq("id", saleOrderId);
@@ -243,19 +293,27 @@ serve(async (req) => {
       throw updateError;
     }
 
-    // Send email with PDF and OTP (via Resend)
+    // Send email with PDF and OTP (via Resend) - only for final mode
     const resendApiKey = Deno.env.get("RESEND_API_KEY");
     if (resendApiKey) {
       try {
-        // Convert PDF bytes to base64 for email attachment (efficient method for large files)
+        // Convert PDF bytes to base64 for email attachment
         const base64Pdf = btoa(
           Array.from(new Uint8Array(pdfBytes))
-            .map((byte) => String.fromCharCode(byte))
+            .map((byte: number) => String.fromCharCode(byte))
             .join("")
         );
 
-        // Send PDF email
-        const pdfEmailResponse = await fetch("https://api.resend.com/emails", {
+        // Generate email HTML using template
+        const emailHTML = saleOrderApprovedEmailHTML({
+          customerName: saleOrder.order.customer_name,
+          pdfUrl: urlData.publicUrl,
+          otp: otp,
+          orderNumber: saleOrder.order.order_number,
+        });
+
+        // Send single email with PDF attachment
+        const emailResponse = await fetch("https://api.resend.com/emails", {
           method: "POST",
           headers: {
             "Authorization": `Bearer ${resendApiKey}`,
@@ -264,14 +322,8 @@ serve(async (req) => {
           body: JSON.stringify({
             from: "Estre <orders@estre.in>",
             to: saleOrder.order.customer_email,
-            subject: "Your Sale Order is Ready",
-            html: `
-              <h2>Dear ${saleOrder.order.customer_name},</h2>
-              <p>Your Sale Order is ready.</p>
-              <p>Please review the attached PDF.</p>
-              <p>To confirm, enter the OTP you will receive next.</p>
-              <p><a href="${urlData.publicUrl}">Download Sale Order PDF</a></p>
-            `,
+            subject: "Your Estre Sale Order is Ready",
+            html: emailHTML,
             attachments: [
               {
                 filename: `sale-order-${saleOrder.order.order_number}.pdf`,
@@ -281,48 +333,28 @@ serve(async (req) => {
           }),
         });
 
-        if (!pdfEmailResponse.ok) {
-          console.error("PDF email failed:", await pdfEmailResponse.text());
-        }
-
-        // Send confirmation email (OTP included but not required for confirmation)
-        const otpEmailResponse = await fetch("https://api.resend.com/emails", {
-          method: "POST",
-          headers: {
-            "Authorization": `Bearer ${resendApiKey}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            from: "Estre <orders@estre.in>",
-            to: saleOrder.order.customer_email,
-            subject: "Your Estre Sale Order is Ready for Confirmation",
-            html: `
-              <h2>Dear ${saleOrder.order.customer_name},</h2>
-              <p>Your Sale Order has been reviewed and approved by Estre Staff.</p>
-              <p>Please review the attached PDF and confirm your order.</p>
-              <p>You can confirm your order directly from your dashboard.</p>
-              <p style="margin-top: 20px; color: #666; font-size: 12px;">
-                Order Number: ${saleOrder.order.order_number}
-              </p>
-            `,
-          }),
-        });
-
-        if (!otpEmailResponse.ok) {
-          console.error("OTP email failed:", await otpEmailResponse.text());
+        if (!emailResponse.ok) {
+          const errorText = await emailResponse.text();
+          console.error("Email failed:", errorText);
+          // Don't throw - PDF generation succeeded, email can be retried
+        } else {
+          console.log("Email sent successfully to", saleOrder.order.customer_email);
         }
       } catch (emailError) {
         console.error("Email error:", emailError);
-        // Don't throw - PDF generation succeeded
+        // Don't throw - PDF generation succeeded, email can be retried
       }
     }
 
     return new Response(
       JSON.stringify({
         success: true,
-        message: "PDF generated and email sent",
+        message: mode === "draft" ? "Draft PDF generated successfully" : "Final PDF generated and email sent",
         saleOrderId,
         pdfUrl: urlData.publicUrl,
+        mode: mode,
+        requireOTP: requireOTP,
+        otpGenerated: !!otp,
       }),
       {
         status: 200,

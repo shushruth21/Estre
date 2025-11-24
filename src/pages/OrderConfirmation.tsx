@@ -24,6 +24,7 @@ export default function OrderConfirmation() {
   const { saleOrderId } = useParams<{ saleOrderId: string }>();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   const [otp, setOtp] = useState("");
 
   // Fetch sale order data
@@ -71,12 +72,12 @@ export default function OrderConfirmation() {
       }
 
       // Check if already confirmed
-      if (currentSaleOrder.status === "confirmed_by_customer") {
+      if (currentSaleOrder.status === "confirmed_by_customer" || currentSaleOrder.status === "customer_confirmed") {
         toast({
           title: "Already Confirmed",
           description: "This order has already been confirmed.",
         });
-        navigate(`/payment/${saleOrderId}`);
+        navigate("/dashboard");
         return currentSaleOrder;
       }
 
@@ -97,11 +98,11 @@ export default function OrderConfirmation() {
         throw new Error("OTP has expired. Please request a new one.");
       }
 
-      // Update status
+      // Update status (use customer_confirmed for consistency)
       const { error: updateError } = await supabase
         .from("sale_orders")
         .update({
-          status: "confirmed_by_customer",
+          status: "customer_confirmed",
           otp_verified_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         })
@@ -111,12 +112,33 @@ export default function OrderConfirmation() {
 
       return currentSaleOrder;
     },
-    onSuccess: () => {
+    onSuccess: async () => {
+      // Invalidate queries to refresh dashboard
+      queryClient.invalidateQueries({ queryKey: ["sale-order", saleOrderId] });
+      queryClient.invalidateQueries({ queryKey: ["customer-sale-orders"] });
+      
       toast({
         title: "Order Confirmed!",
         description: "Your order has been confirmed. Proceed to payment.",
       });
-      navigate(`/payment/${saleOrderId}`);
+      
+      // Fetch sale order to get payment method
+      const { data: saleOrder } = await supabase
+        .from("sale_orders")
+        .select(`
+          id,
+          order:orders(payment_method)
+        `)
+        .eq("id", saleOrderId)
+        .single();
+      
+      if (saleOrder?.order?.payment_method === "cash") {
+        // For cash, redirect to dashboard (payment handled there)
+        navigate("/dashboard");
+      } else {
+        // For online, navigate to payment page
+        navigate(`/payment/${saleOrderId}`);
+      }
     },
     onError: (error: any) => {
       toast({
@@ -137,6 +159,53 @@ export default function OrderConfirmation() {
     e.preventDefault();
     if (otp.length === 6) {
       verifyOTPMutation.mutate(otp);
+    }
+  };
+
+  // Handle order confirmation without OTP
+  const handleConfirmOrder = async (id: string, currentSaleOrder: any) => {
+    const { error } = await supabase
+      .from("sale_orders")
+      .update({
+        status: "confirmed_by_customer",
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", id);
+
+    if (error) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to confirm order",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    toast({
+      title: "Order Confirmed",
+      description: "Your order has been confirmed. Proceed to payment.",
+    });
+    
+    queryClient.invalidateQueries({ queryKey: ["sale-order", id] });
+    queryClient.invalidateQueries({ queryKey: ["customer-sale-orders"] });
+
+    if (currentSaleOrder?.order?.payment_method === "cash") {
+      // For cash, update payment status and redirect to dashboard
+      await supabase
+        .from("sale_orders")
+        .update({
+          payment_status: "cash_pending",
+          status: "confirmed", // Final status for cash orders
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", id);
+      toast({
+        title: "Cash Payment Selected",
+        description: "Your order is confirmed. Pay on delivery.",
+      });
+      navigate("/dashboard"); // Redirect to dashboard after cash confirmation
+    } else {
+      navigate(`/payment/${id}`);
     }
   };
 
@@ -168,7 +237,7 @@ export default function OrderConfirmation() {
   }
 
   // Check if already confirmed
-  if (saleOrder.status === "confirmed_by_customer") {
+  if (saleOrder.status === "confirmed_by_customer" || saleOrder.status === "customer_confirmed") {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <Card className="max-w-md">
@@ -179,14 +248,82 @@ export default function OrderConfirmation() {
               <p className="text-muted-foreground">
                 This order has already been confirmed.
               </p>
-              <Button onClick={() => navigate(`/payment/${saleOrderId}`)}>
-                Proceed to Payment
+              <Button onClick={() => navigate("/dashboard")}>
+                Go to Dashboard
               </Button>
             </div>
           </CardContent>
         </Card>
       </div>
     );
+  }
+
+  // Handle staff_approved status - show PDF and confirm button (with or without OTP)
+  if (saleOrder.status === "staff_approved") {
+    // If OTP is required, show OTP input
+    if (saleOrder.require_otp) {
+      // Continue to OTP input below
+    } else {
+      // Simple confirmation without OTP
+      return (
+        <div className="min-h-screen flex items-center justify-center bg-background p-4">
+          <Card className="max-w-md w-full">
+            <CardHeader>
+              <CardTitle>Order Confirmation</CardTitle>
+              <CardDescription>
+                Order: {saleOrder.order?.order_number || saleOrderId?.slice(0, 8)}
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <Alert>
+                <CheckCircle2 className="h-4 w-4" />
+                <AlertDescription>
+                  Your order has been approved by Estre Staff. Please confirm to proceed.
+                </AlertDescription>
+              </Alert>
+
+              {(saleOrder.final_pdf_url || saleOrder.pdf_url) && (
+                <Button
+                  asChild
+                  variant="outline"
+                  className="w-full"
+                >
+                  <a href={saleOrder.final_pdf_url || saleOrder.pdf_url} target="_blank" rel="noopener noreferrer">
+                    <Download className="mr-2 h-4 w-4" />
+                    Download Sale Order PDF
+                  </a>
+                </Button>
+              )}
+
+              <div className="border-t pt-4 space-y-2">
+                <div className="flex justify-between">
+                  <span>Base Price:</span>
+                  <span>₹{Math.round(saleOrder.base_price).toLocaleString()}</span>
+                </div>
+                {saleOrder.discount > 0 && (
+                  <div className="flex justify-between text-green-600">
+                    <span>Discount:</span>
+                    <span>-₹{Math.round(saleOrder.discount).toLocaleString()}</span>
+                  </div>
+                )}
+                <div className="flex justify-between font-semibold text-lg border-t pt-2">
+                  <span>Final Price:</span>
+                  <span>₹{Math.round(saleOrder.final_price).toLocaleString()}</span>
+                </div>
+              </div>
+
+              <Button
+                onClick={() => handleConfirmOrder(saleOrderId!, saleOrder)}
+                className="w-full bg-gradient-gold text-white"
+                size="lg"
+              >
+                Confirm Order
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+      );
+    }
   }
 
   // Handle awaiting_customer_confirmation status - show PDF and confirm button
@@ -208,13 +345,13 @@ export default function OrderConfirmation() {
               </AlertDescription>
             </Alert>
 
-            {saleOrder.pdf_url && (
+            {(saleOrder.final_pdf_url || saleOrder.pdf_url) && (
               <Button
                 asChild
                 variant="outline"
                 className="w-full"
               >
-                <a href={saleOrder.pdf_url} target="_blank" rel="noopener noreferrer">
+                <a href={saleOrder.final_pdf_url || saleOrder.pdf_url} target="_blank" rel="noopener noreferrer">
                   <Download className="mr-2 h-4 w-4" />
                   Download Sale Order PDF
                 </a>
@@ -238,15 +375,21 @@ export default function OrderConfirmation() {
               </div>
             </div>
 
-            <ConfirmOrderButton saleOrderId={saleOrderId!} saleOrder={saleOrder} />
+            <Button
+              onClick={() => handleConfirmOrder(saleOrderId!, saleOrder)}
+              className="w-full bg-gradient-gold text-white"
+              size="lg"
+            >
+              Confirm Order
+            </Button>
           </CardContent>
         </Card>
       </div>
     );
   }
 
-  // Check if OTP is available
-  if (saleOrder.status !== "awaiting_customer_otp") {
+  // Check if OTP is available (for staff_approved with require_otp or awaiting_customer_otp)
+  if (saleOrder.status !== "awaiting_customer_otp" && !(saleOrder.status === "staff_approved" && saleOrder.require_otp)) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <Card className="max-w-md">

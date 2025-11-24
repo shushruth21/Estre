@@ -169,7 +169,7 @@ const Dashboard = () => {
             )
           `)
           .eq("customer_id", user.id)
-          .in("status", ["pending_staff_review", "pending_review", "staff_approved", "awaiting_customer_otp", "awaiting_customer_confirmation", "confirmed_by_customer"])
+          .in("status", ["pending_staff_review", "pending_review", "staff_approved", "customer_confirmed", "awaiting_customer_otp", "awaiting_customer_confirmation", "confirmed_by_customer"])
           .order("created_at", { ascending: false });
 
         if (error) {
@@ -268,152 +268,6 @@ const Dashboard = () => {
     navigate("/");
   };
 
-  // Handle proceed to payment
-  const handleProceedToPayment = async (saleOrder: any) => {
-    const paymentMethod = saleOrder.order?.payment_method || "cash";
-    
-    if (paymentMethod === "cash") {
-      // Immediately confirm for cash
-      const { error } = await supabase
-        .from("sale_orders")
-        .update({
-          status: "confirmed",
-          payment_status: "cash_pending",
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", saleOrder.id);
-
-      if (error) {
-        toast({
-          title: "Error",
-          description: error.message || "Failed to confirm order",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      // Update main order status
-      if (saleOrder.order_id) {
-        await supabase
-          .from("orders")
-          .update({
-            status: "confirmed",
-            payment_status: "pending",
-            updated_at: new Date().toISOString(),
-          })
-          .eq("id", saleOrder.order_id);
-      }
-
-      toast({
-        title: "Order Confirmed",
-        description: "Your order is confirmed. Production will start soon.",
-      });
-      
-      // Refresh queries
-      queryClient.invalidateQueries({ queryKey: ["customer-sale-orders", user?.id] });
-      queryClient.invalidateQueries({ queryKey: ["orders"] });
-    } else {
-      // For online payment, redirect to payment gateway (to be implemented)
-      const { error } = await supabase
-        .from("sale_orders")
-        .update({
-          status: "awaiting_payment",
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", saleOrder.id);
-
-      if (error) {
-        toast({
-          title: "Error",
-          description: error.message || "Failed to update order",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      // TODO: Integrate Razorpay/Stripe here
-      toast({
-        title: "Payment Required",
-        description: "Payment gateway integration coming soon.",
-      });
-      
-      queryClient.invalidateQueries({ queryKey: ["customer-sale-orders", user?.id] });
-    }
-  };
-
-  // Handle proceed to payment
-  const handleProceedToPayment = async (saleOrder: any) => {
-    const paymentMethod = saleOrder.order?.payment_method || "cash";
-    
-    if (paymentMethod === "cash") {
-      // Immediately confirm for cash
-      const { error } = await supabase
-        .from("sale_orders")
-        .update({
-          status: "confirmed",
-          payment_status: "cash_pending",
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", saleOrder.id);
-
-      if (error) {
-        toast({
-          title: "Error",
-          description: error.message || "Failed to confirm order",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      // Update main order status
-      if (saleOrder.order_id) {
-        await supabase
-          .from("orders")
-          .update({
-            status: "confirmed",
-            payment_status: "pending",
-            updated_at: new Date().toISOString(),
-          })
-          .eq("id", saleOrder.order_id);
-      }
-
-      toast({
-        title: "Order Confirmed",
-        description: "Your order is confirmed. Production will start soon.",
-      });
-      
-      // Refresh queries
-      queryClient.invalidateQueries({ queryKey: ["customer-sale-orders", user?.id] });
-      queryClient.invalidateQueries({ queryKey: ["orders"] });
-    } else {
-      // For online payment, redirect to payment gateway (to be implemented)
-      const { error } = await supabase
-        .from("sale_orders")
-        .update({
-          status: "awaiting_payment",
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", saleOrder.id);
-
-      if (error) {
-        toast({
-          title: "Error",
-          description: error.message || "Failed to update order",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      // TODO: Integrate Razorpay/Stripe here
-      toast({
-        title: "Payment Required",
-        description: "Payment gateway integration coming soon.",
-      });
-      
-      queryClient.invalidateQueries({ queryKey: ["customer-sale-orders", user?.id] });
-    }
-  };
-
   // Add timeout for authLoading (max 5 seconds)
   const [authLoadingTimeout, setAuthLoadingTimeout] = useState(false);
   
@@ -505,7 +359,7 @@ const Dashboard = () => {
                     </div>
                     <Badge 
                       className={`uppercase tracking-wide ${
-                        saleOrder.status === 'confirmed_by_customer' ? 'bg-green-500/10 text-green-600 border-green-500/30' :
+                        saleOrder.status === 'confirmed_by_customer' || saleOrder.status === 'customer_confirmed' ? 'bg-green-500/10 text-green-600 border-green-500/30' :
                         saleOrder.status === 'staff_approved' ? 'bg-green-500/10 text-green-600 border-green-500/30' :
                         saleOrder.status === 'awaiting_customer_otp' ? 'bg-yellow-500/10 text-yellow-600 border-yellow-500/30' :
                         saleOrder.status === 'awaiting_customer_confirmation' ? 'bg-blue-500/10 text-blue-600 border-blue-500/30' :

@@ -36,6 +36,7 @@ export default function StaffSaleOrderDetail() {
   const queryClient = useQueryClient();
   const [discount, setDiscount] = useState<string>("");
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
+  const [requireOTP, setRequireOTP] = useState(false);
 
   // Fetch sale order with order and job cards
   const { data: saleOrder, isLoading } = useQuery({
@@ -107,12 +108,12 @@ export default function StaffSaleOrderDetail() {
     },
   });
 
-  // Generate PDF mutation
-  const generatePDFMutation = useMutation({
+  // Generate Draft PDF mutation
+  const generateDraftPDFMutation = useMutation({
     mutationFn: async () => {
       setIsGeneratingPDF(true);
       const { data, error } = await supabase.functions.invoke("generate-sale-order-pdf", {
-        body: { saleOrderId: id },
+        body: { saleOrderId: id, mode: "draft" },
       });
 
       if (error) throw error;
@@ -121,15 +122,51 @@ export default function StaffSaleOrderDetail() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["staff-sale-order-detail", id] });
       toast({
-        title: "PDF Generated",
-        description: "Sale order PDF has been generated successfully.",
+        title: "Draft PDF Generated",
+        description: "Preview the PDF below. You can approve and send the final PDF when ready.",
       });
       setIsGeneratingPDF(false);
     },
     onError: (error: any) => {
       toast({
         title: "Error",
-        description: error.message || "Failed to generate PDF",
+        description: error.message || "Failed to generate draft PDF",
+        variant: "destructive",
+      });
+      setIsGeneratingPDF(false);
+    },
+  });
+
+  // Approve & Send Final PDF mutation
+  const approveAndSendFinalPDFMutation = useMutation({
+    mutationFn: async () => {
+      setIsGeneratingPDF(true);
+      const { data, error } = await supabase.functions.invoke("generate-sale-order-pdf", {
+        body: { 
+          saleOrderId: id, 
+          mode: "final", 
+          requireOTP: requireOTP 
+        },
+      });
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["staff-sale-order-detail", id] });
+      queryClient.invalidateQueries({ queryKey: ["staff-sale-orders"] });
+      queryClient.invalidateQueries({ queryKey: ["customer-sale-orders"] });
+      toast({
+        title: "Order Approved",
+        description: `Final PDF sent to customer. ${requireOTP ? 'OTP generated and sent.' : 'Customer can confirm directly.'}`,
+      });
+      setIsGeneratingPDF(false);
+      navigate("/staff/sale-orders");
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to approve and send PDF",
         variant: "destructive",
       });
       setIsGeneratingPDF(false);
