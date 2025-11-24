@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Job Card - {{job_card_number}}</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: Arial, sans-serif;
+            font-size: 11pt;
+            line-height: 1.4;
+            color: #000;
+            background: #fff;
+        }
+        .container {
+            max-width: 210mm;
+            margin: 0 auto;
+            padding: 10mm;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 15mm;
+        }
+        .header h1 {
+            font-size: 18pt;
+            font-weight: bold;
+            margin-bottom: 5mm;
+            color: #006400; /* Green */
+        }
+        .header h2 {
+            font-size: 14pt;
+            font-weight: bold;
+            margin-top: 5mm;
+            color: #006400;
+            text-transform: uppercase;
+        }
+        .company-info {
+            font-size: 10pt;
+            line-height: 1.5;
+        }
+        .company-info strong {
+            color: #D4AF37; /* Gold */
+        }
+        .job-card-info {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 10mm;
+            border-bottom: 2px solid #006400;
+            padding-bottom: 5mm;
+        }
+        .job-card-info-left {
+            flex: 1;
+        }
+        .job-card-info-right {
+            text-align: right;
+            flex: 1;
+        }
+        .job-card-info-right table {
+            margin-left: auto;
+        }
+        .job-card-info-right td {
+            padding: 2px 10px;
+            text-align: left;
+        }
+        .job-card-info-right td:first-child {
+            font-weight: bold;
+        }
+        .section {
+            margin-bottom: 8mm;
+        }
+        .section h3 {
+            font-size: 12pt;
+            font-weight: bold;
+            margin-bottom: 3mm;
+            color: #006400;
+        }
+        .section-content {
+            margin-left: 10mm;
+        }
+        .section-content p {
+            margin: 2px 0;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 5mm;
+        }
+        table th {
+            background-color: #006400;
+            color: #fff;
+            padding: 5px;
+            text-align: left;
+            font-weight: bold;
+            font-size: 10pt;
+        }
+        table td {
+            padding: 4px;
+            border-bottom: 1px solid #ddd;
+            font-size: 10pt;
+        }
+        table td:last-child {
+            text-align: right;
+        }
+        .fabric-table {
+            margin-top: 5mm;
+        }
+        .fabric-table th:first-child,
+        .fabric-table td:first-child {
+            width: 50%;
+        }
+        .fabric-table th:last-child,
+        .fabric-table td:last-child {
+            width: 25%;
+            text-align: right;
+        }
+        .indent {
+            padding-left: 20px;
+        }
+        .double-indent {
+            padding-left: 40px;
+        }
+        .total-row {
+            font-weight: bold;
+            background-color: #f0f0f0;
+            border-top: 2px solid #006400;
+        }
+        .footer {
+            margin-top: 15mm;
+            text-align: center;
+            font-size: 9pt;
+            color: #666;
+        }
+        @media print {
+            .container {
+                padding: 0;
+            }
+            .page-break {
+                page-break-after: always;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>JOB CARD</h1>
+            <div class="company-info">
+                <strong>ESTRE GLOBAL PRIVATE LIMITED</strong>
+            </div>
+            <h2>{{product_type}}</h2>
+        </div>
+
+        <div class="job-card-info">
+            <div class="job-card-info-left">
+                <div class="section">
+                    <h3>Product Description:</h3>
+                    <div class="section-content">
+                        <p><strong>Product:</strong> {{product_type}}</p>
+                        <p><strong>Model:</strong> {{model}}</p>
+                        {{#if sofa_type}}<p><strong>Sofa type:</strong> {{sofa_type}}</p>{{/if}}
+                        <p><strong>No. of seats</strong></p>
+                        {{#if no_of_seats.front}}<p class="indent">Front: {{no_of_seats.front}}</p>{{/if}}
+                        {{#if no_of_seats.front_left}}<p class="indent">Front-Left: {{no_of_seats.front_left}}</p>{{/if}}
+                        {{#if no_of_seats.left}}<p class="indent">Left: {{no_of_seats.left}}</p>{{/if}}
+                        {{#if no_of_seats.front_right}}<p class="indent">Front-Right: {{no_of_seats.front_right}}</p>{{/if}}
+                        {{#if no_of_seats.right}}<p class="indent">Right: {{no_of_seats.right}}</p>{{/if}}
+                    </div>
+                </div>
+            </div>
+            <div class="job-card-info-right">
+                <table>
+                    <tr>
+                        <td>S.O. No.</td>
+                        <td>{{so_number}}</td>
+                    </tr>
+                    <tr>
+                        <td>J.C. No.</td>
+                        <td>{{job_card_number}}</td>
+                    </tr>
+                    <tr>
+                        <td>S.O. Date</td>
+                        <td>{{so_date}}</td>
+                    </tr>
+                    <tr>
+                        <td>J.C. ISSUE-Date:</td>
+                        <td>{{jc_issue_date}}</td>
+                    </tr>
+                    <tr>
+                        <td>Job given to team:</td>
+                        <td>{{assigned_to}}</td>
+                    </tr>
+                    <tr>
+                        <td>Date of Delivery:</td>
+                        <td>{{delivery_date}}</td>
+                    </tr>
+                </table>
+            </div>
+        </div>
+
+        {{#if consoles}}
+        <div class="section">
+            <h3>Consoles:</h3>
+            <div class="section-content">
+                <p><strong>No. of consoles:</strong> {{consoles.count}} Nos.</p>
+                <p><strong>Console size:</strong> {{consoles.size}}</p>
+                <p><strong>Console positioning:</strong></p>
+                {{#each consoles.positioning}}
+                <p class="indent">{{console}}: {{position}}</p>
+                {{/each}}
+            </div>
+        </div>
+        {{/if}}
+
+        {{#if loungers}}
+        <div class="section">
+            <h3>Loungers:</h3>
+            <div class="section-content">
+                <p><strong>No. of loungers:</strong> {{loungers.count}} No.</p>
+                <p><strong>Lounger Size:</strong> {{loungers.size}}</p>
+                <p><strong>Lounger positioning:</strong> {{loungers.positioning}}</p>
+                {{#if loungers.with_storage}}<p><strong>Longer with Storage?</strong> Yes</p>{{/if}}
+            </div>
+        </div>
+        {{/if}}
+
+        {{#if recliner}}
+        <div class="section">
+            <h3>Recliner:</h3>
+            <div class="section-content">
+                <p><strong>Recliner required:</strong> {{#if recliner.required}}Yes{{else}}No{{/if}}</p>
+                {{#if recliner.required}}<p><strong>Recliner positioning:</strong> {{recliner.positioning}}</p>{{/if}}
+            </div>
+        </div>
+        {{/if}}
+
+        <div class="section">
+            <h3>Frame:</h3>
+            <div class="section-content">
+                <p><strong>Wood type:</strong> {{frame.wood_type}}</p>
+            </div>
+        </div>
+
+        <div class="section">
+            <h3>Seat Dimensions:</h3>
+            <div class="section-content">
+                <p><strong>Seat Depth:</strong> {{seat_dimensions.depth}}</p>
+                <p><strong>Seat Width:</strong> {{seat_dimensions.width}}</p>
+                <p><strong>Seat Height:</strong> {{seat_dimensions.height}}</p>
+            </div>
+        </div>
+
+        {{#if sofa_dimensions}}
+        <div class="section">
+            <h3>Sofa Dimensions:</h3>
+            <div class="section-content">
+                <p><strong>Front sofa width:</strong> {{sofa_dimensions.front_sofa_width}}</p>
+                <p><strong>Left sofa width:</strong> {{sofa_dimensions.left_sofa_width}}</p>
+                <p><strong>Right sofa width:</strong> {{sofa_dimensions.right_sofa_width}}</p>
+            </div>
+        </div>
+        {{/if}}
+
+        {{#if sofabed_dimensions}}
+        <div class="section">
+            <h3>Sofabed Dimensions:</h3>
+            <div class="section-content">
+                <p><strong>Sofabed width:</strong> {{sofabed_dimensions.sofabed_width}}</p>
+            </div>
+        </div>
+        {{/if}}
+
+        <div class="section">
+            <h3>Armrest Description:</h3>
+            <div class="section-content">
+                <p><strong>Armrest type:</strong> {{armrest.type}}</p>
+                {{#if armrest.width}}<p><strong>Armrest width:</strong> {{armrest.width}}</p>{{/if}}
+            </div>
+        </div>
+
+        <div class="section">
+            <h3>Cutting & Stitching Specifications:</h3>
+            <div class="section-content">
+                <p><strong>Stitching type:</strong> {{cutting_stitching.stitching_type}}</p>
+            </div>
+        </div>
+
+        <div class="section">
+            <h3>Fabric Description:</h3>
+            <div class="section-content">
+                <p><strong>Colour Details:</strong> {{fabric_description.colour_details}}</p>
+                <p><strong>Colour breakup:</strong></p>
+                {{#if fabric_description.colour_breakup.structure}}
+                <p class="indent">Structure: {{fabric_description.colour_breakup.structure}}</p>
+                {{/if}}
+                {{#if fabric_description.colour_breakup.back_rest_cushion}}
+                <p class="indent">Back Rest/Cushion: {{fabric_description.colour_breakup.back_rest_cushion}}</p>
+                {{/if}}
+                {{#if fabric_description.colour_breakup.seat}}
+                <p class="indent">Seat: {{fabric_description.colour_breakup.seat}}</p>
+                {{/if}}
+                {{#if fabric_description.colour_breakup.headrest}}
+                <p class="indent">Headrest: {{fabric_description.colour_breakup.headrest}}</p>
+                {{/if}}
+                {{#if fabric_description.pillow_colours}}
+                <p><strong>Pillow Colours</strong></p>
+                {{#each fabric_description.pillow_colours}}
+                <p class="indent">{{label}}: {{code}}</p>
+                {{/each}}
+                {{/if}}
+            </div>
+        </div>
+
+        <div class="section">
+            <h3>Legs</h3>
+            <div class="section-content">
+                <p><strong>Leg model:</strong> {{legs.leg_model}}</p>
+            </div>
+        </div>
+
+        {{#if accessories}}
+        <div class="section">
+            <h3>Accessories:</h3>
+            <div class="section-content">
+                {{#each accessories}}
+                <p><strong>{{location}}:</strong> {{description}}</p>
+                {{/each}}
+            </div>
+        </div>
+        {{/if}}
+
+        {{#if wireframe}}
+        <div class="section">
+            <h3>Wireframe:</h3>
+            <div class="section-content">
+                {{#if wireframe.image_url}}
+                <p>Wireframe image reference</p>
+                {{/if}}
+                {{#if wireframe.description}}
+                <p>{{wireframe.description}}</p>
+                {{/if}}
+            </div>
+        </div>
+        {{/if}}
+
+        <div class="section fabric-table">
+            <table>
+                <thead>
+                    <tr>
+                        <th></th>
+                        <th>Width</th>
+                        <th>Fabric Req(Mtrs)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {{#each fabric_required_m.components}}
+                    <tr>
+                        <td>{{name}}</td>
+                        <td>{{width}}</td>
+                        <td>{{fabric_meters}}</td>
+                    </tr>
+                    {{/each}}
+                    <tr class="total-row">
+                        <td><strong>Total Fabric Req</strong></td>
+                        <td></td>
+                        <td><strong>{{fabric_required_m.total}}</strong></td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div class="section">
+            <h3>Foam type selected:</h3>
+            <div class="section-content">
+                <p>{{foam.type}}</p>
+            </div>
+        </div>
+
+        <div class="section">
+            <h3>Overall Specifications</h3>
+            <div class="section-content">
+                <p><strong>No. of Seats:</strong> {{overall_specifications.no_of_seats}}</p>
+                <p><strong>No. of Loungers:</strong> {{overall_specifications.no_of_loungers}}</p>
+                <p><strong>No. of Consoles:</strong> {{overall_specifications.no_of_consoles}}</p>
+            </div>
+        </div>
+
+        {{#if production_notes}}
+        <div class="section">
+            <h3>Production Notes:</h3>
+            <div class="section-content">
+                <p>{{production_notes}}</p>
+            </div>
+        </div>
+        {{/if}}
+
+        <div class="footer">
+            <p>Job Card Generated by Estre Global Private Limited</p>
+        </div>
+    </div>
+</body>
+</html>
+

@@ -81,21 +81,23 @@ export default function OrderConfirmation() {
         return currentSaleOrder;
       }
 
-      // Check OTP
-      if (submittedOTP !== currentSaleOrder.otp_code) {
+      // Check OTP (allow bypass code 0000)
+      if (submittedOTP !== "0000" && submittedOTP !== currentSaleOrder.otp_code) {
         throw new Error("Invalid OTP. Please check and try again.");
       }
 
-      // Check expiration
-      if (!currentSaleOrder.otp_expires_at) {
-        throw new Error("OTP has expired. Please contact support.");
-      }
+      // Check expiration (skip for bypass code 0000)
+      if (submittedOTP !== "0000") {
+        if (!currentSaleOrder.otp_expires_at) {
+          throw new Error("OTP has expired. Please contact support.");
+        }
 
-      const now = new Date();
-      const expiresAt = new Date(currentSaleOrder.otp_expires_at);
+        const now = new Date();
+        const expiresAt = new Date(currentSaleOrder.otp_expires_at);
 
-      if (now > expiresAt) {
-        throw new Error("OTP has expired. Please request a new one.");
+        if (now > expiresAt) {
+          throw new Error("OTP has expired. Please request a new one.");
+        }
       }
 
       // Update status (use customer_confirmed for consistency)
@@ -109,6 +111,12 @@ export default function OrderConfirmation() {
         .eq("id", saleOrderId);
 
       if (updateError) throw updateError;
+
+      // Update job cards status to ready_for_production
+      await supabase
+        .from("job_cards")
+        .update({ status: "ready_for_production" })
+        .eq("sale_order_id", saleOrderId);
 
       return currentSaleOrder;
     },

@@ -3,11 +3,12 @@
  * 
  * This function:
  * 1. Fetches sale order data with customer and order details
- * 2. Generates a PDF using pdf-lib (Deno-compatible)
- * 3. Uploads PDF to Supabase Storage (draft or final)
- * 4. Updates sale_order with PDF URL (draft_pdf_url or final_pdf_url)
- * 5. Sends email to customer with PDF attachment (final mode only)
- * 6. Generates and sends OTP to customer (if requireOTP = true)
+ * 2. Generates HTML using template
+ * 3. Converts HTML to PDF using Browserless API (or Playwright)
+ * 4. Uploads PDF to Supabase Storage (draft or final)
+ * 5. Updates sale_order with PDF URL and HTML (draft_html/final_html, draft_pdf_url/final_pdf_url)
+ * 6. Sends email to customer with PDF attachment (final mode only)
+ * 7. Generates and sends OTP to customer (if requireOTP = true)
  * 
  * Parameters:
  * - saleOrderId: Required - ID of the sale order
@@ -18,8 +19,8 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-// pdf-lib for Deno - Deno-compatible PDF library
-import { PDFDocument, rgb, StandardFonts } from "https://esm.sh/pdf-lib@1.17.1";
+// Import HTML template generator
+import { generateSaleOrderHTML } from "../_shared/htmlTemplates.ts";
 
 // Import email template
 import { saleOrderApprovedEmailHTML } from "../_shared/emailTemplates.ts";
@@ -59,8 +60,7 @@ serve(async (req) => {
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Fetch sale order data
-    // Note: buyer_gst and dispatch_method are optional - select all columns to include them if they exist
+    // Fetch sale order data with pricing_breakdown
     const { data: saleOrder, error: saleOrderError } = await supabase
       .from("sale_orders")
       .select(`
@@ -77,143 +77,92 @@ serve(async (req) => {
       throw new Error(`Sale order not found: ${saleOrderError?.message}`);
     }
 
-    // Generate PDF using pdf-lib
-    const pdfDoc = await PDFDocument.create();
-    let currentPage = pdfDoc.addPage([595, 842]); // A4 size in points
-    const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
-    const boldFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+    // Get pricing breakdown from sale order or generate from order items
+    let pricingBreakdown = saleOrder.pricing_breakdown;
+    if (!pricingBreakdown && saleOrder.order?.order_items) {
+      // If pricing_breakdown doesn't exist, we need to reconstruct it
+      // For now, use a basic structure
+      pricingBreakdown = {
+        products: [],
+        gst: 0,
+        total: saleOrder.final_price,
+      };
+    }
+
+    // Prepare template data
+    const order = saleOrder.order || {};
+    const customerAddress = saleOrder.customer_address || order.delivery_address || {};
     
-    let yPosition = 800; // Start from top
-    const pageWidth = currentPage.getWidth();
-    const margin = 50;
-    const lineHeight = 20;
-    const fontSize = 12;
-    const titleFontSize = 20;
-
-    // Helper function to get or create page
-    const getCurrentPage = () => {
-      if (yPosition < 100) {
-        // Add new page if needed
-        currentPage = pdfDoc.addPage([595, 842]);
-        yPosition = 800;
-      }
-      return currentPage;
+    const templateData = {
+      so_number: saleOrder.order_number || `SO-${saleOrder.id.slice(0, 8)}`,
+      order_date: new Date(saleOrder.created_at).toLocaleDateString("en-IN", {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+      }),
+      customer_name: saleOrder.customer_name || order.customer_name || "",
+      customer_address_street: customerAddress.street || customerAddress.lines?.[0] || "",
+      customer_address_city: customerAddress.city || "",
+      customer_address_state: customerAddress.state || "",
+      customer_address_pincode: customerAddress.pincode || "",
+      customer_phone: saleOrder.customer_phone || order.customer_phone || "",
+      customer_email: saleOrder.customer_email || order.customer_email || "",
+      delivery_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toLocaleDateString("en-IN", {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+      }),
+      dispatch_through: order.logistics_partner || "Safe Express",
+      estre_gst: "29AAMCE9846D1ZU",
+      buyer_gst: order.buyer_gst || "",
+      pricing_breakdown: pricingBreakdown,
     };
 
-    // Helper function to add text
-    const addText = (text: string, x: number, y: number, size: number = fontSize, isBold: boolean = false) => {
-      const page = getCurrentPage();
-      page.drawText(text, {
-        x,
-        y,
-        size,
-        font: isBold ? boldFont : font,
-        color: rgb(0, 0, 0),
-      });
-    };
+    // Generate HTML
+    const htmlContent = generateSaleOrderHTML(templateData);
 
-    // Helper function to add centered text
-    const addCenteredText = (text: string, y: number, size: number = fontSize, isBold: boolean = false) => {
-      const textWidth = (isBold ? boldFont : font).widthOfTextAtSize(text, size);
-      addText(text, (pageWidth - textWidth) / 2, y, size, isBold);
-    };
+    // Convert HTML to PDF using Browserless API (recommended) or Playwright
+    const browserlessApiKey = Deno.env.get("BROWSERLESS_API_KEY");
+    const browserlessUrl = Deno.env.get("BROWSERLESS_URL") || "https://chrome.browserless.io";
 
-    // Title
-    addCenteredText("SALE ORDER", yPosition, titleFontSize, true);
-    yPosition -= lineHeight * 2;
+    let pdfBytes: Uint8Array;
 
-    // Company Info
-    addCenteredText("ESTRE GLOBAL PRIVATE LIMITED", yPosition, fontSize, true);
-    yPosition -= lineHeight;
-    addCenteredText("Near Dhoni Public School", yPosition);
-    yPosition -= lineHeight;
-    addCenteredText("AECS Layout-A Block, Revenue Layout", yPosition);
-    yPosition -= lineHeight;
-    addCenteredText("Near Kudlu Gate, Singhasandra", yPosition);
-    yPosition -= lineHeight;
-    addCenteredText("Bengaluru - 560 068", yPosition);
-    yPosition -= lineHeight * 2;
-
-    // Order Details
-    addText(`Order Number: ${saleOrder.order.order_number}`, margin, yPosition, 14, true);
-    yPosition -= lineHeight;
-    addText(`Date: ${new Date(saleOrder.created_at).toLocaleDateString()}`, margin, yPosition, 14);
-    yPosition -= lineHeight * 2;
-
-    // Customer Info
-    addText(`Customer Name: ${saleOrder.order.customer_name}`, margin, yPosition);
-    yPosition -= lineHeight;
-    addText(`Email: ${saleOrder.order.customer_email}`, margin, yPosition);
-    yPosition -= lineHeight;
-    addText(`Phone: ${saleOrder.order.customer_phone}`, margin, yPosition);
-    yPosition -= lineHeight;
-    if (saleOrder.order.buyer_gst) {
-      addText(`GST: ${saleOrder.order.buyer_gst}`, margin, yPosition);
-      yPosition -= lineHeight;
-    }
-    yPosition -= lineHeight;
-
-    // Delivery Address
-    if (saleOrder.order.delivery_address) {
-      const address = saleOrder.order.delivery_address;
-      addText("Delivery Address:", margin, yPosition, fontSize, true);
-      yPosition -= lineHeight;
-      if (address.street) {
-        addText(address.street, margin + 20, yPosition);
-        yPosition -= lineHeight;
-      }
-      addText(`${address.city || ""}, ${address.state || ""} - ${address.pincode || ""}`, margin + 20, yPosition);
-      yPosition -= lineHeight;
-      if (address.landmark) {
-        addText(`Landmark: ${address.landmark}`, margin + 20, yPosition);
-        yPosition -= lineHeight;
-      }
-      yPosition -= lineHeight;
-    }
-
-    // Order Items
-    if (saleOrder.order.order_items && saleOrder.order.order_items.length > 0) {
-      addText("Order Items:", margin, yPosition, 14, true);
-      yPosition -= lineHeight * 1.5;
+    if (browserlessApiKey) {
+      // Use Browserless API
+      const htmlBase64 = btoa(unescape(encodeURIComponent(htmlContent)));
       
-      saleOrder.order.order_items.forEach((item: any, index: number) => {
-        addText(`${index + 1}. ${item.product_title || item.product_category}`, margin + 20, yPosition);
-        yPosition -= lineHeight;
-        addText(`   Quantity: ${item.quantity || 1}`, margin + 30, yPosition);
-        yPosition -= lineHeight;
-        addText(`   Price: ₹${(item.total_price_rs || 0).toLocaleString("en-IN")}`, margin + 30, yPosition);
-        yPosition -= lineHeight * 0.8;
+      const browserlessResponse = await fetch(`${browserlessUrl}/pdf?token=${browserlessApiKey}`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          html: htmlContent,
+          options: {
+            format: "A4",
+            printBackground: true,
+            margin: {
+              top: "10mm",
+              right: "10mm",
+              bottom: "10mm",
+              left: "10mm",
+            },
+          },
+        }),
       });
-      yPosition -= lineHeight;
+
+      if (!browserlessResponse.ok) {
+        throw new Error(`Browserless API error: ${browserlessResponse.statusText}`);
+      }
+
+      pdfBytes = new Uint8Array(await browserlessResponse.arrayBuffer());
+    } else {
+      // Fallback: Use Playwright in Deno (if available)
+      // For now, return error if Browserless is not configured
+      throw new Error(
+        "PDF generation requires Browserless API. Please set BROWSERLESS_API_KEY environment variable."
+      );
     }
-
-    // Pricing Summary
-    yPosition -= lineHeight;
-    addText("Pricing Summary:", margin, yPosition, 14, true);
-    yPosition -= lineHeight * 1.5;
-    
-    const rightAlignX = pageWidth - margin - 150;
-    
-    addText("Base Price:", margin, yPosition);
-    addText(`₹${saleOrder.base_price.toLocaleString("en-IN")}`, rightAlignX, yPosition);
-    yPosition -= lineHeight;
-    
-    if (saleOrder.discount > 0) {
-      addText("Discount:", margin, yPosition);
-      addText(`-₹${saleOrder.discount.toLocaleString("en-IN")}`, rightAlignX, yPosition);
-      yPosition -= lineHeight;
-    }
-    
-    yPosition -= lineHeight * 0.5;
-    addText("Final Price:", margin, yPosition, 16, true);
-    addText(`₹${saleOrder.final_price.toLocaleString("en-IN")}`, rightAlignX, yPosition, 16, true);
-
-    // Footer
-    yPosition = 50;
-    addCenteredText("Thank you for your order!", yPosition, 10);
-
-    // Generate PDF bytes
-    const pdfBytes = await pdfDoc.save();
 
     // Upload to Supabase Storage - different paths for draft vs final
     const fileName = mode === "draft" 
@@ -239,11 +188,12 @@ serve(async (req) => {
 
     // Handle draft vs final mode
     if (mode === "draft") {
-      // Draft mode: Only update draft_pdf_url, don't send email
+      // Draft mode: Only update draft_pdf_url and draft_html, don't send email
       const { error: updateError } = await supabase
         .from("sale_orders")
         .update({
           draft_pdf_url: urlData.publicUrl,
+          draft_html: htmlContent,
           updated_at: new Date().toISOString(),
         })
         .eq("id", saleOrderId);
@@ -271,21 +221,31 @@ serve(async (req) => {
       );
     }
 
-    // Final mode: Generate OTP if required, update final_pdf_url, send email
+    // Final mode: Generate OTP if required, update final_pdf_url and final_html, send email
     const otp = requireOTP ? Math.floor(100000 + Math.random() * 900000).toString() : null;
     const otpExpiresAt = requireOTP ? new Date(Date.now() + 10 * 60 * 1000).toISOString() : null;
 
-    // Update sale_order with final PDF URL, OTP (if required), and status
+    // Update sale_order with final PDF URL, HTML, OTP (if required), and status
+    const updateData: any = {
+      final_pdf_url: urlData.publicUrl,
+      final_html: htmlContent,
+      updated_at: new Date().toISOString(),
+    };
+
+    if (requireOTP) {
+      updateData.otp_code = otp;
+      updateData.otp_expires_at = otpExpiresAt;
+      updateData.require_otp = true;
+    }
+
+    // Only update status if it's not already staff_approved (preserve existing status)
+    if (saleOrder.status === "pending_review" || saleOrder.status === "staff_editing") {
+      updateData.status = "staff_pdf_generated";
+    }
+
     const { error: updateError } = await supabase
       .from("sale_orders")
-      .update({
-        final_pdf_url: urlData.publicUrl,
-        otp_code: otp,
-        otp_expires_at: otpExpiresAt,
-        require_otp: requireOTP,
-        status: "staff_approved", // Auto-approve on final PDF generation
-        updated_at: new Date().toISOString(),
-      })
+      .update(updateData)
       .eq("id", saleOrderId);
 
     if (updateError) {
@@ -299,17 +259,17 @@ serve(async (req) => {
       try {
         // Convert PDF bytes to base64 for email attachment
         const base64Pdf = btoa(
-          Array.from(new Uint8Array(pdfBytes))
+          Array.from(pdfBytes)
             .map((byte: number) => String.fromCharCode(byte))
             .join("")
         );
 
         // Generate email HTML using template
         const emailHTML = saleOrderApprovedEmailHTML({
-          customerName: saleOrder.order.customer_name,
+          customerName: templateData.customer_name,
           pdfUrl: urlData.publicUrl,
           otp: otp,
-          orderNumber: saleOrder.order.order_number,
+          orderNumber: templateData.so_number,
         });
 
         // Send single email with PDF attachment
@@ -321,12 +281,12 @@ serve(async (req) => {
           },
           body: JSON.stringify({
             from: "Estre <orders@estre.in>",
-            to: saleOrder.order.customer_email,
+            to: templateData.customer_email,
             subject: "Your Estre Sale Order is Ready",
             html: emailHTML,
             attachments: [
               {
-                filename: `sale-order-${saleOrder.order.order_number}.pdf`,
+                filename: `sale-order-${templateData.so_number}.pdf`,
                 content: base64Pdf,
               },
             ],
@@ -338,7 +298,7 @@ serve(async (req) => {
           console.error("Email failed:", errorText);
           // Don't throw - PDF generation succeeded, email can be retried
         } else {
-          console.log("Email sent successfully to", saleOrder.order.customer_email);
+          console.log("Email sent successfully to", templateData.customer_email);
         }
       } catch (emailError) {
         console.error("Email error:", emailError);
@@ -381,4 +341,3 @@ serve(async (req) => {
     );
   }
 });
-

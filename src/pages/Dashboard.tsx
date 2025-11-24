@@ -169,7 +169,17 @@ const Dashboard = () => {
             )
           `)
           .eq("customer_id", user.id)
-          .in("status", ["pending_staff_review", "pending_review", "staff_approved", "customer_confirmed", "awaiting_customer_otp", "awaiting_customer_confirmation", "confirmed_by_customer"])
+          .in("status", [
+            "pending_review", 
+            "staff_editing", 
+            "staff_pdf_generated", 
+            "staff_approved", 
+            "customer_confirmation_pending", 
+            "customer_confirmed", 
+            "payment_pending", 
+            "payment_completed", 
+            "ready_for_production"
+          ])
           .order("created_at", { ascending: false });
 
         if (error) {
@@ -402,67 +412,83 @@ const Dashboard = () => {
 
                   <Separator />
 
-                  {saleOrder.status === "awaiting_customer_confirmation" && (
+                  {(saleOrder.status === "staff_approved" || saleOrder.status === "customer_confirmation_pending") && (
                     <div className="space-y-3">
                       <div className="flex items-start gap-3 p-4 bg-blue-500/10 rounded-lg border border-blue-500/30">
                         <CheckCircle2 className="h-5 w-5 text-blue-600 mt-0.5" />
                         <div className="flex-1">
                           <p className="font-semibold text-blue-600 mb-1">
-                            Awaiting Your Confirmation
+                            Approved by Estre Staff
                           </p>
                           <p className="text-sm text-muted-foreground">
                             Staff has reviewed and approved your order. Please review the sale order PDF and confirm to proceed.
                           </p>
                         </div>
                       </div>
-                      {saleOrder.pdf_url && (
+                      {(saleOrder.final_pdf_url || saleOrder.pdf_url) && (
                         <Button 
                           asChild
                           variant="outline"
                           className="w-full"
                         >
-                          <a href={saleOrder.pdf_url} target="_blank" rel="noopener noreferrer">
+                          <a href={saleOrder.final_pdf_url || saleOrder.pdf_url} target="_blank" rel="noopener noreferrer">
                             <Download className="mr-2 h-4 w-4" />
                             Download Sale Order PDF
                           </a>
                         </Button>
                       )}
-                      <Button 
-                        onClick={() => navigate(`/order-confirmation/${saleOrder.id}`)}
-                        className="w-full bg-gradient-gold text-white border-gold hover:shadow-gold-glow transition-premium"
-                        size="lg"
-                      >
-                        <CheckCircle2 className="mr-2 h-5 w-5" />
-                        Review & Confirm Order
-                      </Button>
+                      {saleOrder.require_otp ? (
+                        <Button 
+                          onClick={() => navigate(`/order-confirmation/${saleOrder.id}`)}
+                          className="w-full bg-gradient-gold text-white border-gold hover:shadow-gold-glow transition-premium"
+                          size="lg"
+                        >
+                          <CheckCircle2 className="mr-2 h-5 w-5" />
+                          Enter OTP to Confirm Order
+                        </Button>
+                      ) : (
+                        <Button 
+                          onClick={async () => {
+                            // Confirm order without OTP
+                            const { error } = await supabase
+                              .from("sale_orders")
+                              .update({
+                                status: "customer_confirmed",
+                                updated_at: new Date().toISOString(),
+                              })
+                              .eq("id", saleOrder.id);
+                            
+                            if (error) {
+                              toast({
+                                title: "Error",
+                                description: error.message,
+                                variant: "destructive",
+                              });
+                            } else {
+                              // Update job cards status to ready_for_production
+                              await supabase
+                                .from("job_cards")
+                                .update({ status: "ready_for_production" })
+                                .eq("sale_order_id", saleOrder.id);
+                              
+                              queryClient.invalidateQueries({ queryKey: ["customer-sale-orders", user?.id] });
+                              toast({
+                                title: "Order Confirmed",
+                                description: "Your order has been confirmed. Production will begin shortly.",
+                              });
+                            }
+                          }}
+                          className="w-full bg-gradient-gold text-white border-gold hover:shadow-gold-glow transition-premium"
+                          size="lg"
+                        >
+                          <CheckCircle2 className="mr-2 h-5 w-5" />
+                          Confirm Order
+                        </Button>
+                      )}
                     </div>
                   )}
 
-                  {saleOrder.status === "awaiting_customer_otp" && (
-                    <div className="space-y-3">
-                      <div className="flex items-start gap-3 p-4 bg-yellow-500/10 rounded-lg border border-yellow-500/30">
-                        <AlertCircle className="h-5 w-5 text-yellow-600 mt-0.5" />
-                        <div className="flex-1">
-                          <p className="font-semibold text-yellow-600 mb-1">
-                            OTP Verification Required
-                          </p>
-                          <p className="text-sm text-muted-foreground">
-                            Please check your email for the OTP code to confirm your order. The OTP is valid for 10 minutes.
-                          </p>
-                        </div>
-                      </div>
-                      <Button 
-                        onClick={() => navigate(`/order-confirmation/${saleOrder.id}`)}
-                        className="w-full bg-gradient-gold text-white border-gold hover:shadow-gold-glow transition-premium"
-                        size="lg"
-                      >
-                        <CheckCircle2 className="mr-2 h-5 w-5" />
-                        Enter OTP to Confirm Order
-                      </Button>
-                    </div>
-                  )}
-
-                  {saleOrder.status === "confirmed_by_customer" && (
+                  {saleOrder.status === "customer_confirmed" && (
                     <div className="space-y-3">
                       <div className="flex items-start gap-3 p-4 bg-green-500/10 rounded-lg border border-green-500/30">
                         <CheckCircle2 className="h-5 w-5 text-green-600 mt-0.5" />
@@ -496,7 +522,7 @@ const Dashboard = () => {
                     </div>
                   )}
 
-                  {saleOrder.status === "pending_staff_review" && (
+                  {(saleOrder.status === "pending_review" || saleOrder.status === "staff_editing" || saleOrder.status === "staff_pdf_generated") && (
                     <div className="flex items-start gap-3 p-4 bg-blue-500/10 rounded-lg border border-blue-500/30">
                       <Clock className="h-5 w-5 text-blue-600 mt-0.5" />
                       <div className="flex-1">
@@ -504,7 +530,7 @@ const Dashboard = () => {
                           Under Review
                         </p>
                         <p className="text-sm text-muted-foreground">
-                          Your order is being reviewed by Estre Staff. You'll receive a confirmation email with PDF and OTP shortly.
+                          Your order is being reviewed by Estre Staff. You'll receive a confirmation email with PDF {saleOrder.require_otp ? "and OTP" : ""} shortly.
                         </p>
                       </div>
                     </div>

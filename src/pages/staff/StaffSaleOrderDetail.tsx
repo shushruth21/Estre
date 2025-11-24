@@ -21,7 +21,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Download, FileText, CheckCircle2, ArrowLeft, Tag } from "lucide-react";
+import { Loader2, Download, FileText, CheckCircle2, ArrowLeft, Tag, Eye, Edit } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
 
 const formatCurrency = (value: number | null | undefined) => {
@@ -37,6 +39,8 @@ export default function StaffSaleOrderDetail() {
   const [discount, setDiscount] = useState<string>("");
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
   const [requireOTP, setRequireOTP] = useState(false);
+  const [showHTMLPreview, setShowHTMLPreview] = useState(false);
+  const [editableHTML, setEditableHTML] = useState<string>("");
 
   // Fetch sale order with order and job cards
   const { data: saleOrder, isLoading } = useQuery({
@@ -251,7 +255,7 @@ export default function StaffSaleOrderDetail() {
             <Badge className="mt-2" variant={
               saleOrder.status === "pending_review" || saleOrder.status === "pending_staff_review" 
                 ? "default" 
-                : saleOrder.status === "staff_approved" 
+                : saleOrder.status === "staff_approved" || saleOrder.status === "staff_pdf_generated"
                 ? "default" 
                 : "secondary"
             }>
@@ -367,78 +371,231 @@ export default function StaffSaleOrderDetail() {
           </CardContent>
         </Card>
 
-        {/* SECTION 3: PDF Preview & Download */}
+        {/* SECTION 3: HTML Preview & PDF Generation */}
         <Card>
           <CardHeader>
-            <CardTitle>PDF Document</CardTitle>
+            <CardTitle>HTML Preview & PDF Document</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            {saleOrder.pdf_url ? (
-              <>
-                <div className="border rounded-lg p-4 bg-muted">
-                  <iframe
-                    src={saleOrder.pdf_url}
-                    className="w-full h-96 border-0 rounded"
-                    title="Sale Order PDF"
+            <Tabs defaultValue="preview" className="w-full">
+              <TabsList>
+                <TabsTrigger value="preview">Preview</TabsTrigger>
+                <TabsTrigger value="html">Edit HTML</TabsTrigger>
+              </TabsList>
+              <TabsContent value="preview" className="space-y-4">
+                {(saleOrder.draft_pdf_url || saleOrder.final_pdf_url || saleOrder.pdf_url) ? (
+                  <>
+                    <div className="border rounded-lg p-4 bg-muted">
+                      <iframe
+                        src={saleOrder.final_pdf_url || saleOrder.draft_pdf_url || saleOrder.pdf_url}
+                        className="w-full h-96 border-0 rounded"
+                        title="Sale Order PDF"
+                      />
+                    </div>
+                    <div className="flex gap-2">
+                      <Button asChild variant="outline" className="flex-1">
+                        <a href={saleOrder.final_pdf_url || saleOrder.draft_pdf_url || saleOrder.pdf_url} download target="_blank" rel="noopener noreferrer">
+                          <Download className="mr-2 h-4 w-4" />
+                          Download PDF
+                        </a>
+                      </Button>
+                      {saleOrder.draft_html && (
+                        <Button
+                          variant="outline"
+                          onClick={() => {
+                            setEditableHTML(saleOrder.draft_html || saleOrder.final_html || "");
+                            setShowHTMLPreview(true);
+                          }}
+                        >
+                          <Eye className="mr-2 h-4 w-4" />
+                          View HTML
+                        </Button>
+                      )}
+                    </div>
+                  </>
+                ) : (
+                  <div className="text-center py-8">
+                    <FileText className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                    <p className="text-muted-foreground mb-4">PDF not generated yet</p>
+                    <Button
+                      onClick={() => generateDraftPDFMutation.mutate()}
+                      disabled={isGeneratingPDF}
+                    >
+                      {isGeneratingPDF ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Generating...
+                        </>
+                      ) : (
+                        <>
+                          <FileText className="mr-2 h-4 w-4" />
+                          Generate Draft PDF
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                )}
+              </TabsContent>
+              <TabsContent value="html" className="space-y-4">
+                <div className="space-y-2">
+                  <Label>Edit HTML Template</Label>
+                  <Textarea
+                    value={editableHTML || saleOrder.draft_html || saleOrder.final_html || ""}
+                    onChange={(e) => setEditableHTML(e.target.value)}
+                    className="font-mono text-xs min-h-[400px]"
+                    placeholder="HTML content will appear here after generating draft PDF"
                   />
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      onClick={async () => {
+                        if (!editableHTML) return;
+                        const { error } = await supabase
+                          .from("sale_orders")
+                          .update({ draft_html: editableHTML })
+                          .eq("id", id);
+                        if (error) {
+                          toast({
+                            title: "Error",
+                            description: error.message,
+                            variant: "destructive",
+                          });
+                        } else {
+                          toast({
+                            title: "HTML Saved",
+                            description: "HTML template updated successfully.",
+                          });
+                          queryClient.invalidateQueries({ queryKey: ["staff-sale-order-detail", id] });
+                        }
+                      }}
+                    >
+                      <Edit className="mr-2 h-4 w-4" />
+                      Save HTML
+                    </Button>
+                    {editableHTML && (
+                      <Button
+                        variant="outline"
+                        onClick={() => {
+                          const newWindow = window.open();
+                          if (newWindow) {
+                            newWindow.document.write(editableHTML);
+                            newWindow.document.close();
+                          }
+                        }}
+                      >
+                        <Eye className="mr-2 h-4 w-4" />
+                        Preview HTML
+                      </Button>
+                    )}
+                  </div>
                 </div>
-                <Button asChild variant="outline" className="w-full">
-                  <a href={saleOrder.pdf_url} download target="_blank" rel="noopener noreferrer">
-                    <Download className="mr-2 h-4 w-4" />
-                    Download PDF
-                  </a>
-                </Button>
-              </>
-            ) : (
-              <div className="text-center py-8">
-                <FileText className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                <p className="text-muted-foreground mb-4">PDF not generated yet</p>
-                <Button
-                  onClick={() => generatePDFMutation.mutate()}
-                  disabled={isGeneratingPDF}
-                >
-                  {isGeneratingPDF ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Generating...
-                    </>
-                  ) : (
-                    <>
-                      <FileText className="mr-2 h-4 w-4" />
-                      Generate PDF
-                    </>
-                  )}
-                </Button>
-              </div>
-            )}
+              </TabsContent>
+            </Tabs>
           </CardContent>
         </Card>
 
-        {/* SECTION 4: Approve Sale Order */}
-        {(saleOrder.status === "pending_review" || saleOrder.status === "pending_staff_review") && (
-          <Card>
-            <CardContent className="pt-6">
+        {/* SECTION 4: Actions */}
+        <Card>
+          <CardContent className="pt-6 space-y-4">
+            {(saleOrder.status === "pending_review" || saleOrder.status === "pending_staff_review" || saleOrder.status === "staff_editing") && (
+              <>
+                <div className="flex gap-2">
+                  <Button
+                    onClick={() => {
+                      // Update status to staff_editing
+                      supabase
+                        .from("sale_orders")
+                        .update({ status: "staff_editing" })
+                        .eq("id", id)
+                        .then(() => {
+                          queryClient.invalidateQueries({ queryKey: ["staff-sale-order-detail", id] });
+                        });
+                    }}
+                    variant="outline"
+                    className="flex-1"
+                  >
+                    <Edit className="mr-2 h-4 w-4" />
+                    Edit Order
+                  </Button>
+                  <Button
+                    onClick={() => generateDraftPDFMutation.mutate()}
+                    disabled={isGeneratingPDF}
+                    variant="outline"
+                    className="flex-1"
+                  >
+                    {isGeneratingPDF ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Generating...
+                      </>
+                    ) : (
+                      <>
+                        <FileText className="mr-2 h-4 w-4" />
+                        Generate Draft PDF
+                      </>
+                    )}
+                  </Button>
+                </div>
+                {(saleOrder.draft_pdf_url || saleOrder.draft_html) && (
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        id="requireOTP"
+                        checked={requireOTP}
+                        onChange={(e) => setRequireOTP(e.target.checked)}
+                        className="rounded"
+                      />
+                      <Label htmlFor="requireOTP" className="cursor-pointer">
+                        Require OTP for customer confirmation
+                      </Label>
+                    </div>
+                    <Button
+                      onClick={() => approveAndSendFinalPDFMutation.mutate()}
+                      disabled={approveAndSendFinalPDFMutation.isPending || isGeneratingPDF}
+                      className="w-full"
+                      size="lg"
+                    >
+                      {approveAndSendFinalPDFMutation.isPending ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Approving...
+                        </>
+                      ) : (
+                        <>
+                          <CheckCircle2 className="mr-2 h-4 w-4" />
+                          Approve & Send Final PDF to Customer
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                )}
+              </>
+            )}
+            {saleOrder.status === "staff_pdf_generated" && (
               <Button
-                onClick={() => approveSaleOrderMutation.mutate()}
-                disabled={approveSaleOrderMutation.isPending}
+                onClick={() => {
+                  supabase
+                    .from("sale_orders")
+                    .update({ status: "staff_approved" })
+                    .eq("id", id)
+                    .then(() => {
+                      queryClient.invalidateQueries({ queryKey: ["staff-sale-order-detail", id] });
+                      toast({
+                        title: "Order Approved",
+                        description: "Sale order status updated to approved.",
+                      });
+                    });
+                }}
                 className="w-full"
                 size="lg"
               >
-                {approveSaleOrderMutation.isPending ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Approving...
-                  </>
-                ) : (
-                  <>
-                    <CheckCircle2 className="mr-2 h-4 w-4" />
-                    Approve Sale Order & Notify Customer
-                  </>
-                )}
+                <CheckCircle2 className="mr-2 h-4 w-4" />
+                Approve Sale Order
               </Button>
-            </CardContent>
-          </Card>
-        )}
+            )}
+          </CardContent>
+        </Card>
       </div>
     </StaffLayout>
   );

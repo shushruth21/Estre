@@ -11,6 +11,8 @@ import { ReviewStep } from "@/components/checkout/ReviewStep";
 import { PaymentStep } from "@/components/checkout/PaymentStep";
 import { calculateDynamicPrice } from "@/lib/dynamic-pricing";
 import { generateSaleOrderData } from "@/lib/sale-order-generator";
+import { generatePricingBreakdown, PricingBreakdownData } from "@/lib/pricing-breakdown-generator";
+import { generateTechnicalSpecifications } from "@/lib/technical-specifications-generator";
 
 const STEPS = [
   { id: 1, name: "Delivery", description: "Shipping details" },
@@ -117,18 +119,40 @@ const Checkout = () => {
         throw orderError;
       }
 
+      // Generate sale order number (format: "001", "002", etc.)
+      // Get the latest sale order number
+      const { data: latestSaleOrder } = await supabase
+        .from("sale_orders")
+        .select("order_number")
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .single();
+
+      let orderNumber = "001";
+      if (latestSaleOrder?.order_number) {
+        const lastNum = parseInt(latestSaleOrder.order_number, 10);
+        if (!isNaN(lastNum)) {
+          orderNumber = String(lastNum + 1).padStart(3, "0");
+        }
+      }
+
       // Create sale_order for staff review workflow
       const { data: saleOrder, error: saleOrderError } = await supabase
         .from("sale_orders")
         .insert({
           customer_id: user.id,
           order_id: order.id,
-          status: "pending_staff_review",
+          order_number: orderNumber,
+          status: "pending_review",
           base_price: subtotal,
           discount: 0,
           final_price: subtotal,
-          payment_mode: paymentMethod || "cash", // Add payment_mode
-          payment_status: "pending", // Add payment_status
+          payment_mode: paymentMethod || "cash",
+          payment_status: "pending",
+          customer_name: order.customer_name,
+          customer_email: order.customer_email,
+          customer_phone: order.customer_phone,
+          customer_address: order.delivery_address,
         })
         .select()
         .single();
@@ -155,6 +179,7 @@ const Checkout = () => {
 
       const saleOrderSnapshots: any[] = [];
       const jobCardInserts: any[] = [];
+      const pricingBreakdownProducts: any[] = [];
 
       if (insertedItems && insertedItems.length > 0) {
         for (const item of insertedItems) {
@@ -173,7 +198,23 @@ const Checkout = () => {
 
           saleOrderSnapshots.push(saleData);
 
+          // Generate pricing breakdown for this product
+          const productPricingBreakdown = generatePricingBreakdown(
+            item,
+            item.configuration,
+            pricing.breakdown,
+            saleData
+          );
+          pricingBreakdownProducts.push(productPricingBreakdown);
+
           saleData.jobCards.forEach((jobCard) => {
+            // Generate technical specifications (NO pricing)
+            const technicalSpecs = generateTechnicalSpecifications(
+              item,
+              item.configuration,
+              jobCard
+            );
+
             jobCardInserts.push({
               job_card_number: jobCard.jobCardNumber,
               so_number: jobCard.soNumber,
@@ -187,15 +228,17 @@ const Checkout = () => {
               customer_email: jobCard.customer.email || order.customer_email,
               delivery_address: jobCard.customer.address,
               product_category: jobCard.category,
+              product_type: technicalSpecs.sofa_type || technicalSpecs.product_type,
               product_title: jobCard.modelName,
               configuration: jobCard.configuration,
+              technical_specifications: technicalSpecs,
               fabric_codes: jobCard.fabricPlan.fabricCodes,
               fabric_meters: jobCard.fabricPlan,
               accessories: {
                 console: jobCard.console,
                 dummySeats: jobCard.dummySeats,
                 sections: jobCard.sections,
-                pricing: jobCard.pricing,
+                // NO pricing in accessories
               },
               dimensions: jobCard.dimensions,
               status: "pending",
@@ -204,6 +247,20 @@ const Checkout = () => {
           });
         }
       }
+
+      // Update sale order with pricing breakdown
+      const pricingBreakdown: PricingBreakdownData = {
+        products: pricingBreakdownProducts,
+        gst: 0, // GST calculation can be added later
+        total: subtotal,
+      };
+
+      await supabase
+        .from("sale_orders")
+        .update({
+          pricing_breakdown: pricingBreakdown,
+        })
+        .eq("id", saleOrder.id);
 
       if (jobCardInserts.length > 0) {
         const { data: createdJobCards, error: jobCardsError } = await supabase

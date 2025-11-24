@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sale Order - {{so_number}}</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: Arial, sans-serif;
+            font-size: 11pt;
+            line-height: 1.4;
+            color: #000;
+            background: #fff;
+        }
+        .container {
+            max-width: 210mm;
+            margin: 0 auto;
+            padding: 10mm;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 15mm;
+        }
+        .header h1 {
+            font-size: 18pt;
+            font-weight: bold;
+            margin-bottom: 5mm;
+            color: #006400; /* Green */
+        }
+        .company-info {
+            font-size: 10pt;
+            line-height: 1.5;
+        }
+        .company-info strong {
+            color: #D4AF37; /* Gold */
+        }
+        .order-info {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 10mm;
+            border-bottom: 2px solid #006400;
+            padding-bottom: 5mm;
+        }
+        .order-info-left {
+            flex: 1;
+        }
+        .order-info-right {
+            text-align: right;
+            flex: 1;
+        }
+        .order-info-right table {
+            margin-left: auto;
+        }
+        .order-info-right td {
+            padding: 2px 10px;
+            text-align: left;
+        }
+        .order-info-right td:first-child {
+            font-weight: bold;
+        }
+        .customer-section {
+            margin-bottom: 10mm;
+        }
+        .customer-section h3 {
+            font-size: 12pt;
+            font-weight: bold;
+            margin-bottom: 3mm;
+            color: #006400;
+        }
+        .customer-details {
+            margin-bottom: 5mm;
+        }
+        .customer-details p {
+            margin: 2px 0;
+        }
+        .product-section {
+            margin-top: 10mm;
+            page-break-inside: avoid;
+        }
+        .product-section h2 {
+            font-size: 14pt;
+            font-weight: bold;
+            margin-bottom: 5mm;
+            color: #006400;
+            text-transform: uppercase;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 5mm;
+        }
+        table th {
+            background-color: #006400;
+            color: #fff;
+            padding: 5px;
+            text-align: left;
+            font-weight: bold;
+            font-size: 10pt;
+        }
+        table td {
+            padding: 4px;
+            border-bottom: 1px solid #ddd;
+            font-size: 10pt;
+        }
+        table td:last-child {
+            text-align: right;
+        }
+        .indent {
+            padding-left: 20px;
+        }
+        .double-indent {
+            padding-left: 40px;
+        }
+        .total-row {
+            font-weight: bold;
+            background-color: #f0f0f0;
+            border-top: 2px solid #006400;
+        }
+        .footer {
+            margin-top: 15mm;
+            text-align: center;
+            font-size: 9pt;
+            color: #666;
+        }
+        @media print {
+            .container {
+                padding: 0;
+            }
+            .page-break {
+                page-break-after: always;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>SALE ORDER</h1>
+            <div class="company-info">
+                <strong>ESTRE GLOBAL PRIVATE LTD</strong><br>
+                Near Dhoni Public School<br>
+                AECS Layout-A Block, Revenue Layout<br>
+                Near Kudlu Gate, Singhasandra<br>
+                Bengaluru - 560 068<br>
+                Ph: +91 87 22 200 100<br>
+                Email: support@estre.in
+            </div>
+        </div>
+
+        <div class="order-info">
+            <div class="order-info-left">
+                <div class="customer-section">
+                    <h3>Invoice to:</h3>
+                    <div class="customer-details">
+                        <p><strong>{{customer_name}}</strong></p>
+                        <p>{{customer_address_street}}</p>
+                        <p>{{customer_address_city}}, {{customer_address_state}} - {{customer_address_pincode}}</p>
+                        <p>Mobile No.: {{customer_phone}}</p>
+                        <p>Email: {{customer_email}}</p>
+                    </div>
+                </div>
+                <div class="customer-section">
+                    <h3>To be dispatched to:</h3>
+                    <div class="customer-details">
+                        <p><strong>{{customer_name}}</strong></p>
+                        <p>{{customer_address_street}}</p>
+                        <p>{{customer_address_city}}, {{customer_address_state}} - {{customer_address_pincode}}</p>
+                        <p>Mobile No.: {{customer_phone}}</p>
+                        <p>Email: {{customer_email}}</p>
+                    </div>
+                </div>
+            </div>
+            <div class="order-info-right">
+                <table>
+                    <tr>
+                        <td>S.O. No.</td>
+                        <td>{{so_number}}</td>
+                    </tr>
+                    <tr>
+                        <td>Date</td>
+                        <td>{{order_date}}</td>
+                    </tr>
+                    <tr>
+                        <td>Mode of Payment</td>
+                        <td>
+                            1) 50% advance on placing Sale Order<br>
+                            2) Balance: upon intimation of product readiness, before dispatch<br>
+                            3)
+                        </td>
+                    </tr>
+                    <tr>
+                        <td>Date of Delivery</td>
+                        <td>{{delivery_date}}</td>
+                    </tr>
+                    <tr>
+                        <td>Despatch through</td>
+                        <td>{{dispatch_through}}</td>
+                    </tr>
+                    <tr>
+                        <td>Estre GST</td>
+                        <td>{{estre_gst}}</td>
+                    </tr>
+                    <tr>
+                        <td>Buyer GST</td>
+                        <td>{{buyer_gst}}</td>
+                    </tr>
+                </table>
+            </div>
+        </div>
+
+        {{#each products}}
+        <div class="product-section">
+            <h2>{{category}}</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Sl No.</th>
+                        <th>Description of the product</th>
+                        <th>Amount (Rs.)</th>
+                        <th>Amount (Rs.)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>1</td>
+                        <td>
+                            <strong>{{category}} {{model}}</strong><br>
+                            {{#if sofa_type}}{{sofa_type}}<br>{{/if}}
+                            <br>
+                            <strong>No. of Seats</strong><br>
+                            {{#if no_of_seats.front}}Front: {{no_of_seats.front}}<br>{{/if}}
+                            {{#if no_of_seats.front_left}}Front-Left: {{no_of_seats.front_left}}<br>{{/if}}
+                            {{#if no_of_seats.left}}Left: {{no_of_seats.left}}<br>{{/if}}
+                            {{#if no_of_seats.front_right}}Front-Right: {{no_of_seats.front_right}}<br>{{/if}}
+                            {{#if no_of_seats.right}}Right: {{no_of_seats.right}}<br>{{/if}}
+                            <br>
+                            Reference image<br>
+                            <br>
+                            <strong>Additional customisations:</strong><br>
+                            {{#if consoles}}
+                            No. of Consoles: {{consoles.count}} Nos.<br>
+                            Console Size: {{consoles.size}}<br>
+                            Console positioning<br>
+                            {{#each consoles.positioning}}
+                            <span class="indent">{{console}}: {{position}}<br></span>
+                            {{/each}}
+                            {{/if}}
+                            {{#if lounger}}
+                            <br>
+                            No. of Loungers: {{lounger.count}} No.<br>
+                            Lounger Size: {{lounger.size}}<br>
+                            Lounger positioning: {{lounger.positioning}}<br>
+                            {{/if}}
+                            {{#if recliner}}
+                            <br>
+                            Recliner required: Yes<br>
+                            Recliner positioning: {{recliner.positioning}}<br>
+                            {{/if}}
+                            {{#if pillows}}
+                            <br>
+                            Additional Pillows required: {{pillows.count}} Nos.<br>
+                            Pillow type: {{pillows.type}}<br>
+                            Pillow size: {{pillows.size}}<br>
+                            Pillow colour option: {{pillows.colour_option}}<br>
+                            {{/if}}
+                            <br>
+                            <strong>Fabric selected:</strong> {{fabric.selection}}<br>
+                            {{#if fabric.structure}}<span class="indent">{{fabric.structure}}: Structure<br></span>{{/if}}
+                            {{#if fabric.back_rest_cushion}}<span class="indent">{{fabric.back_rest_cushion}}: Back Rest/Cushion<br></span>{{/if}}
+                            {{#if fabric.seat}}<span class="indent">{{fabric.seat}}: Seat<br></span>{{/if}}
+                            {{#if fabric.headrest}}<span class="indent">{{fabric.headrest}}: Headrest<br></span>{{/if}}
+                            {{#if fabric.pillow_colours}}
+                            Pillow Colours<br>
+                            {{#each fabric.pillow_colours}}
+                            <span class="indent">{{this}} Single Color/Colour 1<br></span>
+                            {{/each}}
+                            {{/if}}
+                            colours may vary +/-3% as indicated by supplier<br>
+                            <br>
+                            Fabric upgrade Charges<br>
+                            <br>
+                            <strong>Foam type selected:</strong> {{foam.type}}<br>
+                            Foam upgrade Charges<br>
+                            <br>
+                            <strong>Seat Depth:</strong> {{seat_dimensions.depth}}<br>
+                            <strong>Seat Width:</strong> {{seat_dimensions.width}}<br>
+                            <strong>Seat Height:</strong> {{seat_dimensions.height}}<br>
+                            <br>
+                            <strong>Armrest type:</strong> {{armrest.type}}<br>
+                            <br>
+                            <strong>Legs:</strong> {{legs.type}}<br>
+                            <br>
+                            <strong>Accessories:</strong><br>
+                            {{#each accessories.items}}
+                            <span class="indent">{{position}} {{location}}<br></span>
+                            {{/each}}
+                            <br>
+                            <strong>Wood type:</strong> {{wood_type}}<br>
+                            <br>
+                            <strong>Stitch type:</strong> {{stitch_type}}<br>
+                            <br>
+                            Approximate width (+/- 5%) {{#if sofa_dimensions}}Front sofa{{else}}sofabed{{/if}}: {{approximate_width}}
+                        </td>
+                        <td>{{base_price}}</td>
+                        <td>{{base_price}}</td>
+                    </tr>
+                    {{#if consoles}}
+                    <tr>
+                        <td></td>
+                        <td class="indent">No. of Consoles: {{consoles.count}} Nos.</td>
+                        <td></td>
+                        <td>{{consoles.total_cost}}</td>
+                    </tr>
+                    {{/if}}
+                    {{#if lounger}}
+                    <tr>
+                        <td></td>
+                        <td class="indent">No. of Loungers: {{lounger.count}} No.</td>
+                        <td></td>
+                        <td>{{lounger.cost}}</td>
+                    </tr>
+                    {{/if}}
+                    {{#if recliner}}
+                    <tr>
+                        <td></td>
+                        <td class="indent">Recliner required: Yes</td>
+                        <td></td>
+                        <td>{{recliner.cost}}</td>
+                    </tr>
+                    {{/if}}
+                    {{#if fabric.upgrade_charges}}
+                    <tr>
+                        <td></td>
+                        <td class="indent">Fabric upgrade Charges</td>
+                        <td></td>
+                        <td>{{fabric.upgrade_charges}}</td>
+                    </tr>
+                    {{/if}}
+                    {{#if foam.upgrade_charges}}
+                    <tr>
+                        <td></td>
+                        <td class="indent">Foam upgrade Charges</td>
+                        <td></td>
+                        <td>{{foam.upgrade_charges}}</td>
+                    </tr>
+                    {{/if}}
+                    {{#if seat_dimensions.depth_cost}}
+                    <tr>
+                        <td></td>
+                        <td class="indent">Seat Depth: {{seat_dimensions.depth}}</td>
+                        <td></td>
+                        <td>{{seat_dimensions.depth_cost}}</td>
+                    </tr>
+                    {{/if}}
+                    {{#if seat_dimensions.width_cost}}
+                    <tr>
+                        <td></td>
+                        <td class="indent">Seat Width: {{seat_dimensions.width}}</td>
+                        <td></td>
+                        <td>{{seat_dimensions.width_cost}}</td>
+                    </tr>
+                    {{/if}}
+                    <tr class="total-row">
+                        <td></td>
+                        <td><strong>Total Cost</strong></td>
+                        <td></td>
+                        <td><strong>{{subtotal}}</strong></td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+        {{/each}}
+
+        <div class="footer">
+            <p>Thank you for your order!</p>
+        </div>
+    </div>
+</body>
+</html>
+

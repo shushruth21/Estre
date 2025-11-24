@@ -39,6 +39,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Link } from "react-router-dom";
 import { calculateDynamicPrice } from "@/lib/dynamic-pricing";
 import { generateJobCardData } from "@/lib/job-card-generator";
+import { generateTechnicalSpecifications } from "@/lib/technical-specifications-generator";
 
 const AdminJobCards = () => {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -178,6 +179,13 @@ const AdminJobCards = () => {
         },
       });
 
+      // Generate technical specifications (NO pricing)
+      const technicalSpecs = generateTechnicalSpecifications(
+        orderItem,
+        orderItem.configuration,
+        generatedJobCard
+      );
+
       const jobCardInsert = {
         job_card_number: generatedJobCard.jobCardNumber,
         so_number: generatedJobCard.soNumber,
@@ -189,15 +197,17 @@ const AdminJobCards = () => {
         customer_email: generatedJobCard.customer.email,
         delivery_address: generatedJobCard.customer.address as any,
         product_category: generatedJobCard.category,
+        product_type: technicalSpecs.sofa_type || technicalSpecs.product_type,
         product_title: generatedJobCard.modelName,
         configuration: generatedJobCard.configuration as any,
+        technical_specifications: technicalSpecs,
         fabric_codes: generatedJobCard.fabricPlan.fabricCodes as any,
         fabric_meters: JSON.parse(JSON.stringify(generatedJobCard.fabricPlan)),
         accessories: JSON.parse(JSON.stringify({
           console: generatedJobCard.console,
           dummySeats: generatedJobCard.dummySeats,
           sections: generatedJobCard.sections,
-          pricing: generatedJobCard.pricing,
+          // NO pricing in accessories
         })),
         dimensions: JSON.parse(JSON.stringify(generatedJobCard.dimensions)),
         calculated_dimensions: JSON.parse(JSON.stringify({
