@@ -44,6 +44,7 @@ const StaffDashboard = lazy(() => import("./pages/staff/StaffDashboard"));
 const StaffOrders = lazy(() => import("./pages/staff/StaffOrders"));
 const StaffSaleOrders = lazy(() => import("./pages/staff/StaffSaleOrders"));
 const StaffSaleOrderDetail = lazy(() => import("./pages/staff/StaffSaleOrderDetail"));
+const StaffOrderDetail = lazy(() => import("./pages/staff/StaffOrderDetail"));
 const StaffJobCards = lazy(() => import("./pages/staff/StaffJobCards"));
 const StaffJobCardDetail = lazy(() => import("./pages/staff/StaffJobCardDetail"));
 
@@ -70,203 +71,210 @@ const queryClient = new QueryClient({
 
 const App = () => (
   <ErrorBoundary>
-  <ThemeProvider attribute="class" defaultTheme="light" enableSystem>
-    <QueryClientProvider client={queryClient}>
-      <AuthProvider>
-        <TooltipProvider>
-          <Toaster />
-          <Sonner />
-          <BrowserRouter
-            future={{
-              v7_startTransition: true,
-              v7_relativeSplatPath: true,
-            }}
-          >
-            <ErrorBoundary>
-          <Routes>
-          <Route path="/" element={<Index />} />
-          <Route path="/products" element={
-            <Suspense fallback={<LoadingSpinner />}>
-              <Products />
-            </Suspense>
-          } />
-          <Route path="/configure/:category/:productId" element={
-            <Suspense fallback={<LoadingSpinner />}>
-              <Configure />
-            </Suspense>
-          } />
-          <Route path="/cart" element={
-            <Suspense fallback={<LoadingSpinner />}>
-              <Cart />
-            </Suspense>
-          } />
-          <Route path="/checkout" element={
-            <Suspense fallback={<LoadingSpinner />}>
-              <ProtectedRoute requiredRole="customer">
-                <Checkout />
-              </ProtectedRoute>
-            </Suspense>
-          } />
-          <Route path="/orders" element={
-            <Suspense fallback={<LoadingSpinner />}>
-              <ProtectedRoute requiredRole="customer">
-                <Orders />
-              </ProtectedRoute>
-            </Suspense>
-          } />
-          <Route path="/sale-order/:orderId" element={
-            <Suspense fallback={<LoadingSpinner />}>
-              <ProtectedRoute requiredRole="staff">
-                <SaleOrder />
-              </ProtectedRoute>
-            </Suspense>
-          } />
-          <Route path="/sale-order/:orderId/:itemId" element={
-            <Suspense fallback={<LoadingSpinner />}>
-              <ProtectedRoute requiredRole="staff">
-                <SaleOrder />
-              </ProtectedRoute>
-            </Suspense>
-          } />
-          <Route path="/login" element={<Login />} />
-          <Route path="/signup" element={<Signup />} />
-          <Route path="/forgot-password" element={<ForgotPassword />} />
-          <Route path="/reset-password" element={<ResetPassword />} />
-          <Route path="/dashboard" element={
-            <Suspense fallback={<LoadingSpinner />}>
-              <ProtectedRoute requiredRole="customer">
-                <Dashboard />
-              </ProtectedRoute>
-            </Suspense>
-          } />
-          <Route path="/orders/:id" element={
-            <Suspense fallback={<LoadingSpinner />}>
-              <ProtectedRoute requiredRole="customer">
-                <OrderDetail />
-              </ProtectedRoute>
-            </Suspense>
-          } />
-          <Route path="/order-confirmation/:saleOrderId" element={
-            <Suspense fallback={<LoadingSpinner />}>
-              <ProtectedRoute requiredRole="customer">
-                <OrderConfirmation />
-              </ProtectedRoute>
-            </Suspense>
-          } />
-          
-          {/* Admin Routes - Protected */}
-          <Route path="/admin/dashboard" element={
-            <Suspense fallback={<LoadingSpinner />}>
-              <ProtectedRoute requiredRole="admin">
-                <AdminDashboard />
-              </ProtectedRoute>
-            </Suspense>
-          } />
-          <Route path="/admin/products" element={
-            <Suspense fallback={<LoadingSpinner />}>
-              <ProtectedRoute requiredRole="admin">
-                <AdminProducts />
-              </ProtectedRoute>
-            </Suspense>
-          } />
-          <Route path="/admin/dropdowns" element={
-            <Suspense fallback={<LoadingSpinner />}>
-              <ProtectedRoute requiredRole="admin">
-                <AdminDropdowns />
-              </ProtectedRoute>
-            </Suspense>
-          } />
-          <Route path="/admin/job-cards" element={
-            <Suspense fallback={<LoadingSpinner />}>
-              <ProtectedRoute requiredRole="admin">
-                <AdminJobCards />
-              </ProtectedRoute>
-            </Suspense>
-          } />
-          <Route path="/admin/orders" element={
-            <Suspense fallback={<LoadingSpinner />}>
-              <ProtectedRoute requiredRole="admin">
-                <AdminOrders />
-              </ProtectedRoute>
-            </Suspense>
-          } />
-          <Route path="/admin/users" element={
-            <Suspense fallback={<LoadingSpinner />}>
-              <ProtectedRoute requiredRole="admin">
-                <AdminUsers />
-              </ProtectedRoute>
-            </Suspense>
-          } />
-          <Route path="/admin/discount-codes" element={
-            <Suspense fallback={<LoadingSpinner />}>
-              <ProtectedRoute requiredRole="admin">
-                <AdminDiscountCodes />
-              </ProtectedRoute>
-            </Suspense>
-          } />
-          <Route path="/admin/settings" element={
-            <Suspense fallback={<LoadingSpinner />}>
-              <ProtectedRoute requiredRole="admin">
-                <AdminSettings />
-              </ProtectedRoute>
-            </Suspense>
-          } />
-          
-          {/* Staff Routes - Protected */}
-          <Route path="/staff/dashboard" element={
-            <Suspense fallback={<LoadingSpinner />}>
-              <ProtectedRoute requiredRole="staff">
-                <StaffDashboard />
-              </ProtectedRoute>
-            </Suspense>
-          } />
-          <Route path="/staff/orders" element={
-            <Suspense fallback={<LoadingSpinner />}>
-              <ProtectedRoute requiredRole="staff">
-                <StaffOrders />
-              </ProtectedRoute>
-            </Suspense>
-          } />
-          <Route path="/staff/sale-orders" element={
-            <Suspense fallback={<LoadingSpinner />}>
-              <ProtectedRoute requiredRole="staff">
-                <StaffSaleOrders />
-              </ProtectedRoute>
-            </Suspense>
-          } />
-          <Route path="/staff/sale-orders/:id" element={
-            <Suspense fallback={<LoadingSpinner />}>
-              <ProtectedRoute requiredRole="staff">
-                <StaffSaleOrderDetail />
-              </ProtectedRoute>
-            </Suspense>
-          } />
-          <Route path="/staff/job-cards" element={
-            <Suspense fallback={<LoadingSpinner />}>
-              <ProtectedRoute requiredRole="staff">
-                <StaffJobCards />
-              </ProtectedRoute>
-            </Suspense>
-          } />
-          <Route path="/staff/job-cards/:id" element={
-            <Suspense fallback={<LoadingSpinner />}>
-              <ProtectedRoute requiredRole="staff">
-                <StaffJobCardDetail />
-              </ProtectedRoute>
-            </Suspense>
-          } />
-          
-          {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-          <Route path="*" element={<NotFound />} />
-        </Routes>
-        {/* Floating CTA - only on customer-facing pages */}
-        <FloatingCTA />
-          </ErrorBoundary>
-      </BrowserRouter>
-        </TooltipProvider>
-      </AuthProvider>
-    </QueryClientProvider>
-  </ThemeProvider>
+    <ThemeProvider attribute="class" defaultTheme="light" enableSystem>
+      <QueryClientProvider client={queryClient}>
+        <AuthProvider>
+          <TooltipProvider>
+            <Toaster />
+            <Sonner />
+            <BrowserRouter
+              future={{
+                v7_startTransition: true,
+                v7_relativeSplatPath: true,
+              }}
+            >
+              <ErrorBoundary>
+                <Routes>
+                  <Route path="/" element={<Index />} />
+                  <Route path="/products" element={
+                    <Suspense fallback={<LoadingSpinner />}>
+                      <Products />
+                    </Suspense>
+                  } />
+                  <Route path="/configure/:category/:productId" element={
+                    <Suspense fallback={<LoadingSpinner />}>
+                      <Configure />
+                    </Suspense>
+                  } />
+                  <Route path="/cart" element={
+                    <Suspense fallback={<LoadingSpinner />}>
+                      <Cart />
+                    </Suspense>
+                  } />
+                  <Route path="/checkout" element={
+                    <Suspense fallback={<LoadingSpinner />}>
+                      <ProtectedRoute requiredRole="customer">
+                        <Checkout />
+                      </ProtectedRoute>
+                    </Suspense>
+                  } />
+                  <Route path="/orders" element={
+                    <Suspense fallback={<LoadingSpinner />}>
+                      <ProtectedRoute requiredRole="customer">
+                        <Orders />
+                      </ProtectedRoute>
+                    </Suspense>
+                  } />
+                  <Route path="/sale-order/:orderId" element={
+                    <Suspense fallback={<LoadingSpinner />}>
+                      <ProtectedRoute requiredRole="staff">
+                        <SaleOrder />
+                      </ProtectedRoute>
+                    </Suspense>
+                  } />
+                  <Route path="/sale-order/:orderId/:itemId" element={
+                    <Suspense fallback={<LoadingSpinner />}>
+                      <ProtectedRoute requiredRole="staff">
+                        <SaleOrder />
+                      </ProtectedRoute>
+                    </Suspense>
+                  } />
+                  <Route path="/login" element={<Login />} />
+                  <Route path="/signup" element={<Signup />} />
+                  <Route path="/forgot-password" element={<ForgotPassword />} />
+                  <Route path="/reset-password" element={<ResetPassword />} />
+                  <Route path="/dashboard" element={
+                    <Suspense fallback={<LoadingSpinner />}>
+                      <ProtectedRoute requiredRole="customer">
+                        <Dashboard />
+                      </ProtectedRoute>
+                    </Suspense>
+                  } />
+                  <Route path="/orders/:id" element={
+                    <Suspense fallback={<LoadingSpinner />}>
+                      <ProtectedRoute requiredRole="customer">
+                        <OrderDetail />
+                      </ProtectedRoute>
+                    </Suspense>
+                  } />
+                  <Route path="/order-confirmation/:saleOrderId" element={
+                    <Suspense fallback={<LoadingSpinner />}>
+                      <ProtectedRoute requiredRole="customer">
+                        <OrderConfirmation />
+                      </ProtectedRoute>
+                    </Suspense>
+                  } />
+
+                  {/* Admin Routes - Protected */}
+                  <Route path="/admin/dashboard" element={
+                    <Suspense fallback={<LoadingSpinner />}>
+                      <ProtectedRoute requiredRole="admin">
+                        <AdminDashboard />
+                      </ProtectedRoute>
+                    </Suspense>
+                  } />
+                  <Route path="/admin/products" element={
+                    <Suspense fallback={<LoadingSpinner />}>
+                      <ProtectedRoute requiredRole="admin">
+                        <AdminProducts />
+                      </ProtectedRoute>
+                    </Suspense>
+                  } />
+                  <Route path="/admin/dropdowns" element={
+                    <Suspense fallback={<LoadingSpinner />}>
+                      <ProtectedRoute requiredRole="admin">
+                        <AdminDropdowns />
+                      </ProtectedRoute>
+                    </Suspense>
+                  } />
+                  <Route path="/admin/job-cards" element={
+                    <Suspense fallback={<LoadingSpinner />}>
+                      <ProtectedRoute requiredRole="admin">
+                        <AdminJobCards />
+                      </ProtectedRoute>
+                    </Suspense>
+                  } />
+                  <Route path="/admin/orders" element={
+                    <Suspense fallback={<LoadingSpinner />}>
+                      <ProtectedRoute requiredRole="admin">
+                        <AdminOrders />
+                      </ProtectedRoute>
+                    </Suspense>
+                  } />
+                  <Route path="/admin/users" element={
+                    <Suspense fallback={<LoadingSpinner />}>
+                      <ProtectedRoute requiredRole="admin">
+                        <AdminUsers />
+                      </ProtectedRoute>
+                    </Suspense>
+                  } />
+                  <Route path="/admin/discount-codes" element={
+                    <Suspense fallback={<LoadingSpinner />}>
+                      <ProtectedRoute requiredRole="admin">
+                        <AdminDiscountCodes />
+                      </ProtectedRoute>
+                    </Suspense>
+                  } />
+                  <Route path="/admin/settings" element={
+                    <Suspense fallback={<LoadingSpinner />}>
+                      <ProtectedRoute requiredRole="admin">
+                        <AdminSettings />
+                      </ProtectedRoute>
+                    </Suspense>
+                  } />
+
+                  {/* Staff Routes - Protected */}
+                  <Route path="/staff/dashboard" element={
+                    <Suspense fallback={<LoadingSpinner />}>
+                      <ProtectedRoute requiredRole="staff">
+                        <StaffDashboard />
+                      </ProtectedRoute>
+                    </Suspense>
+                  } />
+                  <Route path="/staff/orders" element={
+                    <Suspense fallback={<LoadingSpinner />}>
+                      <ProtectedRoute requiredRole="staff">
+                        <StaffOrders />
+                      </ProtectedRoute>
+                    </Suspense>
+                  } />
+                  <Route path="/staff/orders/:id" element={
+                    <Suspense fallback={<LoadingSpinner />}>
+                      <ProtectedRoute requiredRole="staff">
+                        <StaffOrderDetail />
+                      </ProtectedRoute>
+                    </Suspense>
+                  } />
+                  <Route path="/staff/sale-orders" element={
+                    <Suspense fallback={<LoadingSpinner />}>
+                      <ProtectedRoute requiredRole="staff">
+                        <StaffSaleOrders />
+                      </ProtectedRoute>
+                    </Suspense>
+                  } />
+                  <Route path="/staff/sale-orders/:id" element={
+                    <Suspense fallback={<LoadingSpinner />}>
+                      <ProtectedRoute requiredRole="staff">
+                        <StaffSaleOrderDetail />
+                      </ProtectedRoute>
+                    </Suspense>
+                  } />
+                  <Route path="/staff/job-cards" element={
+                    <Suspense fallback={<LoadingSpinner />}>
+                      <ProtectedRoute requiredRole="staff">
+                        <StaffJobCards />
+                      </ProtectedRoute>
+                    </Suspense>
+                  } />
+                  <Route path="/staff/job-cards/:id" element={
+                    <Suspense fallback={<LoadingSpinner />}>
+                      <ProtectedRoute requiredRole="staff">
+                        <StaffJobCardDetail />
+                      </ProtectedRoute>
+                    </Suspense>
+                  } />
+
+                  {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+                  <Route path="*" element={<NotFound />} />
+                </Routes>
+                {/* Floating CTA - only on customer-facing pages */}
+                <FloatingCTA />
+              </ErrorBoundary>
+            </BrowserRouter>
+          </TooltipProvider>
+        </AuthProvider>
+      </QueryClientProvider>
+    </ThemeProvider>
   </ErrorBoundary>
 );
 

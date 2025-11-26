@@ -22,6 +22,11 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 // Import HTML template generator
 import { generateSaleOrderHTML } from "../_shared/htmlTemplates.ts";
 
+// Import premium templates
+import { generatePremiumSaleOrderHTML } from "../_shared/premiumSaleOrderTemplate.ts";
+import { mapSaleOrderData } from "../_shared/mapSaleOrderData.ts";
+import { browserlessPdf } from "../_shared/browserlessPdf.ts";
+
 // Import email template
 import { saleOrderApprovedEmailHTML } from "../_shared/emailTemplates.ts";
 
@@ -67,7 +72,15 @@ serve(async (req) => {
         *,
         order:orders(
           *,
-          order_items:order_items(*)
+          order_items:order_items(
+            id,
+            quantity,
+            unit_price_rs,
+            total_price_rs,
+            product_title,
+            product_category,
+            configuration
+          )
         )
       `)
       .eq("id", saleOrderId)
@@ -92,7 +105,7 @@ serve(async (req) => {
     // Prepare template data
     const order = saleOrder.order || {};
     const customerAddress = saleOrder.customer_address || order.delivery_address || {};
-    
+
     const templateData = {
       so_number: saleOrder.order_number || `SO-${saleOrder.id.slice(0, 8)}`,
       order_date: new Date(saleOrder.created_at).toLocaleDateString("en-IN", {
@@ -118,8 +131,19 @@ serve(async (req) => {
       pricing_breakdown: pricingBreakdown,
     };
 
-    // Generate HTML
-    const htmlContent = generateSaleOrderHTML(templateData);
+    let htmlContent: string;
+
+    // Generate HTML from premium template
+    try {
+      // Use new premium template system
+      const premiumTemplateData = mapSaleOrderData(saleOrder);
+      htmlContent = generatePremiumSaleOrderHTML(premiumTemplateData);
+      console.log("✅ Premium template generated successfully");
+    } catch (premiumError) {
+      console.warn("⚠️ Premium template failed, falling back to legacy:", premiumError);
+      // Fallback to old template if premium fails
+      htmlContent = generateSaleOrderHTML(templateData);
+    }
 
     // Convert HTML to PDF using PDFGeneratorAPI (primary) or Browserless API (fallback)
     const pdfGeneratorApiKey = Deno.env.get("PDF_GENERATOR_API_KEY");
@@ -156,7 +180,7 @@ serve(async (req) => {
         const result = await pdfResponse.json();
         // Handle different response formats from PDFGeneratorAPI
         const base64Data = result.response || result.data || result.pdf || result.body;
-        
+
         if (!base64Data) {
           console.error("PDFGeneratorAPI response:", result);
           throw new Error("PDFGeneratorAPI response missing PDF data. Check API response format.");
@@ -219,10 +243,10 @@ serve(async (req) => {
     const finalPdfBytes: Uint8Array = pdfBytes;
 
     // Upload to Supabase Storage - different paths for draft vs final
-    const fileName = mode === "draft" 
+    const fileName = mode === "draft"
       ? `sale-orders/draft/${saleOrderId}.pdf`
       : `sale-orders/final/${saleOrderId}.pdf`;
-    
+
     const { data: uploadData, error: uploadError } = await supabase.storage
       .from("documents")
       .upload(fileName, finalPdfBytes, {

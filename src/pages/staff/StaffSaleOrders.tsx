@@ -97,7 +97,15 @@ export default function StaffSaleOrders() {
             delivery_address,
             expected_delivery_date,
             special_instructions,
-            order_items:order_items(*)
+            order_items:order_items(
+              id,
+              quantity,
+              unit_price_rs,
+              total_price_rs,
+              product_title,
+              product_category,
+              configuration
+            )
           )
         `)
         .eq("status", "pending_review")

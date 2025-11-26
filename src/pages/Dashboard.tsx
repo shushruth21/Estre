@@ -77,33 +77,60 @@ const Dashboard = () => {
       let saleOrdersByOrder: Record<string, any> = {};
 
       if (orderIds.length > 0) {
+        // Ensure all orderIds are strings (UUIDs)
+        const validOrderIds = orderIds.filter(id => id && typeof id === 'string').map(id => String(id));
+        
+        if (validOrderIds.length === 0) {
+          // If no valid IDs, skip the queries
+          return {
+            orders: orders || [],
+            jobCardsByOrder: {},
+            timelineByOrder: {},
+            saleOrdersByOrder: {},
+          };
+        }
+
         // Add timeout to job cards, timeline, and sale orders queries (5 seconds each)
         const jobCardsPromise = supabase
           .from("job_cards")
           .select(
             "id, order_id, order_item_id, job_card_number, status, priority, product_title, product_category, created_at, updated_at, fabric_meters, accessories, dimensions"
           )
-          .in("order_id", orderIds);
+          .in("order_id", validOrderIds);
 
         const timelinePromise = supabase
           .from("order_timeline")
           .select("id, order_id, status, title, description, created_at")
-          .in("order_id", orderIds)
+          .in("order_id", validOrderIds)
           .order("created_at", { ascending: false });
 
-        const saleOrdersPromise = supabase
-          .from("sale_orders")
-          .select("id, order_id, final_pdf_url, draft_pdf_url, pdf_url, status")
-          .in("order_id", orderIds);
+        // Handle sale_orders query separately with better error handling
+        // The .in() method can sometimes fail with UUID arrays, so we'll catch errors gracefully
+        let saleOrdersResult: { data: any[] | null; error: any } = { data: null, error: null };
+        try {
+          const saleOrdersResponse = await supabase
+            .from("sale_orders")
+            .select("id, order_id, final_pdf_url, draft_pdf_url, pdf_url, status")
+            .in("order_id", validOrderIds);
+          saleOrdersResult = saleOrdersResponse;
+        } catch (saleOrdersError: any) {
+          if (import.meta.env.DEV) {
+            console.warn("Error fetching sale orders (non-critical):", saleOrdersError);
+          }
+          // Continue without sale orders data - this is non-critical
+          saleOrdersResult = { data: [], error: saleOrdersError };
+        }
 
         const timeoutPromise = new Promise<never>((_, reject) =>
           setTimeout(() => reject(new Error("Related data fetch timeout")), 5000)
         );
 
-        const [{ data: jobCards }, { data: timeline }, { data: saleOrders }] = await Promise.race([
-          Promise.all([jobCardsPromise, timelinePromise, saleOrdersPromise]),
-          timeoutPromise.then(() => [{ data: null, error: null }, { data: null, error: null }, { data: null, error: null }] as any)
-        ]).catch(() => [{ data: null, error: null }, { data: null, error: null }, { data: null, error: null }] as any);
+        const [{ data: jobCards }, { data: timeline }] = await Promise.race([
+          Promise.all([jobCardsPromise, timelinePromise]),
+          timeoutPromise.then(() => [{ data: null, error: null }, { data: null, error: null }] as any)
+        ]).catch(() => [{ data: null, error: null }, { data: null, error: null }] as any);
+
+        const saleOrders = saleOrdersResult.data;
 
         jobCardsByOrder =
           jobCards?.reduce((acc: Record<string, any[]>, card) => {

@@ -22,10 +22,14 @@ import {
   ClipboardList,
   FileText,
   Shield,
+  Download,
+  Printer,
+  Eye,
 } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { QCInspectionForm } from "@/components/staff/QCInspectionForm";
+import { JobCardDocument } from "@/components/orders/JobCardDocument";
 
 export default function StaffJobCardDetail() {
   const { id } = useParams();
@@ -39,6 +43,8 @@ export default function StaffJobCardDetail() {
   const [qualityInspection, setQualityInspection] = useState<any>(null);
   const [staffNotes, setStaffNotes] = useState("");
   const [loading, setLoading] = useState(true);
+  const [showPDFPreview, setShowPDFPreview] = useState(false);
+  const [editableAdminNotes, setEditableAdminNotes] = useState("");
 
   useEffect(() => {
     fetchJobCard();
@@ -69,6 +75,7 @@ export default function StaffJobCardDetail() {
 
     setJobCard(data);
     setStaffNotes(data.staff_notes || "");
+    setEditableAdminNotes(data.admin_notes || "");
 
     if (data.order_id) {
       const { data: orderData } = await supabase
@@ -135,11 +142,11 @@ export default function StaffJobCardDetail() {
     if (!id) return;
 
     const updates: any = { status: newStatus };
-    
+
     if (["fabric_cutting", "frame_assembly", "upholstery", "finishing"].includes(newStatus) && !jobCard.actual_start_date) {
       updates.actual_start_date = new Date().toISOString().split("T")[0];
     }
-    
+
     if (newStatus === "completed") {
       updates.actual_completion_date = new Date().toISOString().split("T")[0];
     }
@@ -175,11 +182,11 @@ export default function StaffJobCardDetail() {
 
   const updateTaskStatus = async (taskId: string, newStatus: string) => {
     const updates: any = { status: newStatus };
-    
+
     if (["in_progress"].includes(newStatus) && !tasks.find(t => t.id === taskId)?.started_at) {
       updates.started_at = new Date().toISOString();
     }
-    
+
     if (newStatus === "completed") {
       updates.completed_at = new Date().toISOString();
       updates.completed_by = user?.id;
@@ -613,6 +620,10 @@ export default function StaffJobCardDetail() {
         <Tabs defaultValue="production" className="space-y-4">
           <TabsList>
             <TabsTrigger value="production">Production Details</TabsTrigger>
+            <TabsTrigger value="pdf" className="flex items-center gap-2">
+              <FileText className="h-4 w-4" />
+              PDF Document
+            </TabsTrigger>
             <TabsTrigger value="quality" className="flex items-center gap-2">
               <Shield className="h-4 w-4" />
               Quality Control
@@ -640,6 +651,90 @@ export default function StaffJobCardDetail() {
                   rows={6}
                 />
                 <Button onClick={saveStaffNotes}>Save Notes</Button>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="pdf">
+            <Card>
+              <CardHeader>
+                <CardTitle>Job Card PDF Document</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {/* Editable Admin Notes Section */}
+                <div className="border rounded-lg p-4 bg-muted/50 print:hidden">
+                  <h4 className="font-semibold mb-2 flex items-center gap-2">
+                    <FileText className="h-4 w-4" />
+                    Assembly Instructions (Editable)
+                  </h4>
+                  <p className="text-sm text-muted-foreground mb-2">
+                    Edit the assembly instructions that will appear on the job card PDF.
+                  </p>
+                  <Textarea
+                    placeholder="Add assembly instructions, special notes, or requirements..."
+                    value={editableAdminNotes}
+                    onChange={(e) => setEditableAdminNotes(e.target.value)}
+                    rows={4}
+                    className="mb-2"
+                  />
+                  <Button
+                    size="sm"
+                    onClick={async () => {
+                      if (!id) return;
+                      const { error } = await supabase
+                        .from("job_cards")
+                        .update({ admin_notes: editableAdminNotes })
+                        .eq("id", id);
+
+                      if (error) {
+                        toast({
+                          title: "Error",
+                          description: "Failed to save assembly instructions",
+                          variant: "destructive",
+                        });
+                        return;
+                      }
+
+                      toast({
+                        title: "Success",
+                        description: "Assembly instructions saved",
+                      });
+                      fetchJobCard();
+                    }}
+                  >
+                    Save Instructions
+                  </Button>
+                </div>
+
+                <Separator />
+                {jobCard && (
+                  <JobCardDocument
+                    data={{
+                      job_card_number: jobCard.job_card_number,
+                      so_number: jobCard.so_number,
+                      order_number: jobCard.order_number,
+                      product_title: jobCard.product_title || lineItem?.product_title,
+                      product_category: jobCard.product_category || lineItem?.product_category,
+                      customer_name: jobCard.customer_name,
+                      customer_email: jobCard.customer_email,
+                      customer_phone: jobCard.customer_phone,
+                      quantity: jobCard.quantity,
+                      expected_completion_date: jobCard.expected_completion_date,
+                      created_at: jobCard.created_at,
+                      dimensions: jobCard.dimensions,
+                      fabric_meters: jobCard.fabric_meters,
+                      fabric_codes: jobCard.fabric_codes,
+                      accessories: jobCard.accessories,
+                      technical_specifications: jobCard.technical_specifications,
+                      admin_notes: editableAdminNotes,
+                    }}
+                  />
+                )}
+                {!jobCard && (
+                  <p className="text-muted-foreground text-center py-8">
+                    Loading job card data...
+                  </p>
+                )}
               </CardContent>
             </Card>
           </TabsContent>

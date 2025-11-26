@@ -58,7 +58,16 @@ const OrderDetail = () => {
       const { data, error } = await supabase
         .from("orders")
         .select(
-          "*, order_items(*, product:products(id, title, category, images)), discount_codes(code, label, percent)"
+          `*, order_items(
+            id,
+            quantity,
+            unit_price_rs,
+            total_price_rs,
+            product_title,
+            product_category,
+            configuration,
+            product:products(id, title, category, images)
+          ), discount_codes(code, label, percent)`
         )
         .eq("id", id)
         .eq("customer_id", user.id)

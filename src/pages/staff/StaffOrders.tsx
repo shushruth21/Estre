@@ -448,10 +448,10 @@ const StaffOrders = () => {
                               order.status === "delivered"
                                 ? "bg-green-500/10 text-green-600"
                                 : order.status === "shipped"
-                                ? "bg-blue-500/10 text-blue-600"
-                                : order.status === "production"
-                                ? "bg-orange-500/10 text-orange-600"
-                                : ""
+                                  ? "bg-blue-500/10 text-blue-600"
+                                  : order.status === "production"
+                                    ? "bg-orange-500/10 text-orange-600"
+                                    : ""
                             }
                           >
                             {order.status?.replace(/_/g, " ") || "PENDING"}
@@ -602,7 +602,7 @@ const StaffOrders = () => {
                                 </div>
                               </DialogContent>
                             </Dialog>
-                            <Link to={`/orders/${order.id}`}>
+                            <Link to={`/staff/orders/${order.id}`}>
                               <Button variant="ghost" size="sm">
                                 View Full
                               </Button>

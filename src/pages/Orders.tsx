@@ -27,7 +27,18 @@ const Orders = () => {
       if (!user) return [];
       const { data, error } = await supabase
         .from("orders")
-        .select("*, order_items(*)")
+        .select(`
+          *,
+          order_items(
+            id,
+            quantity,
+            unit_price_rs,
+            total_price_rs,
+            product_title,
+            product_category,
+            configuration
+          )
+        `)
         .eq("customer_id", user.id)
         .order("created_at", { ascending: false });
 

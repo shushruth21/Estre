@@ -1,0 +1,80 @@
+/* Print-friendly styles for Sale Order PDF generation */
+
+@media print {
+
+  /* Hide UI elements that shouldn't be in PDF */
+  .no-print,
+  button,
+  .button,
+  nav,
+  .navigation,
+  header nav,
+  .sidebar {
+    display: none !important;
+  }
+
+  /* Page setup for A4 */
+  @page {
+    size: A4 portrait;
+    margin: 15mm;
+  }
+
+  /* Body styling */
+  body {
+    background: white !important;
+    color: black !important;
+  }
+
+  /* Ensure card backgrounds print */
+  .card {
+    background: white !important;
+    border: 1px solid #ddd !important;
+    page-break-inside: avoid;
+  }
+
+  /* Page breaks */
+  .page-break-before {
+    page-break-before: always;
+  }
+
+  .page-break-after {
+    page-break-after: always;
+  }
+
+  .page-break-avoid {
+    page-break-inside: avoid;
+  }
+
+  /* Ensure accordions are expanded in print */
+  .accordion-content {
+    display: block !important;
+    height: auto !important;
+  }
+
+  /* Hide accordion toggles */
+  .accordion-trigger svg {
+    display: none;
+  }
+
+  /* Ensure tables print well */
+  table {
+    page-break-inside: avoid;
+  }
+
+  /* Remove shadows and fancy effects */
+  * {
+    box-shadow: none !important;
+    text-shadow: none !important;
+  }
+}
+
+/* Additional utility classes for print control */
+.print-only {
+  display: none;
+}
+
+@media print {
+  .print-only {
+    display: block;
+  }
+}

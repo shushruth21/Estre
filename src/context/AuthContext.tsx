@@ -75,62 +75,95 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Fetch user profile from profiles table (with timeout)
+  // Fetch user profile from profiles table (with improved timeout handling)
   const fetchProfile = async (userId: string) => {
+    let timeoutId: NodeJS.Timeout | null = null;
+    
     try {
-      // Add timeout to profile fetch (5 seconds)
+      // Create timeout promise (10 seconds - more reasonable for slow networks)
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        timeoutId = setTimeout(() => {
+          reject(new Error("Profile fetch timeout"));
+        }, 10000); // 10 seconds timeout
+      });
+
+      // Create profile fetch promise
       const profilePromise = supabase
         .from("profiles")
         .select("*")
         .eq("user_id", userId)
         .single();
 
-      const timeoutPromise = new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error("Profile fetch timeout")), 5000)
-      );
-
+      // Race between profile fetch and timeout
       const { data, error } = await Promise.race([profilePromise, timeoutPromise]);
+
+      // Clear timeout if we got here
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+        timeoutId = null;
+      }
 
       if (error) {
         // If profile doesn't exist, create one with customer role
         if (error.code === "PGRST116") {
-          const { data: newProfile, error: createError } = await supabase
-            .from("profiles")
-            .insert({
-              user_id: userId,
-              role: "customer",
-            })
-            .select()
-            .single();
+          try {
+            const { data: newProfile, error: createError } = await supabase
+              .from("profiles")
+              .insert({
+                user_id: userId,
+                role: "customer",
+              })
+              .select()
+              .single();
 
-          if (createError) {
-            if (import.meta.env.DEV) {
-              console.error("Error creating profile:", createError);
+            if (createError) {
+              if (import.meta.env.DEV) {
+                console.warn("Error creating profile:", createError);
+              }
+              // Don't set profile to null - allow app to work without profile
+              return;
             }
-            setProfile(null);
+
+            setProfile(newProfile as Profile);
+            return;
+          } catch (createErr) {
+            if (import.meta.env.DEV) {
+              console.warn("Error creating profile:", createErr);
+            }
             return;
           }
-
-          setProfile(newProfile as Profile);
-          return;
         }
 
+        // For other errors, log but don't break the app
         if (import.meta.env.DEV) {
-          console.error("Error fetching profile:", error);
+          console.warn("Error fetching profile:", error.message || error);
         }
-        setProfile(null);
+        // Don't set profile to null - keep existing state or allow app to work without profile
         return;
       }
 
       setProfile(data as Profile);
     } catch (error: any) {
+      // Clear timeout if still set
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
+      
+      // Handle timeout gracefully - don't break the app
+      if (error?.message?.includes("timeout")) {
+        if (import.meta.env.DEV) {
+          console.warn("Profile fetch timeout - continuing without profile. This is non-critical.");
+        }
+        // Don't throw - allow app to continue without profile
+        // The app should gracefully handle missing profile
+        return;
+      }
+      
+      // For other unexpected errors, log but don't break the app
       if (import.meta.env.DEV) {
-        console.error("Error in fetchProfile:", error);
+        console.warn("Error in fetchProfile:", error?.message || error);
       }
-      // Don't set profile to null on timeout - keep existing state
-      if (!error?.message?.includes("timeout")) {
-        setProfile(null);
-      }
+      // Don't set profile to null - allow app to work without profile
     }
   };
 

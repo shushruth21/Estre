@@ -50,21 +50,16 @@ export default function StaffJobCards() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  // Fetch all job cards (staff can see all, not just assigned)
+  // Fetch all job cards (staff can see all job cards)
   const { data: jobCards, isLoading } = useQuery({
     queryKey: ["staff-job-cards"],
     queryFn: async () => {
-      let query = supabase
+      const query = supabase
         .from("job_cards")
         .select(
           "*, order:orders(id, order_number, customer_name, customer_email, customer_phone, status, expected_delivery_date), order_item:order_items(id, product_title, product_category)"
         )
         .order("created_at", { ascending: false });
-
-      // If not admin, show only assigned job cards
-      if (!isAdmin()) {
-        query = query.eq("assigned_to", user?.id);
-      }
 
       const { data, error } = await query;
 
