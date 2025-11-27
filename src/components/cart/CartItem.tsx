@@ -19,7 +19,7 @@ export const CartItem = ({ item }: CartItemProps) => {
     mutationFn: async (newQuantity: number) => {
       const { error } = await supabase
         .from("customer_orders")
-        .update({ 
+        .update({
           quantity: newQuantity,
           calculated_price: (item.calculated_price / quantity) * newQuantity
         })
@@ -66,53 +66,54 @@ export const CartItem = ({ item }: CartItemProps) => {
   };
 
   return (
-    <Card>
+    <Card className="bg-white border border-gold/20 shadow-sm hover:shadow-md transition-all duration-300">
       <CardContent className="p-6">
-        <div className="flex items-start gap-4">
-          <div className="h-20 w-20 rounded-lg bg-muted flex items-center justify-center">
-            <Package className="h-8 w-8 text-muted-foreground" />
+        <div className="flex items-start gap-6">
+          <div className="h-24 w-24 rounded-lg bg-ivory border border-gold/10 flex items-center justify-center flex-shrink-0">
+            <Package className="h-10 w-10 text-gold/40" />
           </div>
-          
+
           <div className="flex-1">
-            <h3 className="font-semibold text-lg mb-1">
+            <h3 className="font-serif font-bold text-xl mb-1 text-walnut">
               {item.product_type?.toUpperCase()} Configuration
             </h3>
-            <p className="text-sm text-muted-foreground mb-3">
+            <p className="text-sm text-walnut/60 mb-4 font-sans">
               Product ID: {item.product_id}
             </p>
-            
-            <div className="flex items-center gap-4 flex-wrap">
-              <div className="flex items-center gap-2 border rounded-md">
+
+            <div className="flex items-center gap-6 flex-wrap">
+              <div className="flex items-center gap-3 border border-gold/20 rounded-md p-1 bg-ivory/50">
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="h-8 w-8"
+                  className="h-8 w-8 hover:bg-gold/10 hover:text-gold"
                   onClick={() => handleQuantityChange(quantity - 1)}
                   disabled={quantity <= 1 || updateQuantity.isPending}
                 >
-                  <Minus className="h-4 w-4" />
+                  <Minus className="h-3 w-3" />
                 </Button>
-                <span className="w-8 text-center font-medium">{quantity}</span>
+                <span className="w-8 text-center font-medium text-walnut">{quantity}</span>
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="h-8 w-8"
+                  className="h-8 w-8 hover:bg-gold/10 hover:text-gold"
                   onClick={() => handleQuantityChange(quantity + 1)}
                   disabled={updateQuantity.isPending}
                 >
-                  <Plus className="h-4 w-4" />
+                  <Plus className="h-3 w-3" />
                 </Button>
               </div>
-              
-              <div className="text-2xl font-bold text-primary">
+
+              <div className="text-2xl font-serif font-bold text-gold">
                 ₹{Math.round(item.calculated_price || 0).toLocaleString()}
               </div>
             </div>
-            
-            <div className="flex items-center gap-2 mt-3">
+
+            <div className="flex items-center gap-3 mt-4">
               <Button
                 variant="outline"
                 size="sm"
+                className="border-gold/20 text-walnut/80 hover:text-gold hover:border-gold hover:bg-gold/5"
                 onClick={() => saveForLater.mutate()}
                 disabled={saveForLater.isPending}
               >
@@ -129,13 +130,14 @@ export const CartItem = ({ item }: CartItemProps) => {
           <Button
             variant="ghost"
             size="icon"
+            className="text-walnut/40 hover:text-destructive hover:bg-destructive/5 transition-colors"
             onClick={() => deleteItem.mutate()}
             disabled={deleteItem.isPending}
           >
             {deleteItem.isPending ? (
               <Loader2 className="h-4 w-4 animate-spin" />
             ) : (
-              <Trash2 className="h-4 w-4 text-destructive" />
+              <Trash2 className="h-5 w-5" />
             )}
           </Button>
         </div>

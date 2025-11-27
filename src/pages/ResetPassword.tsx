@@ -156,7 +156,7 @@ const ResetPassword = () => {
               </Alert>
               <div className="mt-6 flex flex-col gap-3">
                 <Link to="/forgot-password" className="w-full">
-                  <Button className="w-full luxury-button bg-gradient-gold text-white">
+                  <Button variant="luxury" className="w-full">
                     Request New Reset Link
                   </Button>
                 </Link>
@@ -195,8 +195,8 @@ const ResetPassword = () => {
       <div className="flex-1 flex items-center justify-center p-4 bg-gradient-to-br from-background via-muted/20 to-background">
         <Card className="w-full max-w-md shadow-xl border-gold/20" id="main-content" role="main">
           <CardHeader className="space-y-2 text-center">
-            <div className="mx-auto w-16 h-16 rounded-full bg-gradient-gold flex items-center justify-center shadow-lg mb-2" aria-hidden="true">
-              <CheckCircle2 className="h-8 w-8 text-white" />
+            <div className="mx-auto w-16 h-16 rounded-full bg-gold/10 flex items-center justify-center shadow-sm mb-4 border border-gold/20" aria-hidden="true">
+              <span className="text-gold font-serif font-bold text-3xl">e</span>
             </div>
             <CardTitle className="text-3xl font-serif">Set New Password</CardTitle>
             <CardDescription className="text-base">
@@ -313,7 +313,8 @@ const ResetPassword = () => {
 
               <Button
                 type="submit"
-                className="w-full luxury-button bg-gradient-gold text-white border-gold hover:shadow-gold-glow transition-premium text-base py-6"
+                className="w-full py-6 text-base"
+                variant="luxury"
                 disabled={isLoading}
                 aria-label="Reset password"
               >

@@ -79,7 +79,7 @@ const Dashboard = () => {
       if (orderIds.length > 0) {
         // Ensure all orderIds are strings (UUIDs)
         const validOrderIds = orderIds.filter(id => id && typeof id === 'string').map(id => String(id));
-        
+
         if (validOrderIds.length === 0) {
           // If no valid IDs, skip the queries
           return {
@@ -170,7 +170,7 @@ const Dashboard = () => {
       });
     } catch (error: any) {
       console.error("Error fetching orders:", error);
-      
+
       // Always set loading to false, even on error
       setOrdersState({
         orders: [],
@@ -196,7 +196,7 @@ const Dashboard = () => {
     queryKey: ["customer-sale-orders", user?.id],
     queryFn: async () => {
       if (!user) return [];
-      
+
       try {
         const { data, error } = await supabase
           .from("sale_orders")
@@ -211,14 +211,14 @@ const Dashboard = () => {
           `)
           .eq("customer_id", user.id)
           .in("status", [
-            "pending_review", 
-            "staff_editing", 
-            "staff_pdf_generated", 
-            "staff_approved", 
-            "customer_confirmation_pending", 
-            "customer_confirmed", 
-            "payment_pending", 
-            "payment_completed", 
+            "pending_review",
+            "staff_editing",
+            "staff_pdf_generated",
+            "staff_approved",
+            "customer_confirmation_pending",
+            "customer_confirmed",
+            "payment_pending",
+            "payment_completed",
             "ready_for_production"
           ])
           .order("created_at", { ascending: false });
@@ -245,7 +245,7 @@ const Dashboard = () => {
       const checkRole = async () => {
         let attempts = 0;
         const maxAttempts = 5; // 5 attempts * 200ms = 1 second max
-        
+
         while (attempts < maxAttempts) {
           // Check if admin/staff role is available
           if (isAdmin()) {
@@ -258,7 +258,7 @@ const Dashboard = () => {
             navigate("/staff/dashboard", { replace: true });
             return;
           }
-          
+
           // Quick profile check (only if profile not loaded yet)
           if (attempts === 2 && !profile) {
             try {
@@ -267,7 +267,7 @@ const Dashboard = () => {
                 .select("role")
                 .eq("user_id", user.id)
                 .single();
-              
+
               if (directProfile?.role) {
                 const roleLower = directProfile.role.toLowerCase().trim();
                 if (roleLower === "admin" || roleLower === "super_admin") {
@@ -283,15 +283,15 @@ const Dashboard = () => {
               // Ignore errors - user is likely a customer
             }
           }
-          
+
           // Wait a bit and check again
           await new Promise(resolve => setTimeout(resolve, 200));
           attempts++;
         }
-        
+
         // If we get here, user is a customer - no redirect needed
       };
-      
+
       checkRole();
     }
   }, [authLoading, user, isAdmin, isStaff, navigate, profile]);
@@ -321,7 +321,7 @@ const Dashboard = () => {
 
   // Add timeout for authLoading (max 5 seconds)
   const [authLoadingTimeout, setAuthLoadingTimeout] = useState(false);
-  
+
   useEffect(() => {
     const timeout = setTimeout(() => {
       if (authLoading) {
@@ -394,7 +394,7 @@ const Dashboard = () => {
           <div className="space-y-4">
             <h2 className="text-2xl font-bold font-serif">Orders Needing Your Action</h2>
             {saleOrders.map((saleOrder: any) => (
-              <Card key={saleOrder.id} className="luxury-card-glass border-yellow-500/30 hover:border-yellow-500/50 transition-premium">
+              <Card key={saleOrder.id} className="bg-white/80 backdrop-blur-md border border-gold/20 shadow-sm hover:shadow-md transition-all duration-300">
                 <CardHeader>
                   <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                     <div>
@@ -408,14 +408,13 @@ const Dashboard = () => {
                           : "N/A"}
                       </p>
                     </div>
-                    <Badge 
-                      className={`uppercase tracking-wide ${
-                        saleOrder.status === 'confirmed_by_customer' || saleOrder.status === 'customer_confirmed' ? 'bg-green-500/10 text-green-600 border-green-500/30' :
+                    <Badge
+                      className={`uppercase tracking-wide ${saleOrder.status === 'confirmed_by_customer' || saleOrder.status === 'customer_confirmed' ? 'bg-green-500/10 text-green-600 border-green-500/30' :
                         saleOrder.status === 'staff_approved' ? 'bg-green-500/10 text-green-600 border-green-500/30' :
-                        saleOrder.status === 'awaiting_customer_otp' ? 'bg-yellow-500/10 text-yellow-600 border-yellow-500/30' :
-                        saleOrder.status === 'awaiting_customer_confirmation' ? 'bg-blue-500/10 text-blue-600 border-blue-500/30' :
-                        'bg-gray-500/10 text-gray-600 border-gray-500/30'
-                      }`}
+                          saleOrder.status === 'awaiting_customer_otp' ? 'bg-gold/10 text-gold border-gold/30' :
+                            saleOrder.status === 'awaiting_customer_confirmation' ? 'bg-blue-500/10 text-blue-600 border-blue-500/30' :
+                              'bg-gray-500/10 text-gray-600 border-gray-500/30'
+                        }`}
                     >
                       {saleOrder.status?.replace(/_/g, " ") || "PENDING"}
                     </Badge>
@@ -456,17 +455,17 @@ const Dashboard = () => {
                   {/* PDF Download Section - Show for ALL orders that have a PDF */}
                   {(saleOrder.final_pdf_url || saleOrder.draft_pdf_url || saleOrder.pdf_url) && (
                     <div className="flex gap-2">
-                      <Button 
+                      <Button
                         asChild
                         variant="default"
-                        className="flex-1 bg-gradient-gold text-white border-gold hover:shadow-gold-glow"
+                        className="flex-1 bg-gold text-walnut border-gold hover:bg-gold/90"
                       >
                         <a href={saleOrder.final_pdf_url || saleOrder.draft_pdf_url || saleOrder.pdf_url} target="_blank" rel="noopener noreferrer">
                           <Eye className="mr-2 h-4 w-4" />
                           View PDF
                         </a>
                       </Button>
-                      <Button 
+                      <Button
                         asChild
                         variant="outline"
                         className="flex-1"
@@ -486,8 +485,8 @@ const Dashboard = () => {
                         <CheckCircle2 className="h-5 w-5 text-blue-600 mt-0.5" />
                         <div className="flex-1">
                           <p className="font-semibold text-blue-600 mb-1">
-                            {saleOrder.status === "staff_pdf_generated" 
-                              ? "PDF Generated - Ready for Review" 
+                            {saleOrder.status === "staff_pdf_generated"
+                              ? "PDF Generated - Ready for Review"
                               : "Approved by Estre Staff"}
                           </p>
                           <p className="text-sm text-muted-foreground">
@@ -501,16 +500,16 @@ const Dashboard = () => {
                       {(saleOrder.status === "staff_approved" || saleOrder.status === "customer_confirmation_pending") && (
                         <>
                           {saleOrder.require_otp ? (
-                            <Button 
+                            <Button
                               onClick={() => navigate(`/order-confirmation/${saleOrder.id}`)}
-                              className="w-full bg-gradient-gold text-white border-gold hover:shadow-gold-glow transition-premium"
+                              className="w-full bg-gold text-walnut border-gold hover:bg-gold/90 transition-all duration-300 font-serif"
                               size="lg"
                             >
                               <CheckCircle2 className="mr-2 h-5 w-5" />
                               Enter OTP to Confirm Order
                             </Button>
                           ) : (
-                            <Button 
+                            <Button
                               onClick={async () => {
                                 // Confirm order without OTP
                                 const { error } = await supabase
@@ -520,7 +519,7 @@ const Dashboard = () => {
                                     updated_at: new Date().toISOString(),
                                   })
                                   .eq("id", saleOrder.id);
-                                
+
                                 if (error) {
                                   toast({
                                     title: "Error",
@@ -533,7 +532,7 @@ const Dashboard = () => {
                                     .from("job_cards")
                                     .update({ status: "ready_for_production" })
                                     .eq("sale_order_id", saleOrder.id);
-                                  
+
                                   queryClient.invalidateQueries({ queryKey: ["customer-sale-orders", user?.id] });
                                   toast({
                                     title: "Order Confirmed",
@@ -541,7 +540,7 @@ const Dashboard = () => {
                                   });
                                 }
                               }}
-                              className="w-full bg-gradient-gold text-white border-gold hover:shadow-gold-glow transition-premium"
+                              className="w-full bg-gold text-walnut border-gold hover:bg-gold/90 transition-all duration-300 font-serif"
                               size="lg"
                             >
                               <CheckCircle2 className="mr-2 h-5 w-5" />
@@ -576,9 +575,9 @@ const Dashboard = () => {
                           <span className="font-semibold">{formatCurrency((saleOrder.final_price || 0) * 0.5)}</span>
                         </div>
                       </div>
-                      <Button 
+                      <Button
                         onClick={() => navigate(`/payment/${saleOrder.id}`)}
-                        className="w-full bg-gradient-gold text-white border-gold hover:shadow-gold-glow transition-premium"
+                        className="w-full bg-gold text-walnut border-gold hover:bg-gold/90 transition-all duration-300 font-serif"
                         size="lg"
                       >
                         <CreditCard className="mr-2 h-5 w-5" />
@@ -609,7 +608,7 @@ const Dashboard = () => {
 
         {/* Existing Orders Section */}
         {ordersState.orders.length === 0 && (!saleOrders || saleOrders.length === 0) ? (
-          <Card className="luxury-card-glass border-gold/20">
+          <Card className="bg-white/80 backdrop-blur-md border border-gold/20 shadow-sm">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-2xl font-serif">
                 <ClipboardList className="h-6 w-6 text-gold" />
@@ -621,9 +620,9 @@ const Dashboard = () => {
                 Configure your first product to see live production updates and
                 delivery timelines here.
               </p>
-              <Button 
+              <Button
                 onClick={() => navigate("/products")}
-                className="bg-gradient-gold text-white border-gold hover:shadow-gold-glow transition-premium"
+                className="bg-gold text-walnut border-gold hover:bg-gold/90 transition-all duration-300 font-serif px-8"
                 size="lg"
               >
                 Start Configuring
@@ -633,7 +632,7 @@ const Dashboard = () => {
         ) : (
           <div className="space-y-6">
             {ordersState.orders.map((order) => (
-              <Card key={order.id} className="luxury-card-glass border-gold/20 hover:border-gold/40 transition-premium">
+              <Card key={order.id} className="bg-white/80 backdrop-blur-md border border-gold/20 shadow-sm hover:shadow-md transition-all duration-300">
                 <CardHeader>
                   <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                     <div>
@@ -648,15 +647,14 @@ const Dashboard = () => {
                       </p>
                     </div>
                     <div className="flex flex-col items-start md:items-end gap-2">
-                      <Badge 
-                        className={`uppercase tracking-wide ${
-                          order.status === 'delivered' ? 'bg-green-500/10 text-green-600 border-green-500/30' :
+                      <Badge
+                        className={`uppercase tracking-wide ${order.status === 'delivered' ? 'bg-green-500/10 text-green-600 border-green-500/30' :
                           order.status === 'shipped' ? 'bg-blue-500/10 text-blue-600 border-blue-500/30' :
-                          order.status === 'ready_for_delivery' ? 'bg-purple-500/10 text-purple-600 border-purple-500/30' :
-                          order.status === 'production' ? 'bg-orange-500/10 text-orange-600 border-orange-500/30' :
-                          order.status === 'confirmed' ? 'bg-cyan-500/10 text-cyan-600 border-cyan-500/30' :
-                          'bg-yellow-500/10 text-yellow-600 border-yellow-500/30'
-                        }`}
+                            order.status === 'ready_for_delivery' ? 'bg-purple-500/10 text-purple-600 border-purple-500/30' :
+                              order.status === 'production' ? 'bg-orange-500/10 text-orange-600 border-orange-500/30' :
+                                order.status === 'confirmed' ? 'bg-cyan-500/10 text-cyan-600 border-cyan-500/30' :
+                                  'bg-yellow-500/10 text-yellow-600 border-yellow-500/30'
+                          }`}
                       >
                         {order.status?.replace(/_/g, " ") || "PENDING"}
                       </Badge>
@@ -727,8 +725,8 @@ const Dashboard = () => {
                       <p className="text-lg font-semibold">
                         {order.expected_delivery_date || order.delivery_date
                           ? new Date(
-                              order.expected_delivery_date || order.delivery_date
-                            ).toLocaleDateString()
+                            order.expected_delivery_date || order.delivery_date
+                          ).toLocaleDateString()
                           : "TBD"}
                       </p>
                       {order.delivery_method && (
@@ -744,17 +742,17 @@ const Dashboard = () => {
                   {/* PDF Download Section for Orders */}
                   {order.saleOrder && (order.saleOrder.final_pdf_url || order.saleOrder.draft_pdf_url || order.saleOrder.pdf_url) && (
                     <div className="flex gap-2 mb-4">
-                      <Button 
+                      <Button
                         asChild
                         variant="default"
-                        className="flex-1 bg-gradient-gold text-white border-gold hover:shadow-gold-glow"
+                        className="flex-1 bg-gold text-walnut border-gold hover:bg-gold/90"
                       >
                         <a href={order.saleOrder.final_pdf_url || order.saleOrder.draft_pdf_url || order.saleOrder.pdf_url} target="_blank" rel="noopener noreferrer">
                           <Eye className="mr-2 h-4 w-4" />
                           View Sale Order PDF
                         </a>
                       </Button>
-                      <Button 
+                      <Button
                         asChild
                         variant="outline"
                         className="flex-1"
@@ -829,8 +827,8 @@ const Dashboard = () => {
                                   <p className="text-sm">
                                     {fabricPlan.structureMeters
                                       ? `${fabricPlan.structureMeters.toFixed(
-                                          2
-                                        )} m`
+                                        2
+                                      )} m`
                                       : "-"}
                                   </p>
                                 </div>
@@ -841,8 +839,8 @@ const Dashboard = () => {
                                   <p className="text-sm">
                                     {fabricPlan.armrestMeters
                                       ? `${fabricPlan.armrestMeters.toFixed(
-                                          2
-                                        )} m`
+                                        2
+                                      )} m`
                                       : "-"}
                                   </p>
                                 </div>
@@ -902,8 +900,8 @@ const Dashboard = () => {
                                 <span className="text-xs text-muted-foreground">
                                   {entry.created_at
                                     ? new Date(
-                                        entry.created_at
-                                      ).toLocaleString()
+                                      entry.created_at
+                                    ).toLocaleString()
                                     : "-"}
                                 </span>
                               </div>

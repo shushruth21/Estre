@@ -2,129 +2,109 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
-All colors MUST be HSL.
+/* 
+  ESTRE BRAND SYSTEM
+  Strict adherence to Brand Sheet.
+  Colors: Ivory, Gold/Sand, Earth Brown, Deep Walnut, Clay, Sage Green.
+  Fonts: Seravek, Aileron.
 */
 
 @layer base {
   :root {
-    /* Emerald Essence Color Palette - Luxury Furniture Brand */
-    --background: 90 40% 98%;
-    --foreground: 150 60% 8%;
+    /* Primary Palette */
+    --ivory: 80 14% 95%;      /* #F4F5F0 */
+    --gold: 35 52% 68%;       /* #D6B485 */
+    --brown: 23 18% 49%;      /* #937867 */
+    --walnut: 20 35% 30%;     /* #664331 */
     
-    --card: 0 0% 100%;
-    --card-foreground: 150 60% 8%;
-    
-    --popover: 0 0% 100%;
-    --popover-foreground: 150 60% 8%;
-    
-    /* Primary - Deep Emerald Green (#0D2B1D) */
-    --primary: 150 60% 8%;
-    --primary-foreground: 90 40% 95%;
-    
-    /* Secondary - Medium Green (#345635) */
-    --secondary: 140 25% 25%;
-    --secondary-foreground: 90 40% 95%;
-    
-    /* Accent - Light Green (#E3EFD3) */
-    --accent: 90 40% 90%;
-    --accent-foreground: 150 60% 8%;
-    
-    --muted: 90 30% 96%;
-    --muted-foreground: 140 15% 40%;
-    
-    --destructive: 0 85% 50%;
-    --destructive-foreground: 0 0% 100%;
-    
-    --border: 90 20% 88%;
-    --input: 90 20% 88%;
-    --ring: 150 60% 8%;
-    
-    --radius: 0.75rem;
-    
-    /* Sidebar - Deep Emerald */
-    --sidebar-background: 150 60% 8%;
-    --sidebar-foreground: 90 40% 95%;
-    --sidebar-primary: 90 40% 90%;
-    --sidebar-primary-foreground: 150 60% 8%;
-    --sidebar-accent: 140 25% 25%;
-    --sidebar-accent-foreground: 90 40% 95%;
-    --sidebar-border: 140 30% 20%;
-    --sidebar-ring: 90 40% 90%;
-    
-    /* Custom Semantic Tokens */
-    --success: 140 70% 45%;
-    --success-foreground: 0 0% 100%;
-    --warning: 35 100% 50%;
-    --warning-foreground: 0 0% 100%;
-    --info: 200 85% 50%;
-    --info-foreground: 0 0% 100%;
-    
-    /* Gold Color Palette - Luxury Accents */
-    --gold-primary: 45 85% 55%; /* #D4AF37 - Brushed Gold */
-    --gold-light: 45 60% 75%; /* #E8D5A3 - Light Gold */
-    --gold-dark: 45 75% 40%; /* #B8941F - Dark Gold */
-    --gold-gradient: linear-gradient(135deg, hsl(45 85% 55%) 0%, hsl(45 75% 40%) 100%);
-    
-    /* Gradients - Emerald Essence with Gold */
-    --gradient-primary: linear-gradient(135deg, hsl(150 60% 8%) 0%, hsl(140 25% 25%) 100%);
-    --gradient-accent: linear-gradient(135deg, hsl(90 40% 90%) 0%, hsl(140 25% 25%) 100%);
-    --gradient-hero: linear-gradient(135deg, hsl(150 60% 8%) 0%, hsl(140 25% 25%) 50%, hsl(90 40% 90%) 100%);
-    --gradient-gold: linear-gradient(135deg, hsl(45 85% 55%) 0%, hsl(45 75% 40%) 100%);
-    --gradient-luxury: linear-gradient(135deg, hsl(150 60% 8%) 0%, hsl(45 85% 55%) 100%);
-    
-    /* Shadows - Premium Luxury */
-    --shadow-sm: 0 1px 2px 0 rgb(13 43 29 / 0.05);
-    --shadow-md: 0 4px 6px -1px rgb(13 43 29 / 0.1);
-    --shadow-lg: 0 10px 15px -3px rgb(13 43 29 / 0.1);
-    --shadow-xl: 0 20px 25px -5px rgb(13 43 29 / 0.15);
-    --shadow-premium: 0 25px 50px -12px rgb(13 43 29 / 0.25);
-    --shadow-glass: 0 8px 32px 0 rgb(13 43 29 / 0.15);
-    
-    /* Transitions */
-    --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    --transition-fast: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
-    --transition-premium: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    /* Secondary Palette */
+    --clay: 20 39% 52%;       /* #B57454 */
+    --sage: 52 16% 50%;       /* #938E6C */
+
+    /* Base System Colors (Light Mode) */
+    --background: 80 14% 95%; /* Ivory */
+    --foreground: 20 35% 30%; /* Deep Walnut */
+
+    --card: 80 14% 95%;       /* Ivory */
+    --card-foreground: 20 35% 30%;
+
+    --popover: 80 14% 95%;
+    --popover-foreground: 20 35% 30%;
+
+    --primary: 35 52% 68%;    /* Gold/Sand */
+    --primary-foreground: 20 35% 30%; /* Walnut on Gold */
+
+    --secondary: 23 18% 49%;  /* Earth Brown */
+    --secondary-foreground: 80 14% 95%; /* Ivory on Brown */
+
+    --muted: 80 14% 90%;      /* Slightly darker Ivory */
+    --muted-foreground: 23 18% 49%; /* Brown */
+
+    --accent: 20 39% 52%;     /* Clay */
+    --accent-foreground: 80 14% 95%;
+
+    --destructive: 0 85% 60%;
+    --destructive-foreground: 80 14% 95%;
+
+    --border: 23 18% 49%;     /* Brown border */
+    --input: 23 18% 49%;
+    --ring: 35 52% 68%;       /* Gold ring */
+
+    --radius: 0.25rem;        /* 4px standard */
+
+    /* Sidebar */
+    --sidebar-background: 20 35% 30%; /* Walnut */
+    --sidebar-foreground: 80 14% 95%; /* Ivory */
+    --sidebar-primary: 35 52% 68%;    /* Gold */
+    --sidebar-primary-foreground: 20 35% 30%;
+    --sidebar-accent: 23 18% 49%;     /* Brown */
+    --sidebar-accent-foreground: 80 14% 95%;
+    --sidebar-border: 23 18% 49%;
+    --sidebar-ring: 35 52% 68%;
+
+    /* Shadows */
+    --shadow-card: 0 4px 12px rgba(0, 0, 0, 0.05);
+    --shadow-modal: 0 10px 30px rgba(0, 0, 0, 0.15);
   }
 
   .dark {
-    /* Dark Mode - Emerald Essence */
-    --background: 150 60% 5%;
-    --foreground: 90 40% 95%;
-    
-    --card: 150 50% 10%;
-    --card-foreground: 90 40% 95%;
-    
-    --popover: 150 50% 10%;
-    --popover-foreground: 90 40% 95%;
-    
-    --primary: 90 40% 90%;
-    --primary-foreground: 150 60% 8%;
-    
-    --secondary: 140 25% 30%;
-    --secondary-foreground: 90 40% 95%;
-    
-    --muted: 150 30% 15%;
-    --muted-foreground: 90 20% 70%;
-    
-    --accent: 140 25% 30%;
-    --accent-foreground: 90 40% 90%;
-    
-    --destructive: 0 70% 50%;
-    --destructive-foreground: 0 0% 100%;
-    
-    --border: 150 30% 18%;
-    --input: 150 30% 18%;
-    --ring: 90 40% 90%;
-    
-    --sidebar-background: 150 60% 5%;
-    --sidebar-foreground: 90 40% 95%;
-    --sidebar-primary: 90 40% 90%;
-    --sidebar-primary-foreground: 150 60% 8%;
-    --sidebar-accent: 140 25% 25%;
-    --sidebar-accent-foreground: 90 40% 95%;
-    --sidebar-border: 150 40% 12%;
-    --sidebar-ring: 90 40% 90%;
+    /* Dark Mode - Deep Walnut Background */
+    --background: 20 35% 30%; /* Deep Walnut */
+    --foreground: 80 14% 95%; /* Ivory */
+
+    --card: 20 35% 28%;       /* Slightly darker Walnut */
+    --card-foreground: 80 14% 95%;
+
+    --popover: 20 35% 28%;
+    --popover-foreground: 80 14% 95%;
+
+    --primary: 35 52% 68%;    /* Gold */
+    --primary-foreground: 20 35% 30%;
+
+    --secondary: 23 18% 49%;  /* Earth Brown */
+    --secondary-foreground: 80 14% 95%;
+
+    --muted: 20 35% 25%;
+    --muted-foreground: 23 18% 60%;
+
+    --accent: 52 16% 50%;     /* Sage Green in dark mode */
+    --accent-foreground: 80 14% 95%;
+
+    --destructive: 0 60% 50%;
+    --destructive-foreground: 80 14% 95%;
+
+    --border: 23 18% 40%;
+    --input: 23 18% 40%;
+    --ring: 35 52% 68%;
+
+    --sidebar-background: 20 35% 25%;
+    --sidebar-foreground: 80 14% 95%;
+    --sidebar-primary: 35 52% 68%;
+    --sidebar-primary-foreground: 20 35% 30%;
+    --sidebar-accent: 23 18% 40%;
+    --sidebar-accent-foreground: 80 14% 95%;
+    --sidebar-border: 23 18% 40%;
+    --sidebar-ring: 35 52% 68%;
   }
 }
 
@@ -132,182 +112,36 @@ All colors MUST be HSL.
   * {
     @apply border-border;
   }
-
   body {
     @apply bg-background text-foreground antialiased;
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-    letter-spacing: 0.01em;
-    line-height: 1.6;
+    font-family: 'Aileron', sans-serif; /* Secondary font for body */
   }
   
   h1, h2, h3, h4, h5, h6 {
+    font-family: 'Seravek', sans-serif; /* Primary font for headings */
     @apply font-bold tracking-tight;
-    font-family: 'Playfair Display', 'Georgia', serif;
-    letter-spacing: -0.02em;
-    line-height: 1.2;
   }
+
+  /* Typography Hierarchy */
+  h1 { @apply text-4xl lg:text-5xl font-bold; }
+  h2 { @apply text-3xl lg:text-4xl font-semibold; }
+  h3 { @apply text-2xl lg:text-3xl font-medium; }
   
-  /* Luxury Typography */
-  .font-luxury {
-    font-family: 'Cormorant Garamond', 'Playfair Display', 'Georgia', serif;
-    letter-spacing: 0.05em;
+  /* Utility Classes for Brand */
+  .text-gold { color: hsl(var(--primary)); }
+  .text-walnut { color: hsl(var(--foreground)); }
+  .bg-ivory { background-color: hsl(var(--background)); }
+  .bg-walnut { background-color: hsl(20 35% 30%); }
+  
+  /* Glass Effects */
+  .glass-panel {
+    background: rgba(244, 245, 240, 0.7); /* Ivory with opacity */
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.3);
   }
-  
-  h1 {
-    @apply text-4xl lg:text-5xl;
-  }
-  
-  h2 {
-    @apply text-3xl lg:text-4xl;
-  }
-  
-  h3 {
-    @apply text-2xl lg:text-3xl;
+  .dark .glass-panel {
+    background: rgba(102, 67, 49, 0.7); /* Walnut with opacity */
+    border: 1px solid rgba(255, 255, 255, 0.1);
   }
 }
 
-@layer utilities {
-  .gradient-primary {
-    background: var(--gradient-primary);
-  }
-  
-  .gradient-accent {
-    background: var(--gradient-accent);
-  }
-  
-  .gradient-hero {
-    background: var(--gradient-hero);
-  }
-  
-  .gradient-gold {
-    background: var(--gradient-gold);
-  }
-  
-  .gradient-luxury {
-    background: var(--gradient-luxury);
-  }
-  
-  /* Gold Accent Utilities */
-  .text-gold {
-    color: hsl(var(--gold-primary));
-  }
-  
-  .bg-gold {
-    background-color: hsl(var(--gold-primary));
-  }
-  
-  .border-gold {
-    border-color: hsl(var(--gold-primary));
-  }
-  
-  .text-gold-light {
-    color: hsl(var(--gold-light));
-  }
-  
-  .bg-gold-light {
-    background-color: hsl(var(--gold-light));
-  }
-  
-  .text-gold-dark {
-    color: hsl(var(--gold-dark));
-  }
-  
-  .bg-gold-dark {
-    background-color: hsl(var(--gold-dark));
-  }
-  
-  .shadow-premium {
-    box-shadow: var(--shadow-premium);
-  }
-  
-  .shadow-glass {
-    box-shadow: var(--shadow-glass);
-  }
-  
-  .transition-smooth {
-    transition: var(--transition-smooth);
-  }
-  
-  .transition-fast {
-    transition: var(--transition-fast);
-  }
-  
-  .transition-premium {
-    transition: var(--transition-premium);
-  }
-  
-  /* Glassmorphism Effects */
-  .glass-card {
-    @apply rounded-xl border border-white/20;
-    background: rgba(255, 255, 255, 0.7);
-    backdrop-filter: blur(12px) saturate(180%);
-    -webkit-backdrop-filter: blur(12px) saturate(180%);
-    box-shadow: var(--shadow-glass);
-  }
-  
-  .dark .glass-card {
-    background: rgba(13, 43, 29, 0.6);
-    border-color: rgba(255, 255, 255, 0.1);
-  }
-  
-  .glass-panel {
-    @apply rounded-lg border border-white/30;
-    background: rgba(255, 255, 255, 0.8);
-    backdrop-filter: blur(16px) saturate(180%);
-    -webkit-backdrop-filter: blur(16px) saturate(180%);
-    box-shadow: var(--shadow-glass);
-  }
-  
-  .dark .glass-panel {
-    background: rgba(13, 43, 29, 0.7);
-    border-color: rgba(255, 255, 255, 0.15);
-  }
-  
-  .glass-modal {
-    @apply rounded-2xl border border-white/20;
-    background: rgba(255, 255, 255, 0.95);
-    backdrop-filter: blur(20px) saturate(180%);
-    -webkit-backdrop-filter: blur(20px) saturate(180%);
-    box-shadow: var(--shadow-premium);
-  }
-  
-  .dark .glass-modal {
-    background: rgba(13, 43, 29, 0.85);
-    border-color: rgba(255, 255, 255, 0.1);
-  }
-  
-  /* Luxury Card Styles */
-  .luxury-card {
-    @apply rounded-xl border bg-card shadow-lg hover:shadow-xl transition-premium hover:-translate-y-1;
-  }
-  
-  .luxury-card-glass {
-    @apply luxury-card glass-card;
-  }
-  
-  .luxury-button {
-    @apply rounded-lg font-medium transition-premium hover:scale-105 active:scale-95 shadow-md hover:shadow-lg;
-  }
-  
-  .image-zoom {
-    @apply transition-transform duration-500 ease-out;
-  }
-  
-  .image-zoom:hover {
-    @apply scale-110;
-  }
-  
-  .bg-grid-pattern {
-    background-image: radial-gradient(circle, hsl(var(--muted-foreground) / 0.1) 1px, transparent 1px);
-    background-size: 32px 32px;
-  }
-  
-  /* Premium Spacing */
-  .section-spacing {
-    @apply py-16 md:py-24 lg:py-32;
-  }
-  
-  .container-spacing {
-    @apply px-4 sm:px-6 lg:px-8;
-  }
-}

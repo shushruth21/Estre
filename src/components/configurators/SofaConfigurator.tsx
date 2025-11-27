@@ -54,13 +54,13 @@ const SofaConfigurator = ({
   const pillowSizesResult = useDropdownOptions("sofa", "pillow_size");
   const pillowFabricPlanResult = useDropdownOptions("sofa", "pillow_fabric_plan");
   const armrestTypesResult = useDropdownOptions("sofa", "armrest_type");
-  
+
   // Shape-specific dropdown options
   const l1OptionsResult = useDropdownOptions("sofa", "l1_option");
   const r1OptionsResult = useDropdownOptions("sofa", "r1_option");
   const l2SeatCountsResult = useDropdownOptions("sofa", "l2_seat_count");
   const r2SeatCountsResult = useDropdownOptions("sofa", "r2_seat_count");
-  
+
   // Headrest options - separate fields
   const modelHasHeadrestResult = useDropdownOptions("sofa", "model_has_headrest");
   const headrestRequiredResult = useDropdownOptions("sofa", "headrest_required");
@@ -87,7 +87,7 @@ const SofaConfigurator = ({
   const pillowSizes = Array.isArray(pillowSizesResult.data) ? pillowSizesResult.data : [];
   const pillowFabricPlans = Array.isArray(pillowFabricPlanResult.data) ? pillowFabricPlanResult.data : [];
   const armrestTypes = Array.isArray(armrestTypesResult.data) ? armrestTypesResult.data : [];
-  
+
   const l1Options = Array.isArray(l1OptionsResult.data) ? l1OptionsResult.data : [];
   const r1Options = Array.isArray(r1OptionsResult.data) ? r1OptionsResult.data : [];
   const l2SeatCounts = Array.isArray(l2SeatCountsResult.data) ? l2SeatCountsResult.data : [];
@@ -117,16 +117,16 @@ const SofaConfigurator = ({
   const currentShapeValue = configuration.shape || (shapes && shapes.length > 0 ? shapes[0].option_value : "Standard");
   const normalizedShape = normalizeShape(currentShapeValue);
   const currentShape = normalizedShape;
-  
+
   const isStandard = normalizedShape === 'standard';
   const isLShape = normalizedShape === 'l-shape';
   const isUShape = normalizedShape === 'u-shape';
   const isCombo = normalizedShape === 'combo';
 
-  const isLoadingDropdowns = shapesResult.isLoading || frontSeatCountsResult.isLoading || foamTypesResult.isLoading || 
-                              seatDepthsResult.isLoading || seatWidthsResult.isLoading || seatHeightsResult.isLoading || legTypesResult.isLoading || 
-                              woodTypesResult.isLoading || stitchTypesResult.isLoading || loungerSizesResult.isLoading || 
-                              consoleSizesResult.isLoading;
+  const isLoadingDropdowns = shapesResult.isLoading || frontSeatCountsResult.isLoading || foamTypesResult.isLoading ||
+    seatDepthsResult.isLoading || seatWidthsResult.isLoading || seatHeightsResult.isLoading || legTypesResult.isLoading ||
+    woodTypesResult.isLoading || stitchTypesResult.isLoading || loungerSizesResult.isLoading ||
+    consoleSizesResult.isLoading;
 
   // Load legs prices for pricing display
   const { data: legsPrices } = useQuery({
@@ -152,7 +152,7 @@ const SofaConfigurator = ({
         .eq("is_active", true)
         .order("description");
       if (error) throw error;
-      
+
       // Remove duplicates based on description (in case there are any)
       const uniqueAccessories = (data || []).reduce((acc: any[], current: any) => {
         const existing = acc.find((item: any) => item.description === current.description);
@@ -161,7 +161,7 @@ const SofaConfigurator = ({
         }
         return acc;
       }, []);
-      
+
       return uniqueAccessories;
     },
   });
@@ -213,23 +213,23 @@ const SofaConfigurator = ({
   const getTotalSeats = (): number => {
     let total = 0;
     const shape = normalizeShape(configuration.shape || 'standard');
-    
+
     // Front seats - selectable for ALL shapes (1-4)
     const frontSeats = parseSeatCount(configuration.frontSeatCount || configuration.frontSeats || 2);
     total += frontSeats;
-    
+
     // Add left section seats (L2) - for L-Shape, U-Shape, and Combo
     if (shape === 'l-shape' || shape === 'u-shape' || shape === 'combo') {
       const l2 = parseSeatCount(configuration.l2SeatCount || configuration.l2 || 0);
       total += l2;
     }
-    
+
     // Add right section seats (R2) - only for U-Shape and Combo
     if (shape === 'u-shape' || shape === 'combo') {
       const r2 = parseSeatCount(configuration.r2SeatCount || configuration.r2 || 0);
       total += r2;
     }
-    
+
     return total;
   };
 
@@ -237,13 +237,13 @@ const SofaConfigurator = ({
   const getSectionSeaterTypes = () => {
     const shape = normalizeShape(configuration.shape || 'standard');
     const frontSeaterType = configuration.frontSeatCount || "2-Seater";
-    const leftSeaterType = (shape === 'l-shape' || shape === 'u-shape' || shape === 'combo') 
+    const leftSeaterType = (shape === 'l-shape' || shape === 'u-shape' || shape === 'combo')
       ? (configuration.l2SeatCount || "2-Seater")
       : undefined;
     const rightSeaterType = (shape === 'u-shape' || shape === 'combo')
       ? (configuration.r2SeatCount || "2-Seater")
       : undefined;
-    
+
     return {
       front: frontSeaterType,
       left: leftSeaterType,
@@ -288,11 +288,11 @@ const SofaConfigurator = ({
     if (configuration.console?.required) {
       const maxConsoles = calculateMaxConsoles(totalSeats);
       const currentPlacements = configuration.console?.placements || [];
-      
+
       // Always maintain maxConsoles slots in the array
       // This ensures slots maintain their positions even when set to "none"
       let placements = [...currentPlacements];
-      
+
       // Ensure we have exactly maxConsoles slots
       if (placements.length < maxConsoles) {
         // Fill missing slots with "none" placeholder
@@ -308,10 +308,10 @@ const SofaConfigurator = ({
         // Trim excess slots
         placements = placements.slice(0, maxConsoles);
       }
-      
+
       // Only update if placements array changed or quantity is different
       const placementsChanged = JSON.stringify(placements) !== JSON.stringify(currentPlacements);
-      
+
       if (placementsChanged || configuration.console?.quantity !== maxConsoles) {
         updateConfiguration({
           console: {
@@ -330,25 +330,25 @@ const SofaConfigurator = ({
       const defaultShapeValue = (shapes && shapes.length > 0) ? shapes[0].option_value : "Standard";
       const defaultShape = normalizeShape(defaultShapeValue);
       const defaultFrontSeats = 2; // Default to 2-seater
-      
+
       // Filter front seat counts to only 1-4
       const validFrontSeatCounts = frontSeatCounts.filter((count: any) => {
         if (!count || !count.option_value) return false;
         const seatNum = parseInt(count.option_value.replace("-Seater", "") || "0");
         return seatNum >= 1 && seatNum <= 4;
       });
-      
-      const defaultFrontSeatValue = validFrontSeatCounts.length > 0 
-        ? validFrontSeatCounts[0].option_value 
+
+      const defaultFrontSeatValue = validFrontSeatCounts.length > 0
+        ? validFrontSeatCounts[0].option_value
         : "2-Seater";
       // Parse seat count - extract number from string like "2-Seater"
       const defaultFrontSeatsNum = (() => {
         const match = defaultFrontSeatValue.match(/(\d+)/);
         return match ? parseInt(match[1], 10) : 2;
       })();
-      
+
       const defaultConfig = {
-      productId: product.id,
+        productId: product.id,
         shape: defaultShape, // Normalized: 'standard' | 'l-shape' | 'u-shape' | 'combo'
         frontSeats: defaultFrontSeatsNum, // Number 1-4
         frontSeatCount: defaultFrontSeatValue, // Keep for display compatibility
@@ -362,36 +362,36 @@ const SofaConfigurator = ({
         r1Option: "Corner",
         l2SeatCount: "2",
         r2SeatCount: "2",
-        console: { 
+        console: {
           required: false,
           quantity: 0,
           size: "",
           placements: [] // Array of { position: "front"|"left"|"right", afterSeat: number }
         },
-        lounger: { 
+        lounger: {
           required: false,
           quantity: 1,
           size: "",
           placement: "LHS", // LHS, RHS, Both
           storage: "No"
         },
-        additionalPillows: { 
+        additionalPillows: {
           required: false,
           quantity: 1,
           type: "",
           size: "",
           fabricPlan: "Single Colour"
         },
-      fabric: {
-        claddingPlan: "Single Colour",
-        structureCode: "",
-      },
-      foam: {
-          type: (foamTypes && foamTypes.length > 0) 
+        fabric: {
+          claddingPlan: "Single Colour",
+          structureCode: "",
+        },
+        foam: {
+          type: (foamTypes && foamTypes.length > 0)
             ? (foamTypes.find((f: any) => f.metadata?.default)?.option_value || foamTypes[0].option_value)
             : "Firm",
-      },
-      dimensions: {
+        },
+        dimensions: {
           seatDepth: (seatDepths && seatDepths.length > 0)
             ? (seatDepths.find((d: any) => d.metadata?.default || d.option_value?.includes("22"))?.option_value?.replace(/["\s]/g, '')?.replace('in', '') || seatDepths[0].option_value?.replace(/["\s]/g, '')?.replace('in', ''))
             : "22",
@@ -410,7 +410,7 @@ const SofaConfigurator = ({
         },
         stitch: {
           type: (stitchTypes && stitchTypes.length > 0) ? stitchTypes[0].option_value : "",
-      },
+        },
         comesWithHeadrest: productComesWithHeadrest || "No", // Keep for backward compatibility
         modelHasHeadrest: productComesWithHeadrest || "No", // Read from product (sofa_database)
         headrestRequired: "No", // Whether headrest is required (only if model has headrest)
@@ -467,7 +467,7 @@ const SofaConfigurator = ({
       const totalWidth = totalSeats * baseWidth;
       const depth = 95; // Standard depth
       const shapeLabel = (configuration.shape || 'standard').toUpperCase().replace('-', ' ');
-      
+
       return {
         width: totalWidth,
         depth: depth,
@@ -488,7 +488,7 @@ const SofaConfigurator = ({
   // Show loading state if all dropdowns are loading (but allow rendering if data exists)
   // Don't block rendering if data is available - only show loading if we have NO data at all
   if (isLoadingDropdowns && (!shapes || shapes.length === 0) && (!frontSeatCounts || frontSeatCounts.length === 0)) {
-  return (
+    return (
       <div className="flex items-center justify-center py-12">
         <div className="text-center space-y-4">
           <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto" />
@@ -501,7 +501,7 @@ const SofaConfigurator = ({
   return (
     <div className="space-y-6">
       {/* Configuration Section */}
-      <Card className="luxury-card-glass border-2">
+      <Card className="bg-white/80 backdrop-blur-md border border-gold/20 shadow-sm">
         <CardHeader>
           <CardTitle className="text-2xl font-serif">Configuration</CardTitle>
           <CardDescription>Customize your perfect sofa piece</CardDescription>
@@ -529,15 +529,15 @@ const SofaConfigurator = ({
                     const normalizedShapeValue = normalizeShape(shapeValue);
                     const currentNormalizedShape = normalizeShape(configuration.shape || '');
                     const isSelected = currentNormalizedShape === normalizedShapeValue;
-                    
+
                     // Icon based on shape type - using provided shape icons
                     const getShapeIcon = () => {
                       const shapeLower = shapeValue.toLowerCase();
                       if (shapeLower.includes("l-shape") || shapeLower.includes("l shape")) {
                         return (
-                          <img 
-                            src="/shape-icons/l-sectionals.svg" 
-                            alt="L-Sectionals" 
+                          <img
+                            src="/shape-icons/l-sectionals.svg"
+                            alt="L-Sectionals"
                             className="w-16 h-16 object-contain"
                             onError={(e) => {
                               e.currentTarget.style.display = 'none';
@@ -546,9 +546,9 @@ const SofaConfigurator = ({
                         );
                       } else if (shapeLower.includes("u-shape") || shapeLower.includes("u shape")) {
                         return (
-                          <img 
-                            src="/shape-icons/u-sectionals.svg" 
-                            alt="U-Sectionals" 
+                          <img
+                            src="/shape-icons/u-sectionals.svg"
+                            alt="U-Sectionals"
                             className="w-16 h-16 object-contain"
                             onError={(e) => {
                               e.currentTarget.style.display = 'none';
@@ -557,9 +557,9 @@ const SofaConfigurator = ({
                         );
                       } else if (shapeLower.includes("combo")) {
                         return (
-                          <img 
-                            src="/shape-icons/u-sectionals.svg" 
-                            alt="Combo Modules" 
+                          <img
+                            src="/shape-icons/u-sectionals.svg"
+                            alt="Combo Modules"
                             className="w-16 h-16 object-contain"
                             onError={(e) => {
                               e.currentTarget.style.display = 'none';
@@ -570,7 +570,7 @@ const SofaConfigurator = ({
                         return <Square className="w-12 h-12" />;
                       }
                     };
-                    
+
                     return (
                       <SelectionCard
                         key={shape.id}
@@ -579,7 +579,7 @@ const SofaConfigurator = ({
                         isSelected={isSelected}
                         onClick={() => {
                           const normalized = normalizeShape(shapeValue);
-                          updateConfiguration({ 
+                          updateConfiguration({
                             shape: normalized,
                             // Reset shape-specific fields when shape changes
                             ...(normalized === 'standard' && {
@@ -611,57 +611,57 @@ const SofaConfigurator = ({
           {configuration.shape && (
             <div className="space-y-3">
               <Label className="text-base font-semibold">Front Seat Count</Label>
-            {frontSeatCountsResult.isLoading ? (
-              <div className="flex items-center justify-center py-8">
-                <Loader2 className="h-6 w-6 animate-spin text-primary" />
-              </div>
-            ) : frontSeatCounts && frontSeatCounts.length > 0 ? (
-              <div className="grid grid-cols-4 gap-4">
-                {frontSeatCounts
-                  .filter((count: any) => {
-                    if (!count || !count.option_value) return false;
-                    // Only allow 1-4 seaters for front seat count
-                    const seatNumber = parseInt(count.option_value.replace("-Seater", "") || "0");
-                    return seatNumber >= 1 && seatNumber <= 4;
-                  })
-                  .map((count: any) => {
-                    const countValue = count.option_value;
-                    const isSelected = configuration.frontSeatCount === countValue;
-                    const seatNumber = parseInt(countValue.replace("-Seater", "") || "1");
-                    
-                    // Icon showing number of seats
-                    const getSeatIcon = () => {
+              {frontSeatCountsResult.isLoading ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                </div>
+              ) : frontSeatCounts && frontSeatCounts.length > 0 ? (
+                <div className="grid grid-cols-4 gap-4">
+                  {frontSeatCounts
+                    .filter((count: any) => {
+                      if (!count || !count.option_value) return false;
+                      // Only allow 1-4 seaters for front seat count
+                      const seatNumber = parseInt(count.option_value.replace("-Seater", "") || "0");
+                      return seatNumber >= 1 && seatNumber <= 4;
+                    })
+                    .map((count: any) => {
+                      const countValue = count.option_value;
+                      const isSelected = configuration.frontSeatCount === countValue;
+                      const seatNumber = parseInt(countValue.replace("-Seater", "") || "1");
+
+                      // Icon showing number of seats
+                      const getSeatIcon = () => {
+                        return (
+                          <div className="flex gap-1">
+                            {Array.from({ length: seatNumber }).map((_, i) => (
+                              <Square key={i} className="w-6 h-6" />
+                            ))}
+                          </div>
+                        );
+                      };
+
                       return (
-                        <div className="flex gap-1">
-                          {Array.from({ length: seatNumber }).map((_, i) => (
-                            <Square key={i} className="w-6 h-6" />
-                          ))}
-                        </div>
+                        <SelectionCard
+                          key={count.id}
+                          label={count.display_label || count.option_value}
+                          icon={getSeatIcon()}
+                          isSelected={isSelected}
+                          onClick={() => {
+                            const seatNum = parseSeatCount(countValue);
+                            updateConfiguration({
+                              frontSeats: seatNum,
+                              frontSeatCount: countValue // Keep for display
+                            });
+                          }}
+                        />
                       );
-                    };
-                    
-                    return (
-                      <SelectionCard
-                        key={count.id}
-                        label={count.display_label || count.option_value}
-                        icon={getSeatIcon()}
-                        isSelected={isSelected}
-                        onClick={() => {
-                          const seatNum = parseSeatCount(countValue);
-                          updateConfiguration({ 
-                            frontSeats: seatNum,
-                            frontSeatCount: countValue // Keep for display
-                          });
-                        }}
-                      />
-                    );
-                  })}
-              </div>
-            ) : (
-              <Alert>
-                <AlertDescription>No seat count options available</AlertDescription>
-              </Alert>
-            )}
+                    })}
+                </div>
+              ) : (
+                <Alert>
+                  <AlertDescription>No seat count options available</AlertDescription>
+                </Alert>
+              )}
             </div>
           )}
 
@@ -675,20 +675,20 @@ const SofaConfigurator = ({
                   {/* L1 Option */}
                   <div className="space-y-2">
                     <Label className="text-sm text-muted-foreground">L1 (Section Type)</Label>
-            <Select
+                    <Select
                       value={configuration.l1Option || configuration.l1 || ""}
                       onValueChange={(value) => {
                         const normalized = value.toLowerCase();
-                        updateConfiguration({ 
+                        updateConfiguration({
                           l1: normalized, // 'corner' | 'backrest'
                           l1Option: value // Keep for display
                         });
                       }}
-            >
-              <SelectTrigger>
+                    >
+                      <SelectTrigger>
                         <SelectValue placeholder="Select L1 option" />
-              </SelectTrigger>
-              <SelectContent>
+                      </SelectTrigger>
+                      <SelectContent>
                         {l1OptionsResult.isLoading ? (
                           <SelectItem value="loading" disabled>Loading...</SelectItem>
                         ) : l1Options && l1Options.length > 0 ? (
@@ -697,14 +697,14 @@ const SofaConfigurator = ({
                             .map((opt: any) => (
                               <SelectItem key={opt.id} value={opt.option_value}>
                                 {opt.display_label || opt.option_value}
-                  </SelectItem>
+                              </SelectItem>
                             ))
                         ) : (
                           <SelectItem value="no-data" disabled>No options available</SelectItem>
-                )}
-              </SelectContent>
-            </Select>
-          </div>
+                        )}
+                      </SelectContent>
+                    </Select>
+                  </div>
 
                   {/* L2 Seat Count */}
                   <div className="space-y-2">
@@ -713,7 +713,7 @@ const SofaConfigurator = ({
                       value={configuration.l2SeatCount || configuration.l2?.toString() || ""}
                       onValueChange={(value) => {
                         const seatNum = parseSeatCount(value);
-                        updateConfiguration({ 
+                        updateConfiguration({
                           l2: seatNum, // Number 1-6
                           l2SeatCount: value // Keep for display
                         });
@@ -738,8 +738,8 @@ const SofaConfigurator = ({
                         )}
                       </SelectContent>
                     </Select>
-            </div>
-                      </div>
+                  </div>
+                </div>
               </div>
             </>
           )}
@@ -754,20 +754,20 @@ const SofaConfigurator = ({
                   {/* R1 Option */}
                   <div className="space-y-2">
                     <Label className="text-sm text-muted-foreground">R1 (Section Type)</Label>
-                        <Select
+                    <Select
                       value={configuration.r1Option || configuration.r1 || ""}
                       onValueChange={(value) => {
                         const normalized = value.toLowerCase();
-                        updateConfiguration({ 
+                        updateConfiguration({
                           r1: normalized, // 'corner' | 'backrest'
                           r1Option: value // Keep for display
                         });
                       }}
-                        >
-                          <SelectTrigger>
+                    >
+                      <SelectTrigger>
                         <SelectValue placeholder="Select R1 option" />
-                          </SelectTrigger>
-                          <SelectContent>
+                      </SelectTrigger>
+                      <SelectContent>
                         {r1OptionsResult.isLoading ? (
                           <SelectItem value="loading" disabled>Loading...</SelectItem>
                         ) : r1Options && r1Options.length > 0 ? (
@@ -780,11 +780,11 @@ const SofaConfigurator = ({
                             ))
                         ) : (
                           <SelectItem value="no-data" disabled>No options available</SelectItem>
-                            )}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                  
+                        )}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
                   {/* R2 Seat Count */}
                   <div className="space-y-2">
                     <Label className="text-sm text-muted-foreground">R2 (Seat Count)</Label>
@@ -792,7 +792,7 @@ const SofaConfigurator = ({
                       value={configuration.r2SeatCount || configuration.r2?.toString() || ""}
                       onValueChange={(value) => {
                         const seatNum = parseSeatCount(value);
-                        updateConfiguration({ 
+                        updateConfiguration({
                           r2: seatNum, // Number 1-6
                           r2SeatCount: value // Keep for display
                         });
@@ -817,9 +817,9 @@ const SofaConfigurator = ({
                         )}
                       </SelectContent>
                     </Select>
-                      </div>
-                    </div>
-            </div>
+                  </div>
+                </div>
+              </div>
             </>
           )}
 
@@ -836,26 +836,26 @@ const SofaConfigurator = ({
                   const totalSeats = getTotalSeats();
                   const maxConsoles = calculateMaxConsoles(totalSeats);
                   const autoQuantity = isRequired ? maxConsoles : 0;
-                  
+
                   // Initialize placements array - always maintain maxConsoles slots
                   // Use "none" placeholder to maintain slot positions
-                  const placements = isRequired 
+                  const placements = isRequired
                     ? Array(autoQuantity).fill(null).map((_, i) => {
-                        const existing = configuration.console?.placements?.[i];
-                        // If existing placement is valid, keep it; otherwise set to "none"
-                        if (existing && existing.position && existing.position !== "none" && existing.section) {
-                          return existing;
-                        }
-                        // Return "none" placeholder to maintain slot position
-                        return {
-                          section: null,
-                          position: "none",
-                          afterSeat: null,
-                          accessoryId: null
-                        };
-                      })
+                      const existing = configuration.console?.placements?.[i];
+                      // If existing placement is valid, keep it; otherwise set to "none"
+                      if (existing && existing.position && existing.position !== "none" && existing.section) {
+                        return existing;
+                      }
+                      // Return "none" placeholder to maintain slot position
+                      return {
+                        section: null,
+                        position: "none",
+                        afterSeat: null,
+                        accessoryId: null
+                      };
+                    })
                     : [];
-                  
+
                   updateConfiguration({
                     console: {
                       ...configuration.console,
@@ -907,12 +907,12 @@ const SofaConfigurator = ({
                     </SelectContent>
                   </Select>
                 </div>
-                
+
                 <div className="space-y-2">
                   <Label>Number of Consoles</Label>
                   <div className="p-3 bg-muted/50 rounded-lg">
                     <p className="text-sm font-medium">
-                      {configuration.console?.quantity || 0} Console{configuration.console?.quantity !== 1 ? 's' : ''} 
+                      {configuration.console?.quantity || 0} Console{configuration.console?.quantity !== 1 ? 's' : ''}
                       <span className="text-muted-foreground ml-2">
                         (Auto-calculated: Total Seats - 1 = {getTotalSeats()} - 1 = {calculateMaxConsoles(getTotalSeats())})
                       </span>
@@ -927,11 +927,11 @@ const SofaConfigurator = ({
                 {configuration.console?.quantity > 0 && (() => {
                   const allPlacements = generateAllConsolePlacements();
                   const maxConsoles = calculateMaxConsoles(getTotalSeats());
-                  
+
                   // Always maintain maxConsoles slots in the array
                   // This ensures slots maintain their positions even when set to "none"
                   let currentPlacements = configuration.console?.placements || [];
-                  
+
                   // Ensure we have exactly maxConsoles slots
                   if (currentPlacements.length < maxConsoles) {
                     currentPlacements = [...currentPlacements];
@@ -948,7 +948,7 @@ const SofaConfigurator = ({
                     // Trim excess slots
                     currentPlacements = currentPlacements.slice(0, maxConsoles);
                   }
-                  
+
                   // Display all slots (including "none" ones) to maintain correct slot numbers
                   return Array(maxConsoles).fill(null).map((_, index: number) => {
                     const currentPlacement = currentPlacements[index] || {
@@ -957,17 +957,17 @@ const SofaConfigurator = ({
                       afterSeat: null,
                       accessoryId: null
                     };
-                    
+
                     // Check if this slot is active (not "none")
-                    const isActive = currentPlacement.position && 
-                                     currentPlacement.position !== "none" && 
-                                     currentPlacement.section;
-                    
+                    const isActive = currentPlacement.position &&
+                      currentPlacement.position !== "none" &&
+                      currentPlacement.section;
+
                     // Get current placement value for the select dropdown
                     const currentPlacementValue = isActive
                       ? `${currentPlacement.section}_${currentPlacement.afterSeat || 1}`
                       : "none";
-                    
+
                     // Filter out placements that are already selected by OTHER console slots
                     // Only consider ACTIVE slots (not "none") when filtering
                     const otherActivePlacements = currentPlacements
@@ -979,17 +979,17 @@ const SofaConfigurator = ({
                         return null;
                       })
                       .filter(Boolean);
-                    
+
                     // Get available placement options - exclude already selected ones (except current)
-                    const availablePlacements = allPlacements.length > 0 
+                    const availablePlacements = allPlacements.length > 0
                       ? allPlacements.filter((placement) => {
-                          // Always include the current placement (so user can see what's selected)
-                          if (placement.value === currentPlacementValue) return true;
-                          // Exclude placements already selected by other ACTIVE console slots
-                          return !otherActivePlacements.includes(placement.value);
-                        })
+                        // Always include the current placement (so user can see what's selected)
+                        if (placement.value === currentPlacementValue) return true;
+                        // Exclude placements already selected by other ACTIVE console slots
+                        return !otherActivePlacements.includes(placement.value);
+                      })
                       : [{ section: "front", position: "after_1", label: "After 1st Seat from Left (Front)", value: "front_1" }];
-                    
+
                     return (
                       <div key={`console-slot-${index}`} className="space-y-3 p-4 bg-muted/30 rounded-lg border">
                         <div className="flex items-center justify-between">
@@ -1008,7 +1008,7 @@ const SofaConfigurator = ({
                             onValueChange={(value) => {
                               // Get fresh placements from configuration to ensure we have the latest state
                               const freshPlacements = [...(configuration.console?.placements || [])];
-                              
+
                               // Ensure we have exactly maxConsoles slots
                               while (freshPlacements.length < maxConsoles) {
                                 freshPlacements.push({
@@ -1018,7 +1018,7 @@ const SofaConfigurator = ({
                                   accessoryId: null
                                 });
                               }
-                              
+
                               if (value === "none") {
                                 // Set to "none" but keep in array
                                 freshPlacements[index] = {
@@ -1040,10 +1040,10 @@ const SofaConfigurator = ({
                                   };
                                 }
                               }
-                              
+
                               updateConfiguration({
-                                console: { 
-                                  ...configuration.console, 
+                                console: {
+                                  ...configuration.console,
                                   placements: freshPlacements,
                                   quantity: maxConsoles // Keep quantity at maxConsoles
                                 },
@@ -1068,7 +1068,7 @@ const SofaConfigurator = ({
                             </SelectContent>
                           </Select>
                         </div>
-                        
+
                         {/* Only show accessory selector if placement is not "none" */}
                         {isActive && (
                           <div className="space-y-2">
@@ -1099,7 +1099,7 @@ const SofaConfigurator = ({
                                   <SelectItem value="loading" disabled>Loading...</SelectItem>
                                 ) : consoleAccessories && consoleAccessories.length > 0 ? (
                                   consoleAccessories
-                                    .filter((acc: any, idx: number, self: any[]) => 
+                                    .filter((acc: any, idx: number, self: any[]) =>
                                       idx === self.findIndex((a: any) => a.id === acc.id && a.description === acc.description)
                                     )
                                     .map((acc: any) => (
@@ -1124,7 +1124,7 @@ const SofaConfigurator = ({
                   const activePlacements = (configuration.console?.placements || []).filter(
                     (p: any) => p && p.position && p.position !== null && p.section !== null && p.position !== "none"
                   );
-                  
+
                   if (activePlacements.length === 0) return null;
 
                   // Get console size for base price calculation
@@ -1144,7 +1144,7 @@ const SofaConfigurator = ({
                           const placementLabel = generateAllConsolePlacements().find(
                             p => p.value === `${placement.section}_${placement.afterSeat || 1}`
                           )?.label || `${placement.section}: After ${placement.afterSeat || 1}${getOrdinalSuffix(placement.afterSeat || 1)} Seat`;
-                          
+
                           const accessory = consoleAccessories?.find((acc: any) => acc.id === placement.accessoryId);
                           const accessoryPrice = accessory ? (Number(accessory.sale_price) || 0) : 0;
                           const consolePrice = baseConsolePrice + accessoryPrice;
@@ -1180,7 +1180,7 @@ const SofaConfigurator = ({
                             </div>
                           );
                         })}
-                        
+
                         {/* Total Console Cost Note */}
                         <div className="pt-3 border-t border-gray-300 dark:border-gray-700">
                           <div className="flex items-center justify-between">
@@ -1381,9 +1381,9 @@ const SofaConfigurator = ({
                     value={(configuration.additionalPillows?.quantity || 1).toString()}
                     onValueChange={(value) =>
                       updateConfiguration({
-                        additionalPillows: { 
-                          ...configuration.additionalPillows, 
-                          quantity: parseInt(value, 10) 
+                        additionalPillows: {
+                          ...configuration.additionalPillows,
+                          quantity: parseInt(value, 10)
                         },
                       })
                     }
@@ -1481,8 +1481,8 @@ const SofaConfigurator = ({
                     value={configuration.additionalPillows?.fabricPlan || "Single Colour"}
                     onValueChange={(value) =>
                       updateConfiguration({
-                        additionalPillows: { 
-                          ...configuration.additionalPillows, 
+                        additionalPillows: {
+                          ...configuration.additionalPillows,
                           fabricPlan: value,
                           // Reset fabric selections when changing plan
                           fabricColour: value === "Single Colour" ? (configuration.additionalPillows?.fabricColour || undefined) : undefined,
@@ -1531,7 +1531,7 @@ const SofaConfigurator = ({
                             <div
                               className="w-8 h-8 rounded-full border-2 border-gray-200 flex-shrink-0"
                               style={{
-                                backgroundColor: selectedPillowFabrics[configuration.additionalPillows.fabricColour].colour_link || 
+                                backgroundColor: selectedPillowFabrics[configuration.additionalPillows.fabricColour].colour_link ||
                                   `hsl(${(selectedPillowFabrics[configuration.additionalPillows.fabricColour].estre_code.charCodeAt(0) || 0) % 360}, 70%, 75%)`,
                               }}
                             />
@@ -1539,13 +1539,13 @@ const SofaConfigurator = ({
                               {selectedPillowFabrics[configuration.additionalPillows.fabricColour].estre_code}
                             </Badge>
                             <span className="flex-1 truncate">
-                              {selectedPillowFabrics[configuration.additionalPillows.fabricColour].description || 
-                               selectedPillowFabrics[configuration.additionalPillows.fabricColour].colour || 
-                               selectedPillowFabrics[configuration.additionalPillows.fabricColour].estre_code}
+                              {selectedPillowFabrics[configuration.additionalPillows.fabricColour].description ||
+                                selectedPillowFabrics[configuration.additionalPillows.fabricColour].colour ||
+                                selectedPillowFabrics[configuration.additionalPillows.fabricColour].estre_code}
                             </span>
                             <span className="ml-auto text-primary font-semibold">
-                              ₹{selectedPillowFabrics[configuration.additionalPillows.fabricColour].bom_price?.toLocaleString() || 
-                                 selectedPillowFabrics[configuration.additionalPillows.fabricColour].price?.toLocaleString() || 0}
+                              ₹{selectedPillowFabrics[configuration.additionalPillows.fabricColour].bom_price?.toLocaleString() ||
+                                selectedPillowFabrics[configuration.additionalPillows.fabricColour].price?.toLocaleString() || 0}
                             </span>
                           </div>
                         ) : (
@@ -1571,7 +1571,7 @@ const SofaConfigurator = ({
                             <div
                               className="w-8 h-8 rounded-full border-2 border-gray-200 flex-shrink-0"
                               style={{
-                                backgroundColor: selectedPillowFabrics[configuration.additionalPillows.fabricColour1].colour_link || 
+                                backgroundColor: selectedPillowFabrics[configuration.additionalPillows.fabricColour1].colour_link ||
                                   `hsl(${(selectedPillowFabrics[configuration.additionalPillows.fabricColour1].estre_code.charCodeAt(0) || 0) % 360}, 70%, 75%)`,
                               }}
                             />
@@ -1579,9 +1579,9 @@ const SofaConfigurator = ({
                               {selectedPillowFabrics[configuration.additionalPillows.fabricColour1].estre_code}
                             </Badge>
                             <span className="flex-1 truncate">
-                              {selectedPillowFabrics[configuration.additionalPillows.fabricColour1].description || 
-                               selectedPillowFabrics[configuration.additionalPillows.fabricColour1].colour || 
-                               selectedPillowFabrics[configuration.additionalPillows.fabricColour1].estre_code}
+                              {selectedPillowFabrics[configuration.additionalPillows.fabricColour1].description ||
+                                selectedPillowFabrics[configuration.additionalPillows.fabricColour1].colour ||
+                                selectedPillowFabrics[configuration.additionalPillows.fabricColour1].estre_code}
                             </span>
                             <span className="ml-auto text-primary font-semibold">
                               ₹{selectedPillowFabrics[configuration.additionalPillows.fabricColour1].price?.toLocaleString() || 0}
@@ -1605,7 +1605,7 @@ const SofaConfigurator = ({
                             <div
                               className="w-8 h-8 rounded-full border-2 border-gray-200 flex-shrink-0"
                               style={{
-                                backgroundColor: selectedPillowFabrics[configuration.additionalPillows.fabricColour2].colour_link || 
+                                backgroundColor: selectedPillowFabrics[configuration.additionalPillows.fabricColour2].colour_link ||
                                   `hsl(${(selectedPillowFabrics[configuration.additionalPillows.fabricColour2].estre_code.charCodeAt(0) || 0) % 360}, 70%, 75%)`,
                               }}
                             />
@@ -1613,9 +1613,9 @@ const SofaConfigurator = ({
                               {selectedPillowFabrics[configuration.additionalPillows.fabricColour2].estre_code}
                             </Badge>
                             <span className="flex-1 truncate">
-                              {selectedPillowFabrics[configuration.additionalPillows.fabricColour2].description || 
-                               selectedPillowFabrics[configuration.additionalPillows.fabricColour2].colour || 
-                               selectedPillowFabrics[configuration.additionalPillows.fabricColour2].estre_code}
+                              {selectedPillowFabrics[configuration.additionalPillows.fabricColour2].description ||
+                                selectedPillowFabrics[configuration.additionalPillows.fabricColour2].colour ||
+                                selectedPillowFabrics[configuration.additionalPillows.fabricColour2].estre_code}
                             </span>
                             <span className="ml-auto text-primary font-semibold">
                               ₹{selectedPillowFabrics[configuration.additionalPillows.fabricColour2].price?.toLocaleString() || 0}
@@ -1722,16 +1722,16 @@ const SofaConfigurator = ({
                           .filter((foam: any) => foam && foam.option_value)
                           .map((foam: any) => (
                             <SelectItem key={foam.id} value={foam.option_value}>
-                            <div className="flex items-center justify-between w-full">
-                              <span>{foam.display_label || foam.option_value}</span>
-                              {getFoamPrice(foam.option_value) > 0 && (
-                                <Badge variant="secondary" className="ml-2">
-                                  +₹{getFoamPrice(foam.option_value).toLocaleString()}
-                                </Badge>
-                              )}
-                            </div>
-                        </SelectItem>
-                        ))
+                              <div className="flex items-center justify-between w-full">
+                                <span>{foam.display_label || foam.option_value}</span>
+                                {getFoamPrice(foam.option_value) > 0 && (
+                                  <Badge variant="secondary" className="ml-2">
+                                    +₹{getFoamPrice(foam.option_value).toLocaleString()}
+                                  </Badge>
+                                )}
+                              </div>
+                            </SelectItem>
+                          ))
                       ) : (
                         <SelectItem value="no-data" disabled>No options available</SelectItem>
                       )}
@@ -1809,21 +1809,21 @@ const SofaConfigurator = ({
                 {/* Seat Width */}
                 <div className="space-y-3">
                   <Label className="text-base font-semibold">Seat Width Upgrade Charges</Label>
-            <Select
+                  <Select
                     value={configuration.dimensions?.seatWidth?.toString() || (seatWidths && seatWidths.length > 0 && seatWidths[0]?.option_value ? normalizeDimensionValue(seatWidths[0].option_value) : "")}
-              onValueChange={(value) =>
+                    onValueChange={(value) =>
                       updateConfiguration({
                         dimensions: {
                           ...configuration.dimensions,
                           seatWidth: value,
                         },
                       })
-              }
-            >
-              <SelectTrigger>
+                    }
+                  >
+                    <SelectTrigger>
                       <SelectValue placeholder="Select Seat Width" />
-              </SelectTrigger>
-              <SelectContent>
+                    </SelectTrigger>
+                    <SelectContent>
                       {seatWidthsResult.isLoading ? (
                         <SelectItem value="loading" disabled>Loading...</SelectItem>
                       ) : seatWidths && seatWidths.length > 0 ? (
@@ -1841,14 +1841,14 @@ const SofaConfigurator = ({
                                   </Badge>
                                 )}
                               </div>
-                  </SelectItem>
+                            </SelectItem>
                           );
                         })
                       ) : (
                         <SelectItem value="no-data" disabled>No options available</SelectItem>
                       )}
-              </SelectContent>
-            </Select>
+                    </SelectContent>
+                  </Select>
                   {configuration.dimensions?.seatWidth && (
                     <Alert>
                       <AlertDescription>
@@ -1860,7 +1860,7 @@ const SofaConfigurator = ({
                       </AlertDescription>
                     </Alert>
                   )}
-          </div>
+                </div>
 
                 {/* Seat Height */}
                 <div className="space-y-3">
@@ -1909,23 +1909,23 @@ const SofaConfigurator = ({
                       </AlertDescription>
                     </Alert>
                   )}
-          </div>
+                </div>
 
                 {/* Leg Options */}
                 <div className="space-y-3">
                   <Label className="text-base font-semibold">Leg Options</Label>
-            <Select
+                  <Select
                     value={configuration.legs?.type || ""}
-              onValueChange={(value) =>
-                updateConfiguration({
+                    onValueChange={(value) =>
+                      updateConfiguration({
                         legs: { ...configuration.legs, type: value },
-                })
-              }
-            >
-              <SelectTrigger>
+                      })
+                    }
+                  >
+                    <SelectTrigger>
                       <SelectValue placeholder="Select Leg Type" />
-              </SelectTrigger>
-              <SelectContent>
+                    </SelectTrigger>
+                    <SelectContent>
                       {legTypesResult.isLoading ? (
                         <SelectItem value="loading" disabled>Loading...</SelectItem>
                       ) : legTypes && legTypes.length > 0 ? (
@@ -1933,36 +1933,36 @@ const SofaConfigurator = ({
                           .filter((leg: any) => leg && leg.option_value)
                           .map((leg: any) => (
                             <SelectItem key={leg.id} value={leg.option_value}>
-                            {leg.display_label || leg.option_value}
-                  </SelectItem>
-                        ))
+                              {leg.display_label || leg.option_value}
+                            </SelectItem>
+                          ))
                       ) : (
                         <SelectItem value="no-data" disabled>No options available</SelectItem>
                       )}
-              </SelectContent>
-            </Select>
+                    </SelectContent>
+                  </Select>
                   {configuration.legs?.type && (
                     <p className="text-sm text-muted-foreground">
                       Premium leg finish for your sofa
                     </p>
                   )}
-          </div>
+                </div>
 
                 {/* Wood Type */}
                 <div className="space-y-3">
                   <Label className="text-base font-semibold">Wood Type</Label>
-            <Select
+                  <Select
                     value={configuration.wood?.type || ""}
-              onValueChange={(value) =>
-                updateConfiguration({
+                    onValueChange={(value) =>
+                      updateConfiguration({
                         wood: { ...configuration.wood, type: value },
-                })
-              }
-            >
-              <SelectTrigger>
+                      })
+                    }
+                  >
+                    <SelectTrigger>
                       <SelectValue placeholder="Select Wood Type" />
-              </SelectTrigger>
-              <SelectContent>
+                    </SelectTrigger>
+                    <SelectContent>
                       {woodTypesResult.isLoading ? (
                         <SelectItem value="loading" disabled>Loading...</SelectItem>
                       ) : woodTypes && woodTypes.length > 0 ? (
@@ -1970,36 +1970,36 @@ const SofaConfigurator = ({
                           .filter((wood: any) => wood && wood.option_value)
                           .map((wood: any) => (
                             <SelectItem key={wood.id} value={wood.option_value}>
-                            {wood.display_label || wood.option_value}
-                  </SelectItem>
-                        ))
+                              {wood.display_label || wood.option_value}
+                            </SelectItem>
+                          ))
                       ) : (
                         <SelectItem value="no-data" disabled>No options available</SelectItem>
                       )}
-              </SelectContent>
-            </Select>
+                    </SelectContent>
+                  </Select>
                   {configuration.wood?.type && (
                     <p className="text-sm text-muted-foreground">
                       High-quality wood for frame construction
                     </p>
                   )}
-          </div>
+                </div>
 
                 {/* Armrest Type */}
                 <div className="space-y-3">
                   <Label className="text-base font-semibold">Armrest</Label>
-            <Select
+                  <Select
                     value={configuration.armrest?.type || ""}
-              onValueChange={(value) =>
-                updateConfiguration({
+                    onValueChange={(value) =>
+                      updateConfiguration({
                         armrest: { ...configuration.armrest, type: value },
-                })
-              }
-            >
-              <SelectTrigger>
+                      })
+                    }
+                  >
+                    <SelectTrigger>
                       <SelectValue placeholder="Select Armrest Type" />
-              </SelectTrigger>
-              <SelectContent>
+                    </SelectTrigger>
+                    <SelectContent>
                       {armrestTypesResult.isLoading ? (
                         <SelectItem value="loading" disabled>Loading...</SelectItem>
                       ) : armrestTypes && armrestTypes.length > 0 ? (
@@ -2015,7 +2015,7 @@ const SofaConfigurator = ({
                                     <span>{armrest.display_label || armrest.option_value}</span>
                                     {width && (
                                       <span className="text-xs text-muted-foreground">
-                                        Width: {width}" 
+                                        Width: {width}"
                                       </span>
                                     )}
                                   </div>
@@ -2030,9 +2030,9 @@ const SofaConfigurator = ({
                           })
                       ) : (
                         <SelectItem value="no-data" disabled>No options available</SelectItem>
-                )}
-              </SelectContent>
-            </Select>
+                      )}
+                    </SelectContent>
+                  </Select>
                   {configuration.armrest?.type && (() => {
                     const selectedArmrest = armrestTypes.find((a: any) => a?.option_value === configuration.armrest?.type);
                     const price = selectedArmrest?.metadata?.price_rs || 0;
@@ -2055,23 +2055,23 @@ const SofaConfigurator = ({
                       </Alert>
                     );
                   })()}
-          </div>
+                </div>
 
                 {/* Stitch Type */}
                 <div className="space-y-3">
                   <Label className="text-base font-semibold">Stitch Type</Label>
-            <Select
+                  <Select
                     value={configuration.stitch?.type || ""}
-              onValueChange={(value) =>
-                updateConfiguration({
+                    onValueChange={(value) =>
+                      updateConfiguration({
                         stitch: { ...configuration.stitch, type: value },
-                })
-              }
-            >
-              <SelectTrigger>
+                      })
+                    }
+                  >
+                    <SelectTrigger>
                       <SelectValue placeholder="Select Stitch Type" />
-              </SelectTrigger>
-              <SelectContent>
+                    </SelectTrigger>
+                    <SelectContent>
                       {stitchTypesResult.isLoading ? (
                         <SelectItem value="loading" disabled>Loading...</SelectItem>
                       ) : stitchTypes && stitchTypes.length > 0 ? (
@@ -2079,20 +2079,20 @@ const SofaConfigurator = ({
                           .filter((stitch: any) => stitch && stitch.option_value)
                           .map((stitch: any) => (
                             <SelectItem key={stitch.id} value={stitch.option_value}>
-                            {stitch.display_label || stitch.option_value}
-                  </SelectItem>
-                        ))
+                              {stitch.display_label || stitch.option_value}
+                            </SelectItem>
+                          ))
                       ) : (
                         <SelectItem value="no-data" disabled>No options available</SelectItem>
-                )}
-              </SelectContent>
-            </Select>
+                      )}
+                    </SelectContent>
+                  </Select>
                   {configuration.stitch?.type && (
                     <p className="text-sm text-muted-foreground">
                       Professional stitching finish for durability
                     </p>
                   )}
-          </div>
+                </div>
 
                 {/* Model Has Headrest - Read-only from product */}
                 <div className="space-y-3">
@@ -2105,8 +2105,8 @@ const SofaConfigurator = ({
                       className="bg-muted cursor-not-allowed"
                     />
                     <p className="text-sm text-muted-foreground">
-                      {canSelectHeadrest 
-                        ? "This model supports headrest selection" 
+                      {canSelectHeadrest
+                        ? "This model supports headrest selection"
                         : "This model does not support headrest"}
                     </p>
                   </div>
@@ -2159,7 +2159,7 @@ const SofaConfigurator = ({
       </Card>
 
       {/* Customer Information */}
-      <Card className="luxury-card-glass border-2">
+      <Card className="bg-white/80 backdrop-blur-md border border-gold/20 shadow-sm">
         <CardHeader>
           <CardTitle className="text-2xl font-serif">Your Information</CardTitle>
         </CardHeader>
@@ -2198,8 +2198,8 @@ const SofaConfigurator = ({
                     email: e.target.value,
                   },
                 })
-                      }
-                    />
+              }
+            />
           </div>
           <div className="space-y-2">
             <Label htmlFor="phone">Phone Number</Label>
@@ -2217,7 +2217,7 @@ const SofaConfigurator = ({
                 })
               }
             />
-                    </div>
+          </div>
           <div className="space-y-2">
             <Label htmlFor="specialRequests">Special Requests</Label>
             <Textarea
@@ -2234,12 +2234,12 @@ const SofaConfigurator = ({
               }
               rows={3}
             />
-                  </div>
-                </CardContent>
-              </Card>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Configuration Preview */}
-      <Card className="luxury-card-glass border-2">
+      <Card className="bg-white/80 backdrop-blur-md border border-gold/20 shadow-sm">
         <CardHeader>
           <CardTitle className="text-2xl font-serif">Configuration Preview & Export</CardTitle>
         </CardHeader>
@@ -2248,16 +2248,16 @@ const SofaConfigurator = ({
             <div className="text-center space-y-4">
               <div className="text-4xl font-bold">
                 {dimensions.width}cm × {dimensions.depth}cm
-          </div>
+              </div>
               <div className="text-lg font-semibold text-muted-foreground">
                 {dimensions.label}
-          </div>
+              </div>
               <div className="text-sm text-muted-foreground space-y-1 pt-4">
                 <p>Shape: {configuration.shape?.toUpperCase() || "STANDARD"}</p>
                 <p>Total Seats: {getTotalSeats()}</p>
                 {configuration.legs?.type && (
                   <p>Legs: {configuration.legs.type}</p>
-        )}
+                )}
               </div>
             </div>
           </div>

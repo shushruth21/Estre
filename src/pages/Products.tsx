@@ -25,7 +25,7 @@ const CATEGORY_TABLE_NAMES = {
 };
 
 const getCategoryTableName = (category: string): string => {
-  return CATEGORY_TABLE_NAMES[category as keyof typeof CATEGORY_TABLE_NAMES] 
+  return CATEGORY_TABLE_NAMES[category as keyof typeof CATEGORY_TABLE_NAMES]
     || `${category}_database`;
 };
 
@@ -119,23 +119,23 @@ const Products = () => {
 
       const tableName = getCategoryTableName(category);
       const columns = getCategoryColumns(category);
-      
+
       // Log query attempt
       console.log('🔍 Fetching products:', {
         category,
         table: tableName,
         timestamp: new Date().toISOString()
       });
-      
+
       try {
         // Build select query with error handling (removed redundant test query for performance)
         let selectFields = `id, title, images, ${columns.netPrice}, ${columns.strikePrice}, discount_percent, discount_rs`;
-        
+
         // Only add bom_rs if category supports it (exclude sofa too)
         if (category !== "sofabed" && category !== "recliner" && category !== "cinema_chairs" && category !== "database_pouffes" && category !== "sofa") {
           selectFields += `, bom_rs`;
         }
-        
+
         if (category === "sofabed") {
           selectFields = `id, title, images, ${columns.netPrice}, ${columns.strikePrice}, strike_price_2seater_rs, discount_percent, discount_rs`;
         } else if (category === "recliner" || category === "cinema_chairs") {
@@ -143,26 +143,26 @@ const Products = () => {
         } else if (category === "database_pouffes") {
           selectFields = `id, title, image, ${columns.netPrice}, ${columns.strikePrice}, discount_percent, discount_rs`;
         }
-        
+
         // Execute query with timeout (15 seconds)
         let query = supabase
           .from(tableName as any)
           .select(selectFields);
-        
+
         // Only filter by is_active if the table has that column
         if (category !== "database_pouffes") {
           query = query.eq("is_active", true);
         }
-        
+
         // Add timeout to prevent hanging queries (15 seconds)
         const queryPromise = query.order("title", { ascending: true });
-        const timeoutPromise = new Promise<never>((_, reject) => 
+        const timeoutPromise = new Promise<never>((_, reject) =>
           setTimeout(() => reject(new Error('Query timeout: Request took longer than 15 seconds')), 15000)
         );
-        
+
         const result = await Promise.race([queryPromise, timeoutPromise]);
         const { data, error } = result as any;
-        
+
         if (error) {
           console.error('❌ Supabase query error:', {
             category,
@@ -175,9 +175,9 @@ const Products = () => {
               hint: error.hint,
             }
           });
-          
+
           endTimer();
-          
+
           // Provide specific error messages
           let userMessage = `Failed to load products: ${error.message}`;
           if (error.code === 'PGRST301' || error.message?.includes('permission denied')) {
@@ -189,10 +189,10 @@ const Products = () => {
           } else if (error.hint) {
             userMessage += ` (${error.hint})`;
           }
-          
+
           throw new Error(userMessage);
         }
-        
+
         // Validate and normalize data
         if (!data || data.length === 0) {
           console.warn('⚠️ No products found:', {
@@ -203,32 +203,32 @@ const Products = () => {
           endTimer();
           return [];
         }
-        
+
         console.log('✅ Products loaded successfully:', {
           category,
           count: data.length,
           table: tableName
         });
-        
+
         // End performance timer
         endTimer();
-        
+
         // Normalize the data
         const normalizedData = (data || []).map((item: any) => {
           const imageData = category === "database_pouffes" ? item.image : item.images;
           const imageUrl = imageData ? getFirstImageUrl(imageData) : null;
-          
+
           const strikePrice = category === "sofabed" && item.strike_price_2seater_rs !== null && item.strike_price_2seater_rs !== undefined
             ? item.strike_price_2seater_rs
             : item[columns.strikePrice];
-          
-          const netPrice = item[columns.netPrice] !== null && item[columns.netPrice] !== undefined 
-            ? Number(item[columns.netPrice]) 
+
+          const netPrice = item[columns.netPrice] !== null && item[columns.netPrice] !== undefined
+            ? Number(item[columns.netPrice])
             : null;
-          const strikePriceNum = strikePrice !== null && strikePrice !== undefined 
-            ? Number(strikePrice) 
+          const strikePriceNum = strikePrice !== null && strikePrice !== undefined
+            ? Number(strikePrice)
             : null;
-          
+
           return {
             id: item.id,
             title: item.title,
@@ -241,7 +241,7 @@ const Products = () => {
             bom_rs: (category === "sofabed" || category === "recliner" || category === "cinema_chairs" || category === "database_pouffes" || category === "sofa") ? undefined : item.bom_rs
           };
         });
-        
+
         return normalizedData as Product[];
       } catch (err: any) {
         // Catch-all error handling
@@ -331,9 +331,9 @@ const Products = () => {
                   <li>Verify environment variables are set correctly</li>
                 </ul>
               </div>
-              <Button 
-                onClick={() => window.location.reload()} 
-                variant="outline" 
+              <Button
+                onClick={() => window.location.reload()}
+                variant="outline"
                 className="mt-4"
               >
                 Retry
@@ -341,7 +341,7 @@ const Products = () => {
             </div>
           </div>
         )}
-        
+
         {isLoading && !products && !isError ? (
           <div className="space-y-6">
             <div className="text-center">
@@ -352,7 +352,7 @@ const Products = () => {
             </div>
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
               {[...Array(6)].map((_, i) => (
-                <Card key={i} className="overflow-hidden luxury-card border-muted/30 animate-pulse">
+                <Card key={i} className="overflow-hidden bg-white/80 backdrop-blur-md border border-gold/20 shadow-sm animate-pulse">
                   <div className="aspect-[4/3] bg-gradient-to-br from-muted/50 to-muted/30"></div>
                   <CardContent className="p-6 space-y-3">
                     <div className="h-6 bg-muted/60 rounded w-3/4"></div>
@@ -376,68 +376,68 @@ const Products = () => {
               </div>
             )}
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {products.map((product) => (
-              <Card key={product.id} className="group overflow-hidden luxury-card border-muted/50 hover:border-gold transition-premium">
-                <div className="aspect-[4/3] bg-gradient-to-br from-muted to-muted/50 overflow-hidden relative">
-                  <img
-                    src={product.images || '/placeholder.svg'}
-                    alt={product.title}
-                    className="w-full h-full object-cover image-zoom"
-                    loading="lazy"
-                    decoding="async"
-                    onError={(e) => {
-                      const target = e.target as HTMLImageElement;
-                      const currentSrc = target.src;
+              {products.map((product) => (
+                <Card key={product.id} className="group overflow-hidden bg-white/80 backdrop-blur-md border border-gold/20 shadow-sm hover:shadow-md transition-all duration-300">
+                  <div className="aspect-[4/3] bg-gradient-to-br from-muted to-muted/50 overflow-hidden relative">
+                    <img
+                      src={product.images || '/placeholder.svg'}
+                      alt={product.title}
+                      className="w-full h-full object-cover image-zoom"
+                      loading="lazy"
+                      decoding="async"
+                      onError={(e) => {
+                        const target = e.target as HTMLImageElement;
+                        const currentSrc = target.src;
 
-                      // Only set placeholder if not already placeholder
-                      if (!currentSrc.includes('placeholder.svg')) {
-                        target.src = '/placeholder.svg';
-                        target.onerror = null; // Prevent infinite loop
-                      }
-                    }}
-                    referrerPolicy="no-referrer-when-downgrade"
-                  />
-                </div>
-                <CardContent className="p-6 space-y-3">
-                  <h3 className="text-2xl font-serif font-semibold tracking-tight group-hover:text-gold transition-colors">
-                    {product.title}
-                  </h3>
-                  
-                  {/* Pricing Section */}
-                  <div className="space-y-2">
-                    <div className="flex items-baseline gap-3 flex-wrap">
-                      {product.netPrice ? (
-                        <p className="text-3xl font-bold text-foreground">
-                          ₹{Number(product.netPrice).toLocaleString('en-IN')}
-                        </p>
-                      ) : product.strikePrice ? (
-                        <p className="text-3xl font-bold text-foreground">
-                          ₹{Number(product.strikePrice).toLocaleString('en-IN')}
-                        </p>
-                      ) : null}
-                      {product.strikePrice && product.netPrice && product.strikePrice > product.netPrice && (
-                        <span className="text-lg line-through text-muted-foreground">
-                          ₹{Number(product.strikePrice).toLocaleString('en-IN')}
-                        </span>
+                        // Only set placeholder if not already placeholder
+                        if (!currentSrc.includes('placeholder.svg')) {
+                          target.src = '/placeholder.svg';
+                          target.onerror = null; // Prevent infinite loop
+                        }
+                      }}
+                      referrerPolicy="no-referrer-when-downgrade"
+                    />
+                  </div>
+                  <CardContent className="p-6 space-y-3">
+                    <h3 className="text-2xl font-serif font-semibold tracking-tight group-hover:text-gold transition-colors">
+                      {product.title}
+                    </h3>
+
+                    {/* Pricing Section */}
+                    <div className="space-y-2">
+                      <div className="flex items-baseline gap-3 flex-wrap">
+                        {product.netPrice ? (
+                          <p className="text-3xl font-bold text-foreground">
+                            ₹{Number(product.netPrice).toLocaleString('en-IN')}
+                          </p>
+                        ) : product.strikePrice ? (
+                          <p className="text-3xl font-bold text-foreground">
+                            ₹{Number(product.strikePrice).toLocaleString('en-IN')}
+                          </p>
+                        ) : null}
+                        {product.strikePrice && product.netPrice && product.strikePrice > product.netPrice && (
+                          <span className="text-lg line-through text-muted-foreground">
+                            ₹{Number(product.strikePrice).toLocaleString('en-IN')}
+                          </span>
+                        )}
+                      </div>
+
+                      {product.discount_percent && product.discount_percent > 0 && (
+                        <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-gold/10 text-gold rounded-full text-sm font-semibold border border-gold/20">
+                          Save {product.discount_percent}%
+                        </div>
                       )}
                     </div>
-
-                    {product.discount_percent && product.discount_percent > 0 && (
-                      <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-gold/10 text-gold rounded-full text-sm font-semibold border border-gold/20">
-                        Save {product.discount_percent}%
-                      </div>
-                    )}
-                  </div>
-                </CardContent>
-                <CardFooter className="p-6 pt-0">
-                  <Link to={`/configure/${category}/${product.id}`} className="w-full">
-                    <Button className="w-full luxury-button font-semibold border-gold/30 hover:border-gold hover:bg-gold/10 hover:text-gold transition-premium">
-                      Configure Now
-                    </Button>
-                  </Link>
-                </CardFooter>
-              </Card>
-            ))}
+                  </CardContent>
+                  <CardFooter className="p-6 pt-0">
+                    <Link to={`/configure/${category}/${product.id}`} className="w-full">
+                      <Button variant="luxury" className="w-full">
+                        Configure Now
+                      </Button>
+                    </Link>
+                  </CardFooter>
+                </Card>
+              ))}
             </div>
           </div>
         ) : !isError && !isLoading && (!products || products.length === 0) ? (

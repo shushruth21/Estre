@@ -54,10 +54,10 @@ const Signup = () => {
 
     try {
       // Get the current origin, fallback to localhost:8080 for development
-      const redirectUrl = typeof window !== 'undefined' 
-        ? `${window.location.origin}/` 
+      const redirectUrl = typeof window !== 'undefined'
+        ? `${window.location.origin}/`
         : 'http://localhost:8080/';
-      
+
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
@@ -127,18 +127,21 @@ const Signup = () => {
         </div>
       </header>
 
-      <div className="flex-1 flex items-center justify-center p-4">
-        <Card className="w-full max-w-md">
-          <CardHeader>
-            <CardTitle>Sign Up</CardTitle>
-            <CardDescription>
+      <div className="flex-1 flex items-center justify-center p-4 bg-ivory">
+        <Card className="w-full max-w-md bg-white/80 backdrop-blur-sm border border-gold/20 shadow-lg">
+          <CardHeader className="space-y-2 text-center">
+            <div className="mx-auto w-16 h-16 rounded-full bg-gold/10 flex items-center justify-center shadow-sm mb-4 border border-gold/20" aria-hidden="true">
+              <span className="text-gold font-serif font-bold text-3xl">e</span>
+            </div>
+            <CardTitle className="text-3xl font-serif text-walnut">Sign Up</CardTitle>
+            <CardDescription className="text-walnut/60">
               Create a new account to start configuring furniture
             </CardDescription>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSignup} className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="fullName">Full Name</Label>
+                <Label htmlFor="fullName" className="text-walnut">Full Name</Label>
                 <Input
                   id="fullName"
                   type="text"
@@ -146,10 +149,11 @@ const Signup = () => {
                   value={fullName}
                   onChange={(e) => setFullName(e.target.value)}
                   required
+                  className="border-gold/20 focus:border-gold"
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
+                <Label htmlFor="email" className="text-walnut">Email</Label>
                 <Input
                   id="email"
                   type="email"
@@ -157,39 +161,42 @@ const Signup = () => {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
+                  className="border-gold/20 focus:border-gold"
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="password">Password</Label>
+                <Label htmlFor="password" className="text-walnut">Password</Label>
                 <Input
                   id="password"
                   type="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
+                  className="border-gold/20 focus:border-gold"
                 />
-                <p className="text-xs text-muted-foreground">
+                <p className="text-xs text-walnut/50">
                   Must be 8+ characters with uppercase, lowercase, and number
                 </p>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="confirmPassword">Confirm Password</Label>
+                <Label htmlFor="confirmPassword" className="text-walnut">Confirm Password</Label>
                 <Input
                   id="confirmPassword"
                   type="password"
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
                   required
+                  className="border-gold/20 focus:border-gold"
                 />
               </div>
-              <Button type="submit" className="w-full" disabled={isLoading}>
+              <Button type="submit" variant="luxury" className="w-full py-6 text-base" disabled={isLoading}>
                 {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 Create Account
               </Button>
             </form>
-            <div className="mt-4 text-center text-sm">
-              <span className="text-muted-foreground">Already have an account? </span>
-              <Link to="/login" className="text-primary hover:underline">
+            <div className="mt-6 text-center text-sm">
+              <span className="text-walnut/60">Already have an account? </span>
+              <Link to="/login" className="text-gold hover:text-gold-dark hover:underline font-semibold transition-colors">
                 Sign in
               </Link>
             </div>

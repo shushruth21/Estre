@@ -95,8 +95,8 @@ const ForgotPassword = () => {
       <div className="flex-1 flex items-center justify-center p-4 bg-gradient-to-br from-background via-muted/20 to-background">
         <Card className="w-full max-w-md shadow-xl border-gold/20" id="main-content" role="main">
           <CardHeader className="space-y-2 text-center">
-            <div className="mx-auto w-16 h-16 rounded-full bg-gradient-gold flex items-center justify-center shadow-lg mb-2" aria-hidden="true">
-              <span className="text-white font-bold text-2xl font-luxury">E</span>
+            <div className="mx-auto w-16 h-16 rounded-full bg-gold/10 flex items-center justify-center shadow-sm mb-4 border border-gold/20" aria-hidden="true">
+              <span className="text-gold font-serif font-bold text-3xl">e</span>
             </div>
             <CardTitle className="text-3xl font-serif">Reset Password</CardTitle>
             <CardDescription className="text-base">
@@ -137,7 +137,7 @@ const ForgotPassword = () => {
                     Send Another Link
                   </Button>
                   <Link to="/login" className="w-full">
-                    <Button className="w-full luxury-button bg-gradient-gold text-white border-gold hover:shadow-gold-glow transition-premium">
+                    <Button variant="luxury" className="w-full">
                       Back to Login
                     </Button>
                   </Link>
@@ -173,7 +173,8 @@ const ForgotPassword = () => {
 
                 <Button
                   type="submit"
-                  className="w-full luxury-button bg-gradient-gold text-white border-gold hover:shadow-gold-glow transition-premium text-base py-6"
+                  className="w-full py-6 text-base"
+                  variant="luxury"
                   disabled={isLoading}
                   aria-label="Send password reset email"
                 >

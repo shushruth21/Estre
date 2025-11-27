@@ -125,22 +125,22 @@ export default function StaffSaleOrders() {
           hint: error.hint,
           code: error.code,
         });
-        
+
         // Check if it's a permission error
         if (error.code === 'PGRST301' || error.message?.includes('permission') || error.message?.includes('RLS')) {
           throw new Error("Permission denied. Please ensure you have staff/admin role and RLS policies are configured.");
         }
-        
+
         // Check if table doesn't exist
         if (error.code === '42P01' || error.message?.includes('does not exist')) {
           throw new Error("sale_orders table not found. Please run database migration: 20251121000002_create_sale_orders.sql");
         }
-        
+
         // Check if column doesn't exist
         if (error.message?.includes('column') && error.message?.includes('does not exist')) {
           throw new Error(`Database column error: ${error.message}. Please run database migrations.`);
         }
-        
+
         throw error;
       }
 
@@ -533,8 +533,8 @@ export default function StaffSaleOrders() {
                         <TableCell className="text-right">
                           <div className="flex items-center justify-end gap-2">
                             {(saleOrder.final_pdf_url || saleOrder.draft_pdf_url || saleOrder.pdf_url) && (
-                              <Button 
-                                variant="outline" 
+                              <Button
+                                variant="outline"
                                 size="sm"
                                 asChild
                                 title="View PDF"
@@ -544,8 +544,8 @@ export default function StaffSaleOrders() {
                                 </a>
                               </Button>
                             )}
-                            <Button 
-                              variant="outline" 
+                            <Button
+                              variant="outline"
                               size="sm"
                               asChild
                             >
@@ -756,7 +756,7 @@ export default function StaffSaleOrders() {
                                         <Button
                                           asChild
                                           variant="default"
-                                          className="flex-1 bg-gradient-gold text-white border-gold hover:shadow-gold-glow"
+                                          className="flex-1 bg-gold text-walnut border-gold hover:bg-gold/90"
                                         >
                                           <a href={saleOrder.final_pdf_url || saleOrder.draft_pdf_url || saleOrder.pdf_url} target="_blank" rel="noopener noreferrer">
                                             <Eye className="mr-2 h-4 w-4" />

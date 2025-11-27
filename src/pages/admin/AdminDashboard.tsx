@@ -107,27 +107,27 @@ const AdminDashboard = () => {
 
   return (
     <AdminLayout>
-      <div className="space-y-6">
+      <div className="space-y-8">
         <div>
-          <h1 className="text-3xl font-bold">Dashboard</h1>
-          <p className="text-muted-foreground">Welcome to Estre Admin Panel</p>
+          <h1 className="text-3xl lg:text-4xl font-serif font-bold text-walnut">Dashboard</h1>
+          <p className="text-walnut/60 mt-2">Welcome to Estre Admin Panel</p>
         </div>
 
         {/* Business Stats Grid */}
         <div>
-          <h2 className="text-lg font-semibold mb-3">Business Overview</h2>
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          <h2 className="text-xl font-serif font-semibold mb-4 text-walnut">Business Overview</h2>
+          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
             {statCards.map((stat) => {
               const Icon = stat.icon;
               return (
-                <Card key={stat.title}>
+                <Card key={stat.title} className="bg-white/80 backdrop-blur-md border border-gold/20 shadow-sm hover:shadow-md transition-all duration-300">
                   <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium">{stat.title}</CardTitle>
+                    <CardTitle className="text-sm font-medium text-walnut/80">{stat.title}</CardTitle>
                     <Icon className={`h-4 w-4 ${stat.color}`} />
                   </CardHeader>
                   <CardContent>
-                    <div className="text-2xl font-bold">{stat.value}</div>
-                    <p className="text-xs text-muted-foreground">{stat.description}</p>
+                    <div className="text-2xl font-serif font-bold text-walnut">{stat.value}</div>
+                    <p className="text-xs text-walnut/60 mt-1">{stat.description}</p>
                   </CardContent>
                 </Card>
               );
@@ -137,19 +137,19 @@ const AdminDashboard = () => {
 
         {/* Quality Control Stats */}
         <div>
-          <h2 className="text-lg font-semibold mb-3">Quality Control</h2>
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          <h2 className="text-xl font-serif font-semibold mb-4 text-walnut">Quality Control</h2>
+          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
             {qcCards.map((stat) => {
               const Icon = stat.icon;
               return (
-                <Card key={stat.title}>
+                <Card key={stat.title} className="bg-white/80 backdrop-blur-md border border-gold/20 shadow-sm hover:shadow-md transition-all duration-300">
                   <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium">{stat.title}</CardTitle>
+                    <CardTitle className="text-sm font-medium text-walnut/80">{stat.title}</CardTitle>
                     <Icon className={`h-4 w-4 ${stat.color}`} />
                   </CardHeader>
                   <CardContent>
-                    <div className="text-2xl font-bold">{stat.value}</div>
-                    <p className="text-xs text-muted-foreground">{stat.description}</p>
+                    <div className="text-2xl font-serif font-bold text-walnut">{stat.value}</div>
+                    <p className="text-xs text-walnut/60 mt-1">{stat.description}</p>
                   </CardContent>
                 </Card>
               );
@@ -158,23 +158,23 @@ const AdminDashboard = () => {
         </div>
 
         {/* Recent Activity */}
-        <div className="grid gap-4 md:grid-cols-2">
-          <Card>
+        <div className="grid gap-6 md:grid-cols-2">
+          <Card className="bg-white/80 backdrop-blur-md border border-gold/20 shadow-sm">
             <CardHeader>
-              <CardTitle>Recent Orders</CardTitle>
+              <CardTitle className="font-serif text-xl text-walnut">Recent Orders</CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-sm text-muted-foreground">
+              <p className="text-sm text-walnut/60">
                 View and manage recent customer orders
               </p>
             </CardContent>
           </Card>
-          <Card>
+          <Card className="bg-white/80 backdrop-blur-md border border-gold/20 shadow-sm">
             <CardHeader>
-              <CardTitle>Active Job Cards</CardTitle>
+              <CardTitle className="font-serif text-xl text-walnut">Active Job Cards</CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-sm text-muted-foreground">
+              <p className="text-sm text-walnut/60">
                 Monitor production status and assignments
               </p>
             </CardContent>

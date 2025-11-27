@@ -13,7 +13,7 @@ export function FloatingCTA() {
         <div className="flex flex-col gap-2 animate-slide-up">
           <Link to="/products?category=sofa">
             <Button
-              className="bg-gradient-gold text-white border-gold hover:shadow-gold-glow transition-premium shadow-lg"
+              className="bg-gold text-walnut border-gold hover:bg-gold/90 shadow-lg"
               size="lg"
             >
               <Sofa className="mr-2 h-5 w-5" />
@@ -28,7 +28,7 @@ export function FloatingCTA() {
           >
             <Button
               variant="outline"
-              className="border-gold/50 text-gold hover:bg-gold/10 hover:border-gold transition-premium shadow-lg bg-background/95 backdrop-blur-sm"
+              className="border-gold/50 text-gold hover:bg-gold/10 hover:border-gold shadow-lg bg-background/95 backdrop-blur-sm"
               size="lg"
             >
               <MessageCircle className="mr-2 h-5 w-5" />
@@ -42,7 +42,7 @@ export function FloatingCTA() {
       <Button
         onClick={() => setIsOpen(!isOpen)}
         size="lg"
-        className="rounded-full w-14 h-14 bg-gradient-gold text-white border-gold hover:shadow-gold-glow transition-premium shadow-lg"
+        className="rounded-full w-14 h-14 bg-gold text-walnut border-gold hover:bg-gold/90 shadow-lg"
       >
         {isOpen ? (
           <X className="h-6 w-6" />

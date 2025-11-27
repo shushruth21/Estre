@@ -33,11 +33,11 @@ const FabricSelector = ({
   // Memoize fabric codes to prevent unnecessary re-renders
   const fabricCodes = useMemo(() => {
     const codes: string[] = [];
-    
+
     if (configuration.fabric?.structureCode) {
       codes.push(configuration.fabric.structureCode);
     }
-    
+
     if (effectiveCategory === "bed" || effectiveCategory === "kids_bed") {
       // Bed: Structure and Headrest/Headboard only
       const headrestCode = configuration.fabric?.headrestCode || configuration.fabric?.headboardCode;
@@ -50,7 +50,7 @@ const FabricSelector = ({
       if (configuration.fabric?.seatCode) codes.push(configuration.fabric.seatCode);
       if (configuration.fabric?.headrestCode) codes.push(configuration.fabric.headrestCode);
     }
-    
+
     return codes.sort(); // Sort for stable query key
   }, [
     configuration.fabric?.structureCode,
@@ -116,9 +116,9 @@ const FabricSelector = ({
       }
 
       // Merge with existing configuration to preserve other fields
-      onConfigurationChange({ 
+      onConfigurationChange({
         ...configuration,
-        fabric: fabricUpdates 
+        fabric: fabricUpdates
       });
       setOpenLibrary(null);
     } catch (error) {
@@ -141,7 +141,7 @@ const FabricSelector = ({
         ...currentFabric,
         claddingPlan: value,
       };
-      
+
       // When switching to Multi Colour, ensure structureCode is preserved
       // When switching to Single Colour, clear multi-colour specific codes
       if (value === "Single Colour") {
@@ -162,11 +162,11 @@ const FabricSelector = ({
         // For beds, ensure headrestCode/headboardCode fields exist (even if undefined)
         // This helps with the UI showing the selector
       }
-      
+
       // Merge with existing configuration to preserve other fields
-      onConfigurationChange({ 
+      onConfigurationChange({
         ...configuration,
-        fabric: updatedFabric 
+        fabric: updatedFabric
       });
     } catch (error) {
       console.error("Error changing cladding plan:", error);
@@ -220,25 +220,25 @@ const FabricSelector = ({
         {configuration.fabric?.claddingPlan === "Multi Colour" && (
           <>
             {/* Bed category validation */}
-            {(effectiveCategory === "bed" || effectiveCategory === "kids_bed") && 
-             (!configuration.fabric?.structureCode || (!configuration.fabric?.headrestCode && !configuration.fabric?.headboardCode)) && (
-              <Alert variant="destructive">
-                <AlertCircle className="h-4 w-4" />
-                <AlertDescription>
-                  Multi Colour plan requires both Structure and Headrest fabrics to be selected.
-                </AlertDescription>
-              </Alert>
-            )}
+            {(effectiveCategory === "bed" || effectiveCategory === "kids_bed") &&
+              (!configuration.fabric?.structureCode || (!configuration.fabric?.headrestCode && !configuration.fabric?.headboardCode)) && (
+                <Alert variant="destructive">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription>
+                    Multi Colour plan requires both Structure and Headrest fabrics to be selected.
+                  </AlertDescription>
+                </Alert>
+              )}
             {/* Sofa/Sofabed category validation */}
-            {(effectiveCategory !== "bed" && effectiveCategory !== "kids_bed") && 
-             (!configuration.fabric?.structureCode || !configuration.fabric?.backrestCode || !configuration.fabric?.seatCode || !configuration.fabric?.headrestCode) && (
-              <Alert variant="destructive">
-                <AlertCircle className="h-4 w-4" />
-                <AlertDescription>
-                  Multi Colour plan requires Structure, Backrest, Seat, and Headrest fabrics to be selected.
-                </AlertDescription>
-              </Alert>
-            )}
+            {(effectiveCategory !== "bed" && effectiveCategory !== "kids_bed") &&
+              (!configuration.fabric?.structureCode || !configuration.fabric?.backrestCode || !configuration.fabric?.seatCode || !configuration.fabric?.headrestCode) && (
+                <Alert variant="destructive">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription>
+                    Multi Colour plan requires Structure, Backrest, Seat, and Headrest fabrics to be selected.
+                  </AlertDescription>
+                </Alert>
+              )}
           </>
         )}
 
@@ -340,26 +340,30 @@ const FabricPartSelector = ({
 }: FabricPartSelectorProps) => {
   return (
     <div>
-      <Label className="mb-2">{label}</Label>
-      <Button variant="outline" className="w-full justify-start" onClick={onOpenLibrary}>
+      <Label className="mb-2 text-walnut font-medium">{label}</Label>
+      <Button
+        variant="outline"
+        className="w-full justify-start h-auto py-3 border-gold/20 hover:border-gold hover:bg-gold/5 transition-all duration-300"
+        onClick={onOpenLibrary}
+      >
         {selectedFabric ? (
-          <div className="flex items-center gap-2 w-full">
+          <div className="flex items-center gap-3 w-full">
             <div
-              className="w-8 h-8 rounded-full border-2 border-gray-200 flex-shrink-0"
+              className="w-10 h-10 rounded-full border border-gold/20 flex-shrink-0 shadow-sm"
               style={{
                 backgroundColor: selectedFabric.colour_link || `hsl(${selectedFabric.estre_code.charCodeAt(0) % 360}, 70%, 75%)`,
               }}
             />
-            <Badge variant="outline">{selectedFabric.estre_code}</Badge>
-            <span className="flex-1 truncate">
+            <Badge variant="outline" className="border-gold/30 text-walnut bg-ivory">{selectedFabric.estre_code}</Badge>
+            <span className="flex-1 truncate text-walnut font-medium">
               {selectedFabric.description || selectedFabric.colour || selectedFabric.estre_code}
             </span>
-            <span className="ml-auto text-primary font-semibold">
+            <span className="ml-auto text-gold font-bold">
               ₹{selectedFabric.price?.toLocaleString() || 0}
             </span>
           </div>
         ) : (
-          <span className="text-muted-foreground">Select fabric...</span>
+          <span className="text-walnut/50 italic">Select fabric...</span>
         )}
       </Button>
     </div>

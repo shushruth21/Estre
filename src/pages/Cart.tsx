@@ -83,7 +83,7 @@ const Cart = () => {
         <h1 className="text-4xl lg:text-5xl font-serif font-bold mb-8 tracking-tight">Shopping Cart</h1>
 
         {cartItems.length === 0 && savedItems.length === 0 ? (
-          <Card className="luxury-card-glass border-gold/20">
+          <Card className="bg-white/80 backdrop-blur-md border border-gold/20 shadow-sm">
             <CardContent className="py-16 text-center">
               <ShoppingBag className="h-20 w-20 mx-auto mb-6 text-gold/60" />
               <h2 className="text-3xl font-serif font-bold mb-3">Your cart is empty</h2>
@@ -91,7 +91,7 @@ const Cart = () => {
                 Start configuring products to add them to your cart
               </p>
               <Link to="/products">
-                <Button className="bg-gradient-gold text-white border-gold hover:shadow-gold-glow transition-premium" size="lg">
+                <Button variant="luxury" size="lg" className="mt-4">
                   Browse Products
                 </Button>
               </Link>

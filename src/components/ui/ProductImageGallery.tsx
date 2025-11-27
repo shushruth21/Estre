@@ -39,7 +39,7 @@ const ProductImageGallery = ({ images, productTitle, className = "" }: ProductIm
     <>
       <div className={`space-y-4 ${className}`}>
         {/* Main Image */}
-          <div className="relative aspect-square bg-muted rounded-xl overflow-hidden group">
+        <div className="relative aspect-square bg-muted rounded-xl overflow-hidden group">
           <img
             src={imageUrls[selectedIndex]}
             alt={`${productTitle} - View ${selectedIndex + 1}`}
@@ -49,7 +49,7 @@ const ProductImageGallery = ({ images, productTitle, className = "" }: ProductIm
             loading="lazy"
             referrerPolicy="no-referrer-when-downgrade"
           />
-          
+
           {/* Zoom Button */}
           <button
             onClick={() => setIsLightboxOpen(true)}
@@ -94,11 +94,10 @@ const ProductImageGallery = ({ images, productTitle, className = "" }: ProductIm
               <button
                 key={index}
                 onClick={() => setSelectedIndex(index)}
-                className={`aspect-square rounded-lg overflow-hidden border-2 transition-all ${
-                  selectedIndex === index
-                    ? 'border-primary ring-2 ring-primary/20'
-                    : 'border-transparent hover:border-muted-foreground/20'
-                }`}
+                className={`aspect-square rounded-lg overflow-hidden border-2 transition-all ${selectedIndex === index
+                    ? 'border-gold ring-2 ring-gold/20'
+                    : 'border-transparent hover:border-gold/20'
+                  }`}
               >
                 <img
                   src={url}
@@ -127,7 +126,7 @@ const ProductImageGallery = ({ images, productTitle, className = "" }: ProductIm
               crossOrigin="anonymous"
               referrerPolicy="no-referrer-when-downgrade"
             />
-            
+
             {imageUrls.length > 1 && (
               <>
                 <Button

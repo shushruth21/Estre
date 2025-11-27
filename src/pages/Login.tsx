@@ -58,7 +58,7 @@ const Login = () => {
   useEffect(() => {
     // If still loading auth, wait
     if (authLoading) return;
-    
+
     // If no user, don't redirect (show login form)
     if (!user) return;
 
@@ -147,7 +147,7 @@ const Login = () => {
         try {
           await Promise.race([
             refreshProfile(),
-            new Promise((_, reject) => 
+            new Promise((_, reject) =>
               setTimeout(() => reject(new Error("Profile refresh timeout")), 3000)
             )
           ]);
@@ -159,17 +159,17 @@ const Login = () => {
 
       // Get current user for direct profile query if needed
       const { data: { user: currentUser } } = await supabase.auth.getUser();
-      
+
       // Quick check for admin/staff roles (max 1 second)
       // For customers, redirect immediately without waiting
       let attempts = 0;
       const maxAttempts = 5; // 5 attempts * 200ms = 1 second max
       let detectedRole: "admin" | "staff" | "customer" | null = null;
-      
+
       // Quick check for admin/staff (customers are default, no need to wait)
       while (attempts < maxAttempts) {
         await new Promise(resolve => setTimeout(resolve, 200));
-        
+
         // Check if admin/staff role is available
         if (isAdmin()) {
           detectedRole = "admin";
@@ -199,10 +199,10 @@ const Login = () => {
               detectedRole = "staff";
             }
             // If role is customer or null, detectedRole stays null (will default to customer)
-            
+
             // Force refresh profile in context (non-blocking)
             if (refreshProfile && detectedRole) {
-              refreshProfile().catch(() => {});
+              refreshProfile().catch(() => { });
             }
           }
         } catch (err) {
@@ -240,7 +240,7 @@ const Login = () => {
       }
     } catch (error: any) {
       console.error("Login error:", error);
-      
+
       // Provide user-friendly error messages
       let errorMessage = "Invalid email or password";
       if (error?.message?.includes("Invalid login credentials") || error?.message?.includes("Invalid login")) {
@@ -283,11 +283,11 @@ const Login = () => {
         </div>
       </header>
 
-      <div className="flex-1 flex items-center justify-center p-4 bg-gradient-to-br from-background via-muted/20 to-background">
-        <Card className="w-full max-w-md shadow-xl border-gold/20" id="main-content" role="main">
+      <div className="flex-1 flex items-center justify-center p-4 bg-ivory">
+        <Card className="w-full max-w-md shadow-lg border-gold/20 bg-white/80 backdrop-blur-sm" id="main-content" role="main">
           <CardHeader className="space-y-2 text-center">
-            <div className="mx-auto w-16 h-16 rounded-full bg-gradient-gold flex items-center justify-center shadow-lg mb-2" aria-hidden="true">
-              <span className="text-white font-bold text-2xl font-luxury">E</span>
+            <div className="mx-auto w-16 h-16 rounded-full bg-gold/10 flex items-center justify-center shadow-sm mb-4 border border-gold/20" aria-hidden="true">
+              <span className="text-gold font-serif font-bold text-3xl">e</span>
             </div>
             <CardTitle className="text-3xl font-serif" id="login-title">Welcome Back</CardTitle>
             <CardDescription className="text-base">
@@ -387,7 +387,8 @@ const Login = () => {
                 </div>
                 <Button
                   type="submit"
-                  className="w-full luxury-button bg-gradient-gold text-white border-gold hover:shadow-gold-glow transition-premium text-base py-6"
+                  variant="luxury"
+                  className="w-full py-6 text-base"
                   disabled={isLoading}
                   aria-label="Sign in to your account"
                 >

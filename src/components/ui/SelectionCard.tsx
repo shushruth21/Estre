@@ -15,28 +15,31 @@ export const SelectionCard = ({ label, icon, isSelected, onClick, className }: S
       type="button"
       onClick={onClick}
       className={cn(
-        "relative flex flex-col items-center justify-center p-4 border-2 rounded-lg transition-all cursor-pointer",
-        "hover:border-primary/50 hover:bg-primary/5",
-        isSelected 
-          ? "border-primary bg-primary/10 shadow-md" 
-          : "border-muted bg-background",
+        "relative flex flex-col items-center justify-center p-4 border rounded-xl transition-all duration-300 cursor-pointer group",
+        "hover:border-gold hover:bg-gold/5 hover:shadow-md",
+        isSelected
+          ? "border-gold bg-gold/10 shadow-md"
+          : "border-gold/20 bg-white",
         className
       )}
     >
       {icon && (
-        <div className="mb-2 text-muted-foreground">
+        <div className={cn(
+          "mb-3 transition-colors duration-300",
+          isSelected ? "text-gold" : "text-walnut/60 group-hover:text-gold"
+        )}>
           {icon}
         </div>
       )}
       <span className={cn(
-        "text-sm font-medium text-center",
-        isSelected ? "text-primary" : "text-foreground"
+        "text-sm font-medium text-center transition-colors duration-300",
+        isSelected ? "text-walnut font-bold" : "text-walnut/80"
       )}>
         {label}
       </span>
       {isSelected && (
         <div className="absolute top-2 right-2">
-          <Check className="h-5 w-5 text-primary" />
+          <Check className="h-4 w-4 text-gold" />
         </div>
       )}
     </button>
