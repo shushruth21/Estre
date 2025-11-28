@@ -35,13 +35,13 @@ export const Navbar = () => {
         <header className="sticky top-0 z-50 border-b border-gold/10 bg-ivory/80 backdrop-blur-md shadow-sm transition-all duration-300">
             <div className="container mx-auto px-4 lg:px-8 h-20 flex justify-between items-center">
                 {/* Logo */}
+                {/* Logo */}
                 <Link to="/" className="flex items-center gap-2 group">
-                    <div className="relative flex items-center justify-center w-10 h-10 rounded-lg bg-walnut text-gold shadow-md group-hover:shadow-lg transition-all duration-300">
-                        <span className="font-serif font-bold text-xl pb-1">e</span>
-                    </div>
-                    <span className="text-3xl font-serif font-bold tracking-tight text-walnut group-hover:text-gold transition-colors duration-300">
-                        estre
-                    </span>
+                    <img
+                        src="/estre-logo.jpg"
+                        alt="Estre"
+                        className="h-12 w-auto object-contain transition-transform duration-300 group-hover:scale-105"
+                    />
                 </Link>
 
                 {/* Desktop Navigation */}

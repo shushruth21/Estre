@@ -286,8 +286,8 @@ const Login = () => {
       <div className="flex-1 flex items-center justify-center p-4 bg-ivory">
         <Card className="w-full max-w-md shadow-lg border-gold/20 bg-white/80 backdrop-blur-sm" id="main-content" role="main">
           <CardHeader className="space-y-2 text-center">
-            <div className="mx-auto w-16 h-16 rounded-full bg-gold/10 flex items-center justify-center shadow-sm mb-4 border border-gold/20" aria-hidden="true">
-              <span className="text-gold font-serif font-bold text-3xl">e</span>
+            <div className="mx-auto mb-6 flex justify-center">
+              <img src="/estre-logo.jpg" alt="Estre" className="h-16 w-auto object-contain" />
             </div>
             <CardTitle className="text-3xl font-serif" id="login-title">Welcome Back</CardTitle>
             <CardDescription className="text-base">

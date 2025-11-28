@@ -9,12 +9,13 @@ export const Footer = () => {
                 <div className="grid md:grid-cols-4 gap-12 mb-16">
                     {/* Brand Column */}
                     <div className="space-y-6">
-                        <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-lg bg-gold flex items-center justify-center text-walnut font-serif font-bold text-xl">
-                                e
-                            </div>
-                            <span className="text-3xl font-serif font-bold tracking-tight text-gold">estre</span>
-                        </div>
+                        <Link to="/" className="inline-block">
+                            <img
+                                src="/estre-logo.jpg"
+                                alt="Estre"
+                                className="h-12 w-auto object-contain rounded-lg bg-white p-1"
+                            />
+                        </Link>
                         <p className="text-ivory/80 leading-relaxed max-w-xs font-light">
                             Crafting exceptional furniture experiences.
                             Premium, minimal, and bespoke designs for your sanctuary.
