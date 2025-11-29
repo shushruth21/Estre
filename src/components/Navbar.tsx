@@ -90,6 +90,20 @@ export const Navbar = () => {
                             <Button variant="ghost" className="text-walnut hover:text-gold">Dashboard</Button>
                         </Link>
                     )}
+
+                    {user && (
+                        <Button
+                            variant="ghost"
+                            className="text-walnut hover:text-red-600 hover:bg-red-50"
+                            onClick={async () => {
+                                const { supabase } = await import("@/integrations/supabase/client");
+                                await supabase.auth.signOut();
+                                window.location.href = "/";
+                            }}
+                        >
+                            Logout
+                        </Button>
+                    )}
                 </div>
 
                 {/* Mobile Menu Toggle */}
@@ -130,9 +144,17 @@ export const Navbar = () => {
                             </Link>
                         )}
                         {user && (
-                            <Link to="/login" onClick={() => setMobileMenuOpen(false)}>
-                                <Button variant="ghost" className="w-full justify-start text-lg font-medium text-walnut hover:text-gold">Switch Account</Button>
-                            </Link>
+                            <Button
+                                variant="ghost"
+                                className="w-full justify-start text-lg font-medium text-red-600 hover:text-red-700 hover:bg-red-50"
+                                onClick={async () => {
+                                    const { supabase } = await import("@/integrations/supabase/client");
+                                    await supabase.auth.signOut();
+                                    window.location.href = "/";
+                                }}
+                            >
+                                Logout
+                            </Button>
                         )}
                     </div>
                 </div>
