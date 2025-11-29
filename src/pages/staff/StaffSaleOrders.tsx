@@ -11,7 +11,7 @@
  * Route: /staff/sale-orders
  */
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { StaffLayout } from "@/components/staff/StaffLayout";
@@ -43,6 +43,7 @@ import { Loader2, Tag, Eye, CheckCircle2, AlertCircle, ClipboardList, FileCheck,
 import { format } from "date-fns";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Link } from "react-router-dom";
+import { PerfectSaleOrder } from "@/components/orders/PerfectSaleOrder";
 
 const formatCurrency = (value: number | null | undefined) => {
   if (!value || Number.isNaN(value)) return "₹0";
@@ -58,6 +59,30 @@ export default function StaffSaleOrders() {
   const [isDiscountDialogOpen, setIsDiscountDialogOpen] = useState(false);
   const [manualDiscount, setManualDiscount] = useState<string>("");
   const [isCompletingOrder, setIsCompletingOrder] = useState(false);
+
+  // Real-time subscription
+  useEffect(() => {
+    console.log("🔌 Setting up real-time subscription for sale_orders");
+    const channel = supabase
+      .channel('schema-db-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'sale_orders'
+        },
+        (payload) => {
+          console.log('🔔 Real-time update received:', payload);
+          queryClient.invalidateQueries({ queryKey: ["staff-sale-orders"] });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [queryClient]);
 
   // Fetch pending sale orders with better error handling
   const { data: saleOrders, isLoading, error: saleOrdersError, refetch } = useQuery({
@@ -577,113 +602,100 @@ export default function StaffSaleOrders() {
                                   </DialogDescription>
                                 </DialogHeader>
                                 <div className="space-y-4">
-                                  <div>
-                                    <Label className="text-sm font-semibold">Customer Information</Label>
-                                    <div className="mt-2 space-y-1 text-sm">
-                                      <p>
-                                        <span className="font-medium">Name:</span> {saleOrder.order?.customer_name}
-                                      </p>
-                                      <p>
-                                        <span className="font-medium">Email:</span> {saleOrder.order?.customer_email}
-                                      </p>
-                                      <p>
-                                        <span className="font-medium">Phone:</span> {saleOrder.order?.customer_phone}
-                                      </p>
-                                      {saleOrder.order?.buyer_gst && (
-                                        <p>
-                                          <span className="font-medium">GST:</span> {saleOrder.order.buyer_gst}
-                                        </p>
-                                      )}
-                                    </div>
-                                  </div>
-
-                                  <div>
-                                    <Label className="text-sm font-semibold">Delivery Address</Label>
-                                    <div className="mt-2 text-sm">
-                                      {saleOrder.order?.delivery_address && typeof saleOrder.order.delivery_address === 'object' ? (
-                                        <div className="space-y-1">
-                                          <p>{saleOrder.order.delivery_address.street}</p>
-                                          <p>{saleOrder.order.delivery_address.city}, {saleOrder.order.delivery_address.state}</p>
-                                          <p>PIN: {saleOrder.order.delivery_address.pincode}</p>
-                                          {saleOrder.order.delivery_address.landmark && (
-                                            <p className="text-muted-foreground">Landmark: {saleOrder.order.delivery_address.landmark}</p>
-                                          )}
-                                        </div>
-                                      ) : (
-                                        <p className="text-muted-foreground">Address not available</p>
-                                      )}
-                                    </div>
-                                  </div>
-
-                                  {saleOrder.order?.order_items && saleOrder.order.order_items.length > 0 && (
-                                    <div>
-                                      <Label className="text-sm font-semibold">Order Items ({saleOrder.order.order_items.length})</Label>
-                                      <div className="mt-2 space-y-2">
-                                        {saleOrder.order.order_items.map((item: any, idx: number) => (
-                                          <div key={item.id || idx} className="p-3 bg-muted rounded-lg">
-                                            <div className="flex justify-between items-start">
-                                              <div className="flex-1">
-                                                <p className="font-medium">{item.product_title || item.product_category}</p>
-                                                <p className="text-xs text-muted-foreground">
-                                                  Category: {item.product_category}
-                                                </p>
-                                                {item.quantity && (
-                                                  <p className="text-xs text-muted-foreground">
-                                                    Quantity: {item.quantity}
-                                                  </p>
-                                                )}
-                                              </div>
-                                              <div className="text-right">
-                                                <p className="font-semibold">
-                                                  ₹{Math.round(item.total_price_rs || item.unit_price_rs || 0).toLocaleString()}
-                                                </p>
-                                              </div>
-                                            </div>
-                                          </div>
-                                        ))}
-                                      </div>
-                                    </div>
-                                  )}
-
-                                  <div>
-                                    <Label className="text-sm font-semibold">Pricing</Label>
-                                    <div className="mt-2 space-y-1 text-sm">
-                                      <div className="flex justify-between">
-                                        <span>Base Price:</span>
-                                        <span>{formatCurrency(saleOrder.base_price)}</span>
-                                      </div>
-                                      {saleOrder.discount > 0 && (
-                                        <div className="flex justify-between text-green-600">
-                                          <span>Discount:</span>
-                                          <span>-{formatCurrency(saleOrder.discount)}</span>
-                                        </div>
-                                      )}
-                                      <div className="flex justify-between font-semibold border-t pt-1">
-                                        <span>Final Price:</span>
-                                        <span>{formatCurrency(saleOrder.final_price)}</span>
-                                      </div>
-                                    </div>
-                                  </div>
-
-                                  {saleOrder.order?.special_instructions && (
-                                    <div>
-                                      <Label className="text-sm font-semibold">Special Instructions</Label>
-                                      <p className="mt-2 text-sm text-muted-foreground">{saleOrder.order.special_instructions}</p>
-                                    </div>
-                                  )}
-
-                                  <div>
-                                    <Label className="text-sm font-semibold">Status</Label>
-                                    <div className="mt-2 flex items-center gap-2">
-                                      <Badge variant="outline" className="capitalize">
-                                        {saleOrder.status?.replace(/_/g, ' ')}
-                                      </Badge>
-                                      {saleOrder.order?.status && (
-                                        <Badge variant="secondary" className="capitalize">
-                                          Order: {saleOrder.order.status.replace(/_/g, ' ')}
-                                        </Badge>
-                                      )}
-                                    </div>
+                                  {/* Use the new Perfect Sale Order Template */}
+                                  <div className="border rounded-lg overflow-hidden bg-gray-50">
+                                    <PerfectSaleOrder
+                                      data={{
+                                        header: {
+                                          so_number: saleOrder.order_number,
+                                          order_date: format(new Date(saleOrder.created_at), "dd-MMM-yyyy"),
+                                          company: {
+                                            name: "ESTRE GLOBAL PRIVATE LTD",
+                                            addressLines: [
+                                              "Near Dhoni Public School, AECS Layout – A Block",
+                                              "Revenue Layout, Singasandra, Bengaluru – 560068"
+                                            ],
+                                            phone: "+91 8722200100",
+                                            email: "support@estre.in",
+                                            gst: "29AAMCE9846D1ZU"
+                                          },
+                                          invoice_to: {
+                                            customer_name: saleOrder.customer_name,
+                                            addressLines: [saleOrder.customer_address?.street, saleOrder.customer_address?.landmark].filter(Boolean),
+                                            city: saleOrder.customer_address?.city,
+                                            pincode: saleOrder.customer_address?.pincode,
+                                            mobile: saleOrder.customer_phone,
+                                            email: saleOrder.customer_email
+                                          },
+                                          dispatch_to: {
+                                            customer_name: saleOrder.customer_name,
+                                            addressLines: [saleOrder.customer_address?.street, saleOrder.customer_address?.landmark].filter(Boolean),
+                                            city: saleOrder.customer_address?.city,
+                                            pincode: saleOrder.customer_address?.pincode,
+                                            mobile: saleOrder.customer_phone,
+                                            email: saleOrder.customer_email
+                                          },
+                                          payment_terms: {
+                                            advance_percent: 50,
+                                            advance_condition: "On placing Sale Order",
+                                            balance_condition: "Upon intimation of product readiness, before dispatch"
+                                          },
+                                          delivery_terms: {
+                                            delivery_days: 30,
+                                            delivery_date: saleOrder.order?.expected_delivery_date || format(new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), "dd-MMM-yyyy"),
+                                            dispatch_through: "Safe Express"
+                                          },
+                                          buyer_gst: saleOrder.order?.buyer_gst,
+                                          status: saleOrder.status,
+                                          created_at: saleOrder.created_at,
+                                          updated_at: saleOrder.updated_at,
+                                          created_by: "system",
+                                          updated_by: "system"
+                                        },
+                                        lineItems: saleOrder.order?.order_items?.map((item: any) => ({
+                                          line_item_id: item.id,
+                                          so_number: saleOrder.order_number,
+                                          category: item.product_category,
+                                          model_name: item.product_title,
+                                          shape: item.configuration?.shape || "",
+                                          sections: [], // Simplified for preview, would need full mapping
+                                          fabric: {
+                                            plan: item.configuration?.fabric?.claddingPlan || "Single Colour",
+                                            upgrade_charge: 0,
+                                            colour_variance_note: ""
+                                          },
+                                          seat_dimensions: {
+                                            depth_in: 0,
+                                            width_in: 0,
+                                            height_in: 0,
+                                            depth_upgrade_charge: 0,
+                                            width_upgrade_charge: 0,
+                                            height_upgrade_charge: 0
+                                          },
+                                          armrest_charge: 0,
+                                          legs_charge: 0,
+                                          accessories: [],
+                                          approximate_widths: { overall_inches: 0 },
+                                          line_total: item.total_price_rs || 0,
+                                          // ... map other fields as best as possible from available data
+                                          // Note: Ideally we should store the full generated snapshot in sale_orders table
+                                          // For now, we are reconstructing it for display
+                                          ...((saleOrder.order?.metadata?.sale_orders?.[0]?.lineItems?.find((li: any) => li.line_item_id === item.id)) || {})
+                                        })) || [],
+                                        totals: {
+                                          so_number: saleOrder.order_number,
+                                          subtotal: saleOrder.base_price,
+                                          discount_amount: saleOrder.discount,
+                                          total_amount: saleOrder.final_price,
+                                          advance_amount: saleOrder.final_price * 0.5,
+                                          balance_amount: saleOrder.final_price * 0.5,
+                                          paid_amount: 0,
+                                          outstanding_amount: saleOrder.final_price
+                                        },
+                                        payments: [],
+                                        jobCards: []
+                                      }}
+                                    />
                                   </div>
 
                                   {/* Action Buttons */}
@@ -748,6 +760,31 @@ export default function StaffSaleOrders() {
                                           <ClipboardList className="mr-2 h-4 w-4" />
                                           View/Create Job Cards
                                         </Link>
+                                      </Button>
+                                    )}
+
+                                    {saleOrder.status === "pending_review" && (
+                                      <Button
+                                        onClick={() => {
+                                          applyManualDiscountMutation.mutate({
+                                            saleOrderId: saleOrder.id,
+                                            discountAmount: 0 // Approve with 0 discount
+                                          });
+                                        }}
+                                        disabled={applyManualDiscountMutation.isPending}
+                                        className="flex-1 bg-green-600 hover:bg-green-700 text-white"
+                                      >
+                                        {applyManualDiscountMutation.isPending ? (
+                                          <>
+                                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                            Approving...
+                                          </>
+                                        ) : (
+                                          <>
+                                            <CheckCircle2 className="mr-2 h-4 w-4" />
+                                            Approve & Send to Customer
+                                          </>
+                                        )}
                                       </Button>
                                     )}
 

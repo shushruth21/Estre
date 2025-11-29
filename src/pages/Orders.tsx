@@ -1,15 +1,16 @@
 import { useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, ArrowLeft, Package } from "lucide-react";
+import { Loader2, ArrowLeft, Package, Eye, CheckCircle2 } from "lucide-react";
 import { format } from "date-fns";
 
 const Orders = () => {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
 
   const { data: user } = useQuery({
     queryKey: ["user"],
@@ -21,6 +22,33 @@ const Orders = () => {
     },
   });
 
+  // Real-time subscription
+  useEffect(() => {
+    if (!user) return;
+
+    const channel = supabase
+      .channel('customer-orders-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'sale_orders',
+          filter: `customer_id=eq.${user.id}`
+        },
+        (payload) => {
+          console.log('🔔 Real-time update received:', payload);
+          queryClient.invalidateQueries({ queryKey: ["customer-orders"] });
+          queryClient.invalidateQueries({ queryKey: ["customer-sale-orders"] });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user, queryClient]);
+
   const { data: orders, isLoading } = useQuery({
     queryKey: ["orders", user?.id],
     queryFn: async () => {
@@ -29,6 +57,7 @@ const Orders = () => {
         .from("orders")
         .select(`
           *,
+          sale_orders(*),
           order_items(
             id,
             quantity,
@@ -191,6 +220,43 @@ const Orders = () => {
                         Balance Amount: ₹
                         {Math.round(order.balance_amount_rs || 0).toLocaleString()}
                       </p>
+                    </div>
+                  )}
+
+                  {/* Sale Order Actions */}
+                  {/* @ts-ignore */}
+                  {order.sale_orders && order.sale_orders.length > 0 && (
+                    <div className="pt-4 border-t">
+                      <h4 className="font-semibold mb-2">Sale Order Status</h4>
+                      {/* @ts-ignore */}
+                      {order.sale_orders.map((so: any) => (
+                        <div key={so.id} className="space-y-3">
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm text-muted-foreground">
+                              Status: <Badge variant="outline">{so.status.replace(/_/g, ' ')}</Badge>
+                            </span>
+                            <span className="text-sm font-medium">
+                              Final Price: {so.final_price ? `₹${so.final_price.toLocaleString()}` : 'Pending'}
+                            </span>
+                          </div>
+
+                          <div className="flex gap-2">
+                            <Button variant="outline" size="sm" asChild>
+                              <Link to={`/sale-order/${so.id}`}>
+                                <Eye className="mr-2 h-4 w-4" />
+                                View Sale Order
+                              </Link>
+                            </Button>
+
+                            {so.status === 'awaiting_customer_confirmation' && (
+                              <Button size="sm" className="bg-green-600 hover:bg-green-700">
+                                <CheckCircle2 className="mr-2 h-4 w-4" />
+                                Confirm & Pay Advance
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   )}
                 </CardContent>

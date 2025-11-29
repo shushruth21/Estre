@@ -1,99 +1,66 @@
-import React, { useState, useEffect, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { SaleOrderDocument } from "@/components/orders/SaleOrderDocument";
-import { generateSaleOrderData, SaleOrderGeneratedData } from "@/lib/sale-order-generator";
-import { calculateDynamicPrice } from "@/lib/dynamic-pricing";
-import { Loader2, ArrowLeft } from "lucide-react";
+import { PerfectSaleOrder } from "@/components/orders/PerfectSaleOrder";
 import { Button } from "@/components/ui/button";
+import { Loader2, CheckCircle2, ArrowLeft } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import { format } from "date-fns";
 
 const SaleOrder = () => {
-  const { orderId, itemId } = useParams();
+  const { id } = useParams();
   const navigate = useNavigate();
-  const [saleOrderData, setSaleOrderData] = useState<SaleOrderGeneratedData | null>(null);
-  const [isGenerating, setIsGenerating] = useState(false);
+  const { toast } = useToast();
 
-  // Fetch order
-  const { data: order, isLoading: loadingOrder } = useQuery({
-    queryKey: ["order", orderId],
+  const { data: saleOrder, isLoading, refetch } = useQuery({
+    queryKey: ["sale-order", id],
     queryFn: async () => {
-      if (!orderId) return null;
       const { data, error } = await supabase
-        .from("orders")
-        .select("*")
-        .eq("id", orderId)
+        .from("sale_orders")
+        .select(`
+          *,
+          order:orders(*)
+        `)
+        .eq("id", id)
         .single();
-      
+
       if (error) throw error;
       return data;
     },
-    enabled: !!orderId,
   });
 
-  // Fetch order items
-  const { data: orderItems, isLoading: loadingItems } = useQuery({
-    queryKey: ["order-items", orderId],
-    queryFn: async () => {
-      if (!orderId) return [];
-      const { data, error } = await supabase
-        .from("order_items")
-        .select("*")
-        .eq("order_id", orderId);
-      
+  const confirmOrderMutation = useMutation({
+    mutationFn: async () => {
+      const { error } = await supabase
+        .from("sale_orders")
+        .update({
+          status: "customer_confirmed",
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", id);
+
       if (error) throw error;
-      return data || [];
     },
-    enabled: !!orderId,
+    onSuccess: () => {
+      toast({
+        title: "Order Confirmed",
+        description: "Thank you for confirming your order. Proceeding to payment...",
+      });
+      refetch();
+      // Navigate to payment or show payment modal
+      // For now, we can navigate back to orders or stay here
+    },
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: "Failed to confirm order. Please try again.",
+        variant: "destructive",
+      });
+      console.error("Error confirming order:", error);
+    },
   });
 
-  // Generate sale order data
-  const generateSaleOrder = useCallback(async () => {
-    if (!order || !orderItems || orderItems.length === 0) return;
-
-    setIsGenerating(true);
-    try {
-      // Use the first order item, or the specified itemId
-      const orderItem = itemId 
-        ? orderItems.find((item: any) => item.id === itemId)
-        : orderItems[0];
-
-      if (!orderItem) {
-        throw new Error("Order item not found");
-      }
-
-      // Recalculate pricing breakdown
-      const pricing = await calculateDynamicPrice(
-        orderItem.product_category,
-        orderItem.product_id,
-        orderItem.configuration
-      );
-
-      // Generate sale order data
-      const saleData = await generateSaleOrderData(
-        order,
-        orderItem,
-        orderItem.configuration,
-        pricing.breakdown
-      );
-
-      setSaleOrderData(saleData);
-    } catch (error: any) {
-      console.error("Error generating sale order:", error);
-      alert("Error generating sale order: " + error.message);
-    } finally {
-      setIsGenerating(false);
-    }
-  }, [order, orderItems, itemId]);
-
-  // Auto-generate on load
-  useEffect(() => {
-    if (order && orderItems && orderItems.length > 0 && !saleOrderData && !isGenerating) {
-      generateSaleOrder();
-    }
-  }, [order, orderItems, saleOrderData, isGenerating, generateSaleOrder]);
-
-  if (loadingOrder || loadingItems) {
+  if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -101,58 +68,143 @@ const SaleOrder = () => {
     );
   }
 
-  if (!order || !orderItems || orderItems.length === 0) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <p className="text-lg mb-4">Order not found</p>
-          <Button onClick={() => navigate("/orders")}>
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            Back to Orders
-          </Button>
-        </div>
-      </div>
-    );
+  if (!saleOrder) {
+    return <div>Sale Order not found</div>;
   }
 
-  if (isGenerating) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto mb-4" />
-          <p>Generating Sale Order...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (!saleOrderData) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <p className="text-lg mb-4">Preparing sale order...</p>
-          <Button onClick={generateSaleOrder} disabled={isGenerating}>
-            {isGenerating ? "Generating..." : "Generate Sale Order"}
-          </Button>
-        </div>
-      </div>
-    );
-  }
+  // Construct data for PerfectSaleOrder
+  // Note: This mapping logic is duplicated from StaffSaleOrders.tsx. 
+  // Ideally, we should move this to a helper function or hook.
+  const perfectSaleOrderData = {
+    header: {
+      so_number: saleOrder.order_number,
+      order_date: format(new Date(saleOrder.created_at), "dd-MMM-yyyy"),
+      company: {
+        name: "ESTRE GLOBAL PRIVATE LTD",
+        addressLines: [
+          "Near Dhoni Public School, AECS Layout – A Block",
+          "Revenue Layout, Singasandra, Bengaluru – 560068"
+        ],
+        phone: "+91 8722200100",
+        email: "support@estre.in",
+        gst: "29AAMCE9846D1ZU"
+      },
+      invoice_to: {
+        customer_name: saleOrder.customer_name,
+        addressLines: [saleOrder.customer_address?.street, saleOrder.customer_address?.landmark].filter(Boolean),
+        city: saleOrder.customer_address?.city,
+        pincode: saleOrder.customer_address?.pincode,
+        mobile: saleOrder.customer_phone,
+        email: saleOrder.customer_email
+      },
+      dispatch_to: {
+        customer_name: saleOrder.customer_name,
+        addressLines: [saleOrder.customer_address?.street, saleOrder.customer_address?.landmark].filter(Boolean),
+        city: saleOrder.customer_address?.city,
+        pincode: saleOrder.customer_address?.pincode,
+        mobile: saleOrder.customer_phone,
+        email: saleOrder.customer_email
+      },
+      payment_terms: {
+        advance_percent: 50,
+        advance_condition: "On placing Sale Order",
+        balance_condition: "Upon intimation of product readiness, before dispatch"
+      },
+      delivery_terms: {
+        delivery_days: 30,
+        delivery_date: saleOrder.order?.expected_delivery_date || format(new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), "dd-MMM-yyyy"),
+        dispatch_through: "Safe Express"
+      },
+      buyer_gst: saleOrder.order?.buyer_gst,
+      status: saleOrder.status,
+      created_at: saleOrder.created_at,
+      updated_at: saleOrder.updated_at,
+      created_by: "system",
+      updated_by: "system"
+    },
+    lineItems: saleOrder.order?.order_items?.map((item: any) => ({
+      line_item_id: item.id,
+      so_number: saleOrder.order_number,
+      category: item.product_category,
+      model_name: item.product_title,
+      shape: item.configuration?.shape || "",
+      sections: [],
+      fabric: {
+        plan: item.configuration?.fabric?.claddingPlan || "Single Colour",
+        upgrade_charge: 0,
+        colour_variance_note: ""
+      },
+      seat_dimensions: {
+        depth_in: 0,
+        width_in: 0,
+        height_in: 0,
+        depth_upgrade_charge: 0,
+        width_upgrade_charge: 0,
+        height_upgrade_charge: 0
+      },
+      armrest_charge: 0,
+      legs_charge: 0,
+      accessories: [],
+      approximate_widths: { overall_inches: 0 },
+      line_total: item.total_price_rs || 0,
+      ...((saleOrder.order?.metadata?.sale_orders?.[0]?.lineItems?.find((li: any) => li.line_item_id === item.id)) || {})
+    })) || [],
+    totals: {
+      so_number: saleOrder.order_number,
+      subtotal: saleOrder.base_price,
+      discount_amount: saleOrder.discount,
+      total_amount: saleOrder.final_price,
+      advance_amount: saleOrder.final_price * 0.5,
+      balance_amount: saleOrder.final_price * 0.5,
+      paid_amount: 0,
+      outstanding_amount: saleOrder.final_price
+    },
+    payments: [],
+    jobCards: []
+  };
 
   return (
-    <div className="min-h-screen bg-background">
-      <div className="container mx-auto px-4 py-6">
-        <div className="mb-4 print:hidden">
-          <Button variant="outline" onClick={() => navigate("/orders")}>
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            Back to Orders
-          </Button>
+    <div className="min-h-screen bg-gray-50 pb-20">
+      <div className="container mx-auto px-4 py-8">
+        <Button variant="ghost" className="mb-4" onClick={() => navigate("/orders")}>
+          <ArrowLeft className="mr-2 h-4 w-4" />
+          Back to Orders
+        </Button>
+
+        <div className="bg-white rounded-lg shadow-lg overflow-hidden mb-8">
+          <PerfectSaleOrder data={perfectSaleOrderData} />
         </div>
-        <SaleOrderDocument data={saleOrderData} />
+
+        {saleOrder.status === "awaiting_customer_confirmation" && (
+          <div className="fixed bottom-0 left-0 right-0 bg-white border-t p-4 shadow-lg z-50">
+            <div className="container mx-auto flex justify-between items-center">
+              <div className="text-lg font-bold">
+                Total Amount: ₹{saleOrder.final_price.toLocaleString()}
+              </div>
+              <Button
+                size="lg"
+                className="bg-green-600 hover:bg-green-700 text-white"
+                onClick={() => confirmOrderMutation.mutate()}
+                disabled={confirmOrderMutation.isPending}
+              >
+                {confirmOrderMutation.isPending ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Confirming...
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle2 className="mr-2 h-4 w-4" />
+                    Confirm & Pay Advance
+                  </>
+                )}
+              </Button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
 };
 
 export default SaleOrder;
-

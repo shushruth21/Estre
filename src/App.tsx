@@ -19,6 +19,7 @@ import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
 import NotFound from "./pages/NotFound";
 
+
 // Lazy load non-critical pages for better initial load performance
 const Products = lazy(() => import("./pages/Products"));
 const Configure = lazy(() => import("./pages/Configure"));
@@ -50,6 +51,9 @@ const StaffJobCardDetail = lazy(() => import("./pages/staff/StaffJobCardDetail")
 
 // Lazy load order confirmation and payment pages
 const OrderConfirmation = lazy(() => import("./pages/OrderConfirmation"));
+
+// Lazy load production pages
+const ProductionJobCard = lazy(() => import("./pages/production/ProductionJobCard"));
 
 // Configure QueryClient with optimized performance settings
 const queryClient = new QueryClient({
@@ -265,6 +269,11 @@ const App = () => (
                   } />
 
                   {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+                  <Route path="/production/job-card/:id" element={
+                    <Suspense fallback={<LoadingSpinner />}>
+                      <ProductionJobCard />
+                    </Suspense>
+                  } />
                   <Route path="*" element={<NotFound />} />
                 </Routes>
                 {/* Floating CTA - only on customer-facing pages */}

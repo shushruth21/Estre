@@ -93,32 +93,40 @@ const Index = () => {
       <Navbar />
 
       {/* Hero Section */}
-      <section className="relative overflow-hidden min-h-[90vh] flex items-center justify-center bg-ivory">
-        {/* Background Elements */}
-        <div className="absolute inset-0 bg-gradient-to-b from-ivory via-ivory to-gold/10 opacity-50"></div>
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-gold/5 via-transparent to-transparent"></div>
+      <section className="relative overflow-hidden min-h-[90vh] flex items-center justify-center">
+        {/* Background Image */}
+        <div className="absolute inset-0 z-0">
+          <img
+            src="/hero-bg.jpg"
+            alt="Luxury Living Room"
+            className="w-full h-full object-cover"
+          />
+          {/* Overlay for text readability */}
+          <div className="absolute inset-0 bg-black/20"></div>
+          <div className="absolute inset-0 bg-gradient-to-b from-black/30 via-transparent to-black/30"></div>
+        </div>
 
-        <div className="container mx-auto px-4 text-center relative z-10 animate-fade-in">
+        <div className="container mx-auto px-4 text-center relative z-10 animate-fade-in -mt-32">
           <div className="max-w-5xl mx-auto space-y-8">
-            <h2 className="text-5xl sm:text-6xl lg:text-8xl font-serif font-bold mb-6 tracking-tight text-walnut animate-slide-up">
+            <h2 className="text-5xl sm:text-6xl lg:text-8xl font-serif font-bold mb-6 tracking-tight text-white animate-slide-up drop-shadow-lg">
               Craft Your
-              <span className="block text-gold mt-2 italic">
+              <span className="block text-gold-light mt-2 italic drop-shadow-md">
                 Perfect Space
               </span>
             </h2>
-            <p className="text-xl lg:text-2xl text-walnut/80 mb-12 max-w-3xl mx-auto leading-relaxed animate-slide-up font-light" style={{ animationDelay: "0.2s" }}>
+            <p className="text-xl lg:text-2xl text-white/90 mb-12 max-w-3xl mx-auto leading-relaxed animate-slide-up font-light drop-shadow-md" style={{ animationDelay: "0.2s" }}>
               Bespoke furniture designed with precision, crafted with passion.
               Customize every detail to match your vision and create timeless elegance.
             </p>
             <div className="flex flex-col sm:flex-row gap-6 justify-center items-center animate-slide-up" style={{ animationDelay: "0.4s" }}>
               <Link to="/products">
-                <Button size="lg" variant="luxury" className="text-lg px-12 py-7 rounded-full">
+                <Button size="lg" className="text-lg px-12 py-7 rounded-full bg-gold hover:bg-gold-dark text-white border-none shadow-lg hover:scale-105 transition-all duration-300">
                   Begin Your Journey
                   <ChevronRight className="ml-2 h-5 w-5" />
                 </Button>
               </Link>
               <Link to="/products?category=sofa">
-                <Button size="lg" variant="outline" className="text-lg px-12 py-7 border-gold text-gold hover:bg-gold hover:text-walnut rounded-full transition-all duration-300">
+                <Button size="lg" variant="outline" className="text-lg px-12 py-7 border-white text-white hover:bg-white hover:text-walnut rounded-full transition-all duration-300 backdrop-blur-sm bg-white/10">
                   Explore Collections
                 </Button>
               </Link>

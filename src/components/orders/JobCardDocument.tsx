@@ -161,12 +161,23 @@ const renderTechnicalSpecs = (specs: any) => {
                         </tbody>
                     </table>
                     {specs.fabricPlan.fabricCodes && (
-                        <div className="mt-2">
-                            <p className="text-sm font-medium">Fabric Codes:</p>
-                            <div className="grid grid-cols-2 gap-2 mt-1">
+                        <div className="mt-4">
+                            <p className="text-sm font-medium mb-2">Fabric Selection:</p>
+                            <div className="grid grid-cols-2 gap-4">
                                 {Object.entries(specs.fabricPlan.fabricCodes).map(([key, value]) => (
-                                    <div key={key} className="text-sm">
-                                        <span className="font-medium">{key}:</span> {value as string}
+                                    <div key={key} className="border p-3 rounded flex items-center gap-3">
+                                        {/* Fabric Image Placeholder - In production this should be the actual fabric image URL */}
+                                        <div className="w-12 h-12 bg-gray-200 rounded border flex items-center justify-center overflow-hidden">
+                                            <img
+                                                src={`https://placehold.co/100x100/e2e8f0/64748b?text=${String(value).substring(0, 3)}`}
+                                                alt="Fabric"
+                                                className="w-full h-full object-cover"
+                                            />
+                                        </div>
+                                        <div className="text-sm">
+                                            <span className="font-medium block capitalize">{key}</span>
+                                            <span className="text-muted-foreground">{value as string}</span>
+                                        </div>
                                     </div>
                                 ))}
                             </div>

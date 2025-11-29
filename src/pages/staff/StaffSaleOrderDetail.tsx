@@ -17,6 +17,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { StaffLayout } from "@/components/staff/StaffLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+
+import { renderToStaticMarkup } from "react-dom/server";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
@@ -25,11 +27,11 @@ import { Loader2, Download, FileText, CheckCircle2, ArrowLeft, Tag, Eye, Edit } 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
-import { SaleOrderDocument } from "@/components/orders/SaleOrderDocument";
-import { SaleOrderDetailsSection } from "@/components/staff/SaleOrderDetailsSection";
-import { JobCardsDisplay } from "@/components/staff/JobCardsDisplay";
+import { PerfectSaleOrder } from "@/components/orders/PerfectSaleOrder";
+import { format } from "date-fns";
 import { generateSaleOrderData, SaleOrderGeneratedData } from "@/lib/sale-order-generator";
 import { calculateDynamicPrice } from "@/lib/dynamic-pricing";
+
 
 const formatCurrency = (value: number | null | undefined) => {
   if (!value || Number.isNaN(value)) return "₹0";
@@ -507,15 +509,7 @@ export default function StaffSaleOrderDetail() {
           </CardContent>
         </Card>
 
-        {/* SECTION 1.5: Detailed Order Breakdown - NEW! */}
-        {saleOrder.order?.order_items && saleOrder.order.order_items.length > 0 && (
-          <SaleOrderDetailsSection
-            orderItems={saleOrder.order.order_items}
-            basePrice={saleOrder.base_price}
-            finalPrice={saleOrder.final_price}
-            discount={saleOrder.discount}
-          />
-        )}
+
 
         {/* SECTION 2: Job Cards List */}
         <Card>
@@ -548,6 +542,14 @@ export default function StaffSaleOrderDetail() {
                         </div>
                       </div>
                       <Badge variant="outline">{jobCard.status}</Badge>
+                      <div className="pt-2">
+                        <Link to={`/production/job-card/${jobCard.id}`} target="_blank">
+                          <Button variant="outline" size="sm" className="w-full">
+                            <Printer className="mr-2 h-4 w-4" />
+                            Print for Production
+                          </Button>
+                        </Link>
+                      </div>
                     </CardContent>
                   </Card>
                 ))}
@@ -573,22 +575,123 @@ export default function StaffSaleOrderDetail() {
                 <TabsTrigger value="html">Edit HTML</TabsTrigger>
               </TabsList>
               <TabsContent value="document" className="space-y-4" id="pdf-preview-section">
-                <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center justify-between mb-4 no-print">
                   <p className="text-sm text-muted-foreground">
                     Live preview of the sale order document. Use Print/Download buttons below to save as PDF.
                   </p>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        const printContent = document.getElementById("printable-area");
+                        if (printContent) {
+                          const originalContents = document.body.innerHTML;
+                          document.body.innerHTML = printContent.innerHTML;
+                          window.print();
+                          document.body.innerHTML = originalContents;
+                          window.location.reload(); // Reload to restore state
+                        }
+                      }}
+                    >
+                      <Download className="mr-2 h-4 w-4" />
+                      Print / Download PDF
+                    </Button>
+                  </div>
                 </div>
-                {saleOrderPreviewData ? (
-                  <div className="border rounded-lg overflow-hidden">
-                    <SaleOrderDocument data={saleOrderPreviewData} />
-                  </div>
-                ) : (
-                  <div className="border rounded-lg p-8 bg-muted text-center">
-                    <p className="text-muted-foreground">
-                      Preview not available. Use the PDF Preview tab to view the generated PDF, or generate a draft PDF first.
-                    </p>
-                  </div>
-                )}
+
+                <div id="printable-area" className="bg-white rounded-lg shadow overflow-hidden border">
+                  {saleOrder.draft_html ? (
+                    <div dangerouslySetInnerHTML={{ __html: saleOrder.draft_html }} />
+                  ) : (
+                    <PerfectSaleOrder data={{
+                      header: {
+                        so_number: saleOrder.order_number,
+                        order_date: format(new Date(saleOrder.created_at), "dd-MMM-yyyy"),
+                        company: {
+                          name: "ESTRE GLOBAL PRIVATE LTD",
+                          addressLines: [
+                            "Near Dhoni Public School, AECS Layout – A Block",
+                            "Revenue Layout, Singasandra, Bengaluru – 560068"
+                          ],
+                          phone: "+91 8722200100",
+                          email: "support@estre.in",
+                          gst: "29AAMCE9846D1ZU"
+                        },
+                        invoice_to: {
+                          customer_name: saleOrder.customer_name,
+                          addressLines: [saleOrder.customer_address?.street, saleOrder.customer_address?.landmark].filter(Boolean),
+                          city: saleOrder.customer_address?.city,
+                          pincode: saleOrder.customer_address?.pincode,
+                          mobile: saleOrder.customer_phone,
+                          email: saleOrder.customer_email
+                        },
+                        dispatch_to: {
+                          customer_name: saleOrder.customer_name,
+                          addressLines: [saleOrder.customer_address?.street, saleOrder.customer_address?.landmark].filter(Boolean),
+                          city: saleOrder.customer_address?.city,
+                          pincode: saleOrder.customer_address?.pincode,
+                          mobile: saleOrder.customer_phone,
+                          email: saleOrder.customer_email
+                        },
+                        payment_terms: {
+                          advance_percent: 50,
+                          advance_condition: "On placing Sale Order",
+                          balance_condition: "Upon intimation of product readiness, before dispatch"
+                        },
+                        delivery_terms: {
+                          delivery_days: 30,
+                          delivery_date: saleOrder.order?.expected_delivery_date || format(new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), "dd-MMM-yyyy"),
+                          dispatch_through: "Safe Express"
+                        },
+                        buyer_gst: saleOrder.order?.buyer_gst,
+                        status: saleOrder.status,
+                        created_at: saleOrder.created_at,
+                        updated_at: saleOrder.updated_at,
+                        created_by: "system",
+                        updated_by: "system"
+                      },
+                      lineItems: saleOrder.order?.order_items?.map((item: any) => ({
+                        line_item_id: item.id,
+                        so_number: saleOrder.order_number,
+                        category: item.product_category,
+                        model_name: item.product_title,
+                        shape: item.configuration?.shape || "",
+                        sections: [],
+                        fabric: {
+                          plan: item.configuration?.fabric?.claddingPlan || "Single Colour",
+                          upgrade_charge: 0,
+                          colour_variance_note: ""
+                        },
+                        seat_dimensions: {
+                          depth_in: 0,
+                          width_in: 0,
+                          height_in: 0,
+                          depth_upgrade_charge: 0,
+                          width_upgrade_charge: 0,
+                          height_upgrade_charge: 0
+                        },
+                        armrest_charge: 0,
+                        legs_charge: 0,
+                        accessories: [],
+                        approximate_widths: { overall_inches: 0 },
+                        line_total: item.total_price_rs || 0,
+                        ...((saleOrder.order?.metadata?.sale_orders?.[0]?.lineItems?.find((li: any) => li.line_item_id === item.id)) || {})
+                      })) || [],
+                      totals: {
+                        so_number: saleOrder.order_number,
+                        subtotal: saleOrder.base_price,
+                        discount_amount: saleOrder.discount,
+                        total_amount: saleOrder.final_price,
+                        advance_amount: saleOrder.final_price * 0.5,
+                        balance_amount: saleOrder.final_price * 0.5,
+                        paid_amount: 0,
+                        outstanding_amount: saleOrder.final_price
+                      },
+                      payments: [],
+                      jobCards: []
+                    }} />
+                  )}
+                </div>
               </TabsContent>
               <TabsContent value="pdf" className="space-y-4">
                 {(saleOrder.draft_pdf_url || saleOrder.final_pdf_url || saleOrder.pdf_url) ? (
@@ -646,12 +749,112 @@ export default function StaffSaleOrderDetail() {
               </TabsContent>
               <TabsContent value="html" className="space-y-4">
                 <div className="space-y-2">
-                  <Label>Edit HTML Template</Label>
+                  <div className="flex justify-between items-center">
+                    <Label>Edit HTML Template</Label>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        const template = renderToStaticMarkup(
+                          <PerfectSaleOrder data={{
+                            header: {
+                              so_number: saleOrder.order_number,
+                              order_date: format(new Date(saleOrder.created_at), "dd-MMM-yyyy"),
+                              company: {
+                                name: "ESTRE GLOBAL PRIVATE LTD",
+                                addressLines: [
+                                  "Near Dhoni Public School, AECS Layout – A Block",
+                                  "Revenue Layout, Singasandra, Bengaluru – 560068"
+                                ],
+                                phone: "+91 8722200100",
+                                email: "support@estre.in",
+                                gst: "29AAMCE9846D1ZU"
+                              },
+                              invoice_to: {
+                                customer_name: saleOrder.customer_name,
+                                addressLines: [saleOrder.customer_address?.street, saleOrder.customer_address?.landmark].filter(Boolean),
+                                city: saleOrder.customer_address?.city,
+                                pincode: saleOrder.customer_address?.pincode,
+                                mobile: saleOrder.customer_phone,
+                                email: saleOrder.customer_email
+                              },
+                              dispatch_to: {
+                                customer_name: saleOrder.customer_name,
+                                addressLines: [saleOrder.customer_address?.street, saleOrder.customer_address?.landmark].filter(Boolean),
+                                city: saleOrder.customer_address?.city,
+                                pincode: saleOrder.customer_address?.pincode,
+                                mobile: saleOrder.customer_phone,
+                                email: saleOrder.customer_email
+                              },
+                              payment_terms: {
+                                advance_percent: 50,
+                                advance_condition: "On placing Sale Order",
+                                balance_condition: "Upon intimation of product readiness, before dispatch"
+                              },
+                              delivery_terms: {
+                                delivery_days: 30,
+                                delivery_date: saleOrder.order?.expected_delivery_date || format(new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), "dd-MMM-yyyy"),
+                                dispatch_through: "Safe Express"
+                              },
+                              buyer_gst: saleOrder.order?.buyer_gst,
+                              status: saleOrder.status,
+                              created_at: saleOrder.created_at,
+                              updated_at: saleOrder.updated_at,
+                              created_by: "system",
+                              updated_by: "system"
+                            },
+                            lineItems: saleOrder.order?.order_items?.map((item: any) => ({
+                              line_item_id: item.id,
+                              so_number: saleOrder.order_number,
+                              category: item.product_category,
+                              model_name: item.product_title,
+                              shape: item.configuration?.shape || "",
+                              sections: [],
+                              fabric: {
+                                plan: item.configuration?.fabric?.claddingPlan || "Single Colour",
+                                upgrade_charge: 0,
+                                colour_variance_note: ""
+                              },
+                              seat_dimensions: {
+                                depth_in: 0,
+                                width_in: 0,
+                                height_in: 0,
+                                depth_upgrade_charge: 0,
+                                width_upgrade_charge: 0,
+                                height_upgrade_charge: 0
+                              },
+                              armrest_charge: 0,
+                              legs_charge: 0,
+                              accessories: [],
+                              approximate_widths: { overall_inches: 0 },
+                              line_total: item.total_price_rs || 0,
+                              ...((saleOrder.order?.metadata?.sale_orders?.[0]?.lineItems?.find((li: any) => li.line_item_id === item.id)) || {})
+                            })) || [],
+                            totals: {
+                              so_number: saleOrder.order_number,
+                              subtotal: saleOrder.base_price,
+                              discount_amount: saleOrder.discount,
+                              total_amount: saleOrder.final_price,
+                              advance_amount: saleOrder.final_price * 0.5,
+                              balance_amount: saleOrder.final_price * 0.5,
+                              paid_amount: 0,
+                              outstanding_amount: saleOrder.final_price
+                            },
+                            payments: [],
+                            jobCards: []
+                          }} />
+                        );
+                        setEditableHTML(template);
+                      }}
+                    >
+                      Load Generated Template
+                    </Button>
+                  </div>
                   <Textarea
                     value={editableHTML || saleOrder.draft_html || saleOrder.final_html || ""}
                     onChange={(e) => setEditableHTML(e.target.value)}
                     className="font-mono text-xs min-h-[400px]"
-                    placeholder="HTML content will appear here after generating draft PDF"
+                    placeholder="HTML content will appear here. Click 'Load Generated Template' to start editing the current design."
                   />
                   <div className="flex gap-2">
                     <Button
