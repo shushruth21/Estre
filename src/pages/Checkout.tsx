@@ -119,89 +119,6 @@ const Checkout = () => {
         throw orderError;
       }
 
-      // Generate unique sale order number using timestamp + random to prevent duplicates
-      const generateUniqueOrderNumber = () => {
-        const timestamp = Date.now();
-        const random = Math.floor(Math.random() * 10000);
-        return `${timestamp}${random}`.slice(-10); // 10-digit unique number
-      };
-
-      let saleOrderNumber = generateUniqueOrderNumber();
-      let attempts = 0;
-      const maxAttempts = 3;
-      let saleOrder: any = null;
-
-      // Retry logic in case of duplicate (very unlikely with timestamp + random)
-      while (attempts < maxAttempts) {
-        try {
-          // @ts-ignore - sale_orders table exists but types need regeneration
-          const { data, error: saleOrderError } = await supabase
-            .from("sale_orders")
-            .insert({
-              customer_id: user.id,
-              order_id: order.id,
-              order_number: saleOrderNumber,
-              status: "confirmed",
-              base_price: subtotal,
-              discount: 0,
-              final_price: subtotal,
-              payment_mode: paymentMethod || "cash",
-              payment_status: "pending",
-              customer_name: order.customer_name,
-              customer_email: order.customer_email,
-              customer_phone: order.customer_phone,
-              customer_address: order.delivery_address,
-            })
-            .select()
-            .single();
-
-          if (!saleOrderError) {
-            // Success! Break out of retry loop
-            saleOrder = data;
-            break;
-          }
-
-          // If duplicate key error, generate new number and retry
-          if (saleOrderError.code === '23505' && attempts < maxAttempts - 1) {
-            console.warn(`Duplicate order number detected (attempt ${attempts + 1}/${maxAttempts}), generating new number...`);
-            saleOrderNumber = generateUniqueOrderNumber();
-            attempts++;
-            continue;
-          }
-
-          // For other errors, check if they're schema-related
-          if (saleOrderError.message?.includes("payment_mode") ||
-            saleOrderError.message?.includes("payment_status") ||
-            saleOrderError.message?.includes("schema cache") ||
-            saleOrderError.message?.includes("column")) {
-            console.error("Schema cache error - payment_mode/payment_status columns may not exist yet");
-            console.error("Run migration: 20251124000004_fix_payment_fields_constraints.sql");
-            throw new Error("Database schema needs to be updated. Please run migration 20251124000004_fix_payment_fields_constraints.sql in Supabase and refresh the schema cache.");
-          }
-
-          // If error is about RLS or permissions
-          if (saleOrderError.message?.includes("permission") ||
-            saleOrderError.message?.includes("policy") ||
-            saleOrderError.code === "42501") {
-            console.error("RLS policy error - customer may not have permission to insert sale_orders");
-            throw new Error("Permission denied. Please contact support if this issue persists.");
-          }
-
-          // Log full error for debugging
-          console.error("Sale order creation error:", saleOrderError);
-          throw saleOrderError;
-        } catch (err: any) {
-          if (attempts >= maxAttempts - 1) {
-            throw err; // Max retries reached, throw error
-          }
-          attempts++;
-          saleOrderNumber = generateUniqueOrderNumber(); // Generate new number for retry
-        }
-      }
-
-      if (!saleOrder) {
-        throw new Error("Failed to create sale order after multiple attempts");
-      }
 
       const orderItems = cartItems.map((item) => ({
         order_id: order.id,
@@ -221,9 +138,7 @@ const Checkout = () => {
 
       if (itemsError) throw itemsError;
 
-      const saleOrderSnapshots: any[] = [];
       const jobCardInserts: any[] = [];
-      const pricingBreakdownProducts: any[] = [];
 
       if (insertedItems && insertedItems.length > 0) {
         for (const item of insertedItems) {
@@ -240,17 +155,6 @@ const Checkout = () => {
             pricing.breakdown
           );
 
-          saleOrderSnapshots.push(saleData);
-
-          // Generate pricing breakdown for this product
-          const productPricingBreakdown = generatePricingBreakdown(
-            item,
-            item.configuration,
-            pricing.breakdown,
-            saleData
-          );
-          pricingBreakdownProducts.push(productPricingBreakdown);
-
           saleData.jobCards.forEach((jobCard) => {
             // Generate technical specifications (NO pricing)
             const technicalSpecs = generateTechnicalSpecifications(
@@ -266,7 +170,7 @@ const Checkout = () => {
               order_id: order.id,
               order_item_id: item.id,
               order_number: jobCard.soNumber,
-              sale_order_id: saleOrder.id, // Link job card to sale order
+              sale_order_id: null, // No sale order - simplified workflow
               customer_name: jobCard.customer.name,
               customer_phone: jobCard.customer.phone,
               customer_email: jobCard.customer.email || order.customer_email,
@@ -292,20 +196,7 @@ const Checkout = () => {
         }
       }
 
-      // Update sale order with pricing breakdown
-      const pricingBreakdown: PricingBreakdownData = {
-        products: pricingBreakdownProducts,
-        gst: 0, // GST calculation can be added later
-        total: subtotal,
-      };
 
-      // @ts-ignore - sale_orders table exists but types need regeneration
-      await supabase
-        .from("sale_orders")
-        .update({
-          pricing_breakdown: pricingBreakdown,
-        })
-        .eq("id", saleOrder.id);
 
       if (jobCardInserts.length > 0) {
         const { data: createdJobCards, error: jobCardsError } = await supabase
@@ -339,16 +230,9 @@ const Checkout = () => {
         }
       }
 
-      const orderMetadata = order.metadata as Record<string, any> | null;
       await supabase
         .from("orders")
-        .update({
-          status: "confirmed",
-          metadata: {
-            ...(orderMetadata || {}),
-            sale_orders: saleOrderSnapshots,
-          },
-        })
+        .update({ status: "confirmed" })
         .eq("id", order.id);
 
       // Create initial timeline entry
@@ -357,7 +241,7 @@ const Checkout = () => {
         order_id: order.id,
         status: "pending",
         title: "Order Submitted",
-        description: "Your order has been submitted and is pending staff review",
+        description: "Your order has been confirmed and is now being processed",
         created_by: user.id,
       });
 
@@ -369,12 +253,12 @@ const Checkout = () => {
 
       if (deleteError) throw deleteError;
 
-      return { order, saleOrder };
+      return { order };
     },
     onSuccess: () => {
       toast({
-        title: "Review Requested!",
-        description: "Your order has been sent for staff review. You'll receive a confirmation shortly.",
+        title: "Order Confirmed!",
+        description: "Your order has been placed successfully and is now being processed.",
       });
       queryClient.invalidateQueries({ queryKey: ["cart"] });
       navigate("/dashboard");
