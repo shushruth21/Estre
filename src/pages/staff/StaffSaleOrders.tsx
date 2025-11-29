@@ -133,7 +133,6 @@ export default function StaffSaleOrders() {
             )
           )
         `)
-        .eq("status", "pending_review")
         .order("created_at", { ascending: false });
 
       const timeoutPromise = new Promise<never>((_, reject) =>

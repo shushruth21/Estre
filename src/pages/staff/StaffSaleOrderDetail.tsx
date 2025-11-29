@@ -571,8 +571,6 @@ export default function StaffSaleOrderDetail() {
             <Tabs defaultValue="document" className="w-full">
               <TabsList>
                 <TabsTrigger value="document">Document Preview</TabsTrigger>
-                <TabsTrigger value="pdf">PDF Preview</TabsTrigger>
-                <TabsTrigger value="html">Edit HTML</TabsTrigger>
               </TabsList>
               <TabsContent value="document" className="space-y-4" id="pdf-preview-section">
                 <div className="flex items-center justify-between mb-4 no-print">
@@ -693,322 +691,46 @@ export default function StaffSaleOrderDetail() {
                   )}
                 </div>
               </TabsContent>
-              <TabsContent value="pdf" className="space-y-4">
-                {(saleOrder.draft_pdf_url || saleOrder.final_pdf_url || saleOrder.pdf_url) ? (
-                  <>
-                    <div className="border rounded-lg p-4 bg-muted">
-                      <iframe
-                        src={saleOrder.final_pdf_url || saleOrder.draft_pdf_url || saleOrder.pdf_url}
-                        className="w-full h-96 border-0 rounded"
-                        title="Sale Order PDF"
-                      />
-                    </div>
-                    <div className="flex gap-2">
-                      <Button asChild variant="outline" className="flex-1">
-                        <a href={saleOrder.final_pdf_url || saleOrder.draft_pdf_url || saleOrder.pdf_url} download target="_blank" rel="noopener noreferrer">
-                          <Download className="mr-2 h-4 w-4" />
-                          Download PDF
-                        </a>
-                      </Button>
-                      {saleOrder.draft_html && (
-                        <Button
-                          variant="outline"
-                          onClick={() => {
-                            setEditableHTML(saleOrder.draft_html || saleOrder.final_html || "");
-                            setShowHTMLPreview(true);
-                          }}
-                        >
-                          <Eye className="mr-2 h-4 w-4" />
-                          View HTML
-                        </Button>
-                      )}
-                    </div>
-                  </>
-                ) : (
-                  <div className="text-center py-8">
-                    <FileText className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                    <p className="text-muted-foreground mb-4">PDF not generated yet</p>
-                    <Button
-                      onClick={() => generateDraftPDFMutation.mutate()}
-                      disabled={isGeneratingPDF}
-                    >
-                      {isGeneratingPDF ? (
-                        <>
-                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          Generating...
-                        </>
-                      ) : (
-                        <>
-                          <FileText className="mr-2 h-4 w-4" />
-                          Generate Draft PDF
-                        </>
-                      )}
-                    </Button>
-                  </div>
-                )}
-              </TabsContent>
-              <TabsContent value="html" className="space-y-4">
-                <div className="space-y-2">
-                  <div className="flex justify-between items-center">
-                    <Label>Edit HTML Template</Label>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        const template = renderToStaticMarkup(
-                          <PerfectSaleOrder data={{
-                            header: {
-                              so_number: saleOrder.order_number,
-                              order_date: format(new Date(saleOrder.created_at), "dd-MMM-yyyy"),
-                              company: {
-                                name: "ESTRE GLOBAL PRIVATE LTD",
-                                addressLines: [
-                                  "Near Dhoni Public School, AECS Layout – A Block",
-                                  "Revenue Layout, Singasandra, Bengaluru – 560068"
-                                ],
-                                phone: "+91 8722200100",
-                                email: "support@estre.in",
-                                gst: "29AAMCE9846D1ZU"
-                              },
-                              invoice_to: {
-                                customer_name: saleOrder.customer_name,
-                                addressLines: [saleOrder.customer_address?.street, saleOrder.customer_address?.landmark].filter(Boolean),
-                                city: saleOrder.customer_address?.city,
-                                pincode: saleOrder.customer_address?.pincode,
-                                mobile: saleOrder.customer_phone,
-                                email: saleOrder.customer_email
-                              },
-                              dispatch_to: {
-                                customer_name: saleOrder.customer_name,
-                                addressLines: [saleOrder.customer_address?.street, saleOrder.customer_address?.landmark].filter(Boolean),
-                                city: saleOrder.customer_address?.city,
-                                pincode: saleOrder.customer_address?.pincode,
-                                mobile: saleOrder.customer_phone,
-                                email: saleOrder.customer_email
-                              },
-                              payment_terms: {
-                                advance_percent: 50,
-                                advance_condition: "On placing Sale Order",
-                                balance_condition: "Upon intimation of product readiness, before dispatch"
-                              },
-                              delivery_terms: {
-                                delivery_days: 30,
-                                delivery_date: saleOrder.order?.expected_delivery_date || format(new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), "dd-MMM-yyyy"),
-                                dispatch_through: "Safe Express"
-                              },
-                              buyer_gst: saleOrder.order?.buyer_gst,
-                              status: saleOrder.status,
-                              created_at: saleOrder.created_at,
-                              updated_at: saleOrder.updated_at,
-                              created_by: "system",
-                              updated_by: "system"
-                            },
-                            lineItems: saleOrder.order?.order_items?.map((item: any) => ({
-                              line_item_id: item.id,
-                              so_number: saleOrder.order_number,
-                              category: item.product_category,
-                              model_name: item.product_title,
-                              shape: item.configuration?.shape || "",
-                              sections: [],
-                              fabric: {
-                                plan: item.configuration?.fabric?.claddingPlan || "Single Colour",
-                                upgrade_charge: 0,
-                                colour_variance_note: ""
-                              },
-                              seat_dimensions: {
-                                depth_in: 0,
-                                width_in: 0,
-                                height_in: 0,
-                                depth_upgrade_charge: 0,
-                                width_upgrade_charge: 0,
-                                height_upgrade_charge: 0
-                              },
-                              armrest_charge: 0,
-                              legs_charge: 0,
-                              accessories: [],
-                              approximate_widths: { overall_inches: 0 },
-                              line_total: item.total_price_rs || 0,
-                              ...((saleOrder.order?.metadata?.sale_orders?.[0]?.lineItems?.find((li: any) => li.line_item_id === item.id)) || {})
-                            })) || [],
-                            totals: {
-                              so_number: saleOrder.order_number,
-                              subtotal: saleOrder.base_price,
-                              discount_amount: saleOrder.discount,
-                              total_amount: saleOrder.final_price,
-                              advance_amount: saleOrder.final_price * 0.5,
-                              balance_amount: saleOrder.final_price * 0.5,
-                              paid_amount: 0,
-                              outstanding_amount: saleOrder.final_price
-                            },
-                            payments: [],
-                            jobCards: []
-                          }} />
-                        );
-                        setEditableHTML(template);
-                      }}
-                    >
-                      Load Generated Template
-                    </Button>
-                  </div>
-                  <Textarea
-                    value={editableHTML || saleOrder.draft_html || saleOrder.final_html || ""}
-                    onChange={(e) => setEditableHTML(e.target.value)}
-                    className="font-mono text-xs min-h-[400px]"
-                    placeholder="HTML content will appear here. Click 'Load Generated Template' to start editing the current design."
-                  />
-                  <div className="flex gap-2">
-                    <Button
-                      variant="outline"
-                      onClick={async () => {
-                        if (!editableHTML) return;
-                        const { error } = await supabase
-                          .from("sale_orders")
-                          .update({ draft_html: editableHTML })
-                          .eq("id", id);
-                        if (error) {
-                          toast({
-                            title: "Error",
-                            description: error.message,
-                            variant: "destructive",
-                          });
-                        } else {
-                          toast({
-                            title: "HTML Saved",
-                            description: "HTML template updated successfully.",
-                          });
-                          queryClient.invalidateQueries({ queryKey: ["staff-sale-order-detail", id] });
-                        }
-                      }}
-                    >
-                      <Edit className="mr-2 h-4 w-4" />
-                      Save HTML
-                    </Button>
-                    {editableHTML && (
-                      <Button
-                        variant="outline"
-                        onClick={() => {
-                          const newWindow = window.open();
-                          if (newWindow) {
-                            newWindow.document.write(editableHTML);
-                            newWindow.document.close();
-                          }
-                        }}
-                      >
-                        <Eye className="mr-2 h-4 w-4" />
-                        Preview HTML
-                      </Button>
-                    )}
-                  </div>
-                </div>
-              </TabsContent>
             </Tabs>
           </CardContent>
         </Card>
 
-        {/* SECTION 4: Actions */}
+        {/* SECTION 4: Order Management */}
         <Card>
-          <CardContent className="pt-6 space-y-4">
-            {(saleOrder.status === "pending_review" || saleOrder.status === "staff_editing") && (
-              <>
-                <div className="flex gap-2">
-                  <Button
-                    onClick={() => {
-                      // Update status to staff_editing
-                      supabase
-                        .from("sale_orders")
-                        .update({ status: "staff_editing" })
-                        .eq("id", id)
-                        .then(() => {
-                          queryClient.invalidateQueries({ queryKey: ["staff-sale-order-detail", id] });
-                        });
-                    }}
-                    variant="outline"
-                    className="flex-1"
-                  >
-                    <Edit className="mr-2 h-4 w-4" />
-                    Edit Order
-                  </Button>
-                  <Button
-                    onClick={() => generateDraftPDFMutation.mutate()}
-                    disabled={isGeneratingPDF}
-                    variant="outline"
-                    className="flex-1"
-                  >
-                    {isGeneratingPDF ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Generating...
-                      </>
-                    ) : (
-                      <>
-                        <FileText className="mr-2 h-4 w-4" />
-                        Generate Draft PDF
-                      </>
-                    )}
-                  </Button>
-                </div>
-                {(saleOrder.draft_pdf_url || saleOrder.draft_html) && (
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="checkbox"
-                        id="requireOTP"
-                        checked={requireOTP}
-                        onChange={(e) => setRequireOTP(e.target.checked)}
-                        className="rounded"
-                      />
-                      <Label htmlFor="requireOTP" className="cursor-pointer">
-                        Require OTP for customer confirmation
-                      </Label>
-                    </div>
-                    <Button
-                      onClick={() => approveAndSendFinalPDFMutation.mutate()}
-                      disabled={approveAndSendFinalPDFMutation.isPending || isGeneratingPDF}
-                      className="w-full"
-                      size="lg"
-                    >
-                      {approveAndSendFinalPDFMutation.isPending ? (
-                        <>
-                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          Approving...
-                        </>
-                      ) : (
-                        <>
-                          <CheckCircle2 className="mr-2 h-4 w-4" />
-                          Approve & Send Final PDF to Customer
-                        </>
-                      )}
-                    </Button>
-                  </div>
-                )}
-              </>
-            )}
-            {/* Show approve button only if PDF exists and status is staff_pdf_generated */}
-            {/* Note: This button is now mostly redundant since PDF generation auto-transitions status,
-                but keeping it for edge cases where manual approval might be needed */}
-            {saleOrder.status === "staff_pdf_generated" && (saleOrder.final_pdf_url || saleOrder.draft_pdf_url) && (
-              <Button
-                onClick={() => {
-                  supabase
-                    .from("sale_orders")
-                    .update({ status: "staff_approved" })
-                    .eq("id", id)
-                    .then(() => {
-                      queryClient.invalidateQueries({ queryKey: ["staff-sale-order-detail", id] });
-                      queryClient.invalidateQueries({ queryKey: ["customer-sale-orders"] });
-                      toast({
-                        title: "Order Approved",
-                        description: "Sale order status updated to approved. Customer can now confirm their order.",
-                      });
-                    });
-                }}
-                className="w-full"
-                size="lg"
-              >
-                <CheckCircle2 className="mr-2 h-4 w-4" />
-                Approve Sale Order
-              </Button>
-            )}
+          <CardHeader>
+            <CardTitle>Order Management</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <Button
+              variant="destructive"
+              className="w-full"
+              onClick={async () => {
+                if (!confirm("Are you sure you want to delete this sale order? This action cannot be undone.")) {
+                  return;
+                }
+
+                const { error } = await supabase
+                  .from("sale_orders")
+                  .delete()
+                  .eq("id", id);
+
+                if (error) {
+                  toast({
+                    title: "Error",
+                    description: "Failed to delete order: " + error.message,
+                    variant: "destructive",
+                  });
+                } else {
+                  toast({
+                    title: "Order Deleted",
+                    description: "Sale order has been deleted successfully.",
+                  });
+                  navigate("/staff/sale-orders");
+                }
+              }}
+            >
+              Delete Order
+            </Button>
           </CardContent>
         </Card>
       </div>

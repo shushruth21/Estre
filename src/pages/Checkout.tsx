@@ -134,13 +134,14 @@ const Checkout = () => {
       // Retry logic in case of duplicate (very unlikely with timestamp + random)
       while (attempts < maxAttempts) {
         try {
+          // @ts-ignore - sale_orders table exists but types need regeneration
           const { data, error: saleOrderError } = await supabase
             .from("sale_orders")
             .insert({
               customer_id: user.id,
               order_id: order.id,
               order_number: saleOrderNumber,
-              status: "pending_review",
+              status: "confirmed",
               base_price: subtotal,
               discount: 0,
               final_price: subtotal,
@@ -169,23 +170,23 @@ const Checkout = () => {
           }
 
           // For other errors, check if they're schema-related
-          if (saleOrderError.message?.includes("payment_mode") || 
-              saleOrderError.message?.includes("payment_status") || 
-              saleOrderError.message?.includes("schema cache") ||
-              saleOrderError.message?.includes("column")) {
+          if (saleOrderError.message?.includes("payment_mode") ||
+            saleOrderError.message?.includes("payment_status") ||
+            saleOrderError.message?.includes("schema cache") ||
+            saleOrderError.message?.includes("column")) {
             console.error("Schema cache error - payment_mode/payment_status columns may not exist yet");
             console.error("Run migration: 20251124000004_fix_payment_fields_constraints.sql");
             throw new Error("Database schema needs to be updated. Please run migration 20251124000004_fix_payment_fields_constraints.sql in Supabase and refresh the schema cache.");
           }
-          
+
           // If error is about RLS or permissions
-          if (saleOrderError.message?.includes("permission") || 
-              saleOrderError.message?.includes("policy") ||
-              saleOrderError.code === "42501") {
+          if (saleOrderError.message?.includes("permission") ||
+            saleOrderError.message?.includes("policy") ||
+            saleOrderError.code === "42501") {
             console.error("RLS policy error - customer may not have permission to insert sale_orders");
             throw new Error("Permission denied. Please contact support if this issue persists.");
           }
-          
+
           // Log full error for debugging
           console.error("Sale order creation error:", saleOrderError);
           throw saleOrderError;
@@ -298,6 +299,7 @@ const Checkout = () => {
         total: subtotal,
       };
 
+      // @ts-ignore - sale_orders table exists but types need regeneration
       await supabase
         .from("sale_orders")
         .update({
@@ -378,17 +380,29 @@ const Checkout = () => {
       navigate("/dashboard");
     },
     onError: (error: any) => {
+      console.error("Order creation error:", error);
+
+      let errorMessage = "An unexpected error occurred";
+
+      if (error?.message) {
+        errorMessage = error.message;
+      } else if (error?.code) {
+        errorMessage = `Database error: ${error.code}`;
+      } else if (typeof error === "string") {
+        errorMessage = error;
+      }
+
       toast({
         title: "Order Failed",
-        description: error.message,
+        description: errorMessage,
         variant: "destructive",
       });
     },
   });
 
-  const isDeliveryValid = deliveryAddress.street && deliveryAddress.city && 
-                          deliveryAddress.state && deliveryAddress.pincode;
-  
+  const isDeliveryValid = deliveryAddress.street && deliveryAddress.city &&
+    deliveryAddress.state && deliveryAddress.pincode;
+
   const subtotal = cartItems?.reduce((sum, item) => sum + (item.calculated_price || 0), 0) || 0;
   const total = subtotal; // No discount at checkout
 
