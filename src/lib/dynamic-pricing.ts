@@ -151,7 +151,7 @@ async function getLoungerSizeMetadata(
   loungerSize: string
 ): Promise<{ basePercentage?: number; priceMultiplier?: number; fabricMeters?: number }> {
   if (!loungerSize) return {};
-  
+
   try {
     const { data, error } = await supabase
       .from("dropdown_options")
@@ -163,7 +163,7 @@ async function getLoungerSizeMetadata(
       .single();
 
     if (error || !data) return {};
-    
+
     const metadata = (data.metadata || {}) as Record<string, any>;
     return {
       basePercentage: typeof metadata.base_percentage === 'number' ? metadata.base_percentage : undefined,
@@ -317,12 +317,12 @@ export const calculateFabricMeters = async (
       };
 
       let totalSeats = 0;
-      
+
       // Count seats from Front section
       if (sections.F?.type) {
         totalSeats += getSeatCount(sections.F.type);
       }
-      
+
       // Count seats from L2 section (if L SHAPE)
       if (sections.L2?.type) {
         totalSeats += getSeatCount(sections.L2.type);
@@ -413,7 +413,7 @@ export const calculateFabricMeters = async (
       const bedSize = configuration.bedSize || "Double";
       const width = configuration.dimensions?.width || 54;
       const length = configuration.dimensions?.length || 78;
-      
+
       // Fetch default dimensions from DB
       let defaultDimensions = { width: 54, length: 75 };
       try {
@@ -452,14 +452,14 @@ export const calculateFabricMeters = async (
         };
         defaultDimensions = fallback[bedSize] || fallback.Double;
       }
-      
+
       // Calculate area ratio
       const areaRatio = (width * length) / (defaultDimensions.width * defaultDimensions.length);
-      
+
       // Get base fabric meterage from product or settings
       const isQueenOrAbove = bedSize === "Queen" || bedSize === "King";
       let baseFabric = 0;
-      
+
       if (productData) {
         baseFabric = isQueenOrAbove
           ? (productData.fabric_bed_queen_above_mtrs || getSettingValue(settings, "fabric_bed_queen_above_mtrs", 10.0))
@@ -469,10 +469,10 @@ export const calculateFabricMeters = async (
           ? getSettingValue(settings, "fabric_bed_queen_above_mtrs", 10.0)
           : getSettingValue(settings, "fabric_bed_up_to_double_xl_mtrs", 8.0);
       }
-      
+
       // Apply area ratio to base fabric
       totalMeters = baseFabric * areaRatio;
-      
+
       // Add extra fabric if specified
       const extraFabric = Number(configuration.fabric?.extraFabricCharges || 0);
       if (!Number.isNaN(extraFabric) && extraFabric > 0) {
@@ -560,7 +560,7 @@ export const calculateFabricMeters = async (
 
     case "benches": {
       const seatingCapacity = configuration.seatingCapacity || configuration.qty || 1;
-      
+
       // First bench
       const firstBenchMeters = getSettingValue(settings, "fabric_single_bench_mtrs", 3.0);
       totalMeters += firstBenchMeters;
@@ -577,7 +577,7 @@ export const calculateFabricMeters = async (
     case "sofabed": {
       // Section-based fabric calculation (similar to sofa)
       const sections = configuration.sections || {};
-      
+
       // Helper to parse seat count
       const parseSeatCount = (seaterType: string): number => {
         if (!seaterType) return 0;
@@ -614,12 +614,12 @@ export const calculateFabricMeters = async (
       if (configuration.lounger?.required === "Yes" && configuration.lounger?.size) {
         const loungerSize = configuration.lounger.size;
         const quantity = configuration.lounger?.numberOfLoungers === "2 Nos." ? 2 : 1;
-        
+
         // Fetch lounger size metadata from database
         const loungerMetadata = await getLoungerSizeMetadata("sofabed", loungerSize);
-        
+
         let loungerMeters = 0;
-        
+
         if (loungerMetadata.fabricMeters !== undefined) {
           // Use fabric meters from metadata
           loungerMeters = loungerMetadata.fabricMeters;
@@ -662,9 +662,9 @@ export const calculateFabricMeters = async (
         const pillowType = configuration.additionalPillows?.type || "Simple pillow";
         const pillowSize = configuration.additionalPillows?.size || "18 in X 18 in";
         const pillowQuantity = configuration.additionalPillows?.quantity || 1;
-        
+
         let pillowFabricMeters = 0.6; // Default fallback
-        
+
         try {
           const { data: pillowSizeOption } = await supabase
             .from("dropdown_options")
@@ -687,7 +687,7 @@ export const calculateFabricMeters = async (
         } catch (error) {
           console.warn("Error fetching pillow fabric metadata; using fallback", error);
         }
-        
+
         totalMeters += pillowQuantity * pillowFabricMeters;
       }
 
@@ -696,9 +696,9 @@ export const calculateFabricMeters = async (
         const pillowType = configuration.additionalPillows?.type || "Simple pillow";
         const pillowSize = configuration.additionalPillows?.size || "18 in X 18 in";
         const pillowQuantity = configuration.additionalPillows?.quantity || 1;
-        
+
         let pillowFabricMeters = 0.6; // Default fallback
-        
+
         try {
           const { data: pillowSizeOption } = await supabase
             .from("dropdown_options")
@@ -721,7 +721,7 @@ export const calculateFabricMeters = async (
         } catch (error) {
           console.warn("Error fetching pillow fabric metadata; using fallback", error);
         }
-        
+
         totalMeters += pillowQuantity * pillowFabricMeters;
       }
 
@@ -744,6 +744,7 @@ export interface PricingBreakdown {
   loungerPrice: number;
   consolePrice: number;
   pillowsPrice: number;
+  pillowFabricPrice: number; // Added
   fabricCharges: number;
   fabricMeters?: number;
   foamUpgrade: number;
@@ -785,6 +786,7 @@ export const calculateDynamicPrice = async (
       loungerPrice: 0,
       consolePrice: 0,
       pillowsPrice: 0,
+      pillowFabricPrice: 0,
       fabricCharges: 0,
       fabricMeters: 0,
       foamUpgrade: 0,
@@ -804,45 +806,45 @@ export const calculateDynamicPrice = async (
     // For sofabed, use 2-seater base price (strike_price_2seater_rs or net_price_rs)
     let basePrice = 0;
     if (category === "sofa") {
-      basePrice = productData.net_markup_1seater || 
-                  productData.net_price_rs || 
-                  productData.strike_price_1seater_rs || 
-                  productData.bom_rs || 
-                  productData.adjusted_bom_rs || 0;
+      basePrice = productData.net_markup_1seater ||
+        productData.net_price_rs ||
+        productData.strike_price_1seater_rs ||
+        productData.bom_rs ||
+        productData.adjusted_bom_rs || 0;
     } else if (category === "sofabed") {
       // Sofa bed uses 2-seater base price
       // Note: bom_rs has been renamed to strike_price_2seater_rs in sofabed_database
       basePrice = productData.strike_price_2seater_rs ||
-                  productData.net_price_rs || 
-                  productData.adjusted_bom_rs || 0;
+        productData.net_price_rs ||
+        productData.adjusted_bom_rs || 0;
     } else if (category === "recliner") {
       // Recliner doesn't have bom_rs column - use net_price_rs as primary
       basePrice = productData.net_price_rs ||
-                  productData.net_markup_1seater_manual ||
-                  productData.strike_price_1seater_rs ||
-                  productData.adjusted_bom_rs || 0;
+        productData.net_markup_1seater_manual ||
+        productData.strike_price_1seater_rs ||
+        productData.adjusted_bom_rs || 0;
     } else if (category === "bed" || category === "kids_bed") {
       // Bed category: prioritize net_price_rs (base product cost ~46k)
       // Do NOT use bom_rs as it's for BOM calculations, not base price
-      basePrice = productData.net_price_rs || 
-                  productData.net_price || 
-                  productData.strike_price_rs ||
-                  productData.adjusted_bom_rs || 
-                  productData.bom_rs || 0;
+      basePrice = productData.net_price_rs ||
+        productData.net_price ||
+        productData.strike_price_rs ||
+        productData.adjusted_bom_rs ||
+        productData.bom_rs || 0;
     } else if (category === "database_pouffes") {
       // Pouffes uses net_price (not net_price_rs) as primary column
       basePrice = productData.net_price ||
-                  productData.net_price_rs ||
-                  productData.strike_price_rs ||
-                  productData.adjusted_bom_rs ||
-                  productData.bom_rs || 0;
+        productData.net_price_rs ||
+        productData.strike_price_rs ||
+        productData.adjusted_bom_rs ||
+        productData.bom_rs || 0;
     } else {
       // For other categories, use existing fallback chain
-      basePrice = productData.net_price_rs || 
-                  productData.bom_rs || 
-                  productData.adjusted_bom_rs || 
-                  productData.net_price_single_no_storage_rs || 
-                  productData.net_price || 0;
+      basePrice = productData.net_price_rs ||
+        productData.bom_rs ||
+        productData.adjusted_bom_rs ||
+        productData.net_price_single_no_storage_rs ||
+        productData.net_price || 0;
     }
 
     breakdown.basePrice = basePrice;
@@ -882,7 +884,7 @@ export const calculateDynamicPrice = async (
  */
 async function getFabricPrice(fabricCode: string): Promise<number> {
   if (!fabricCode) return 0;
-  
+
   try {
     const { data, error } = await supabase
       .from("fabric_coding")
@@ -917,6 +919,7 @@ async function calculateSofaPricing(
     loungerPrice: 0,
     consolePrice: 0,
     pillowsPrice: 0,
+    pillowFabricPrice: 0,
     fabricCharges: 0,
     fabricMeters: 0,
     foamUpgrade: 0,
@@ -1007,39 +1010,26 @@ async function calculateSofaPricing(
     totalPrice += breakdown.additionalSeatsPrice;
   }
 
-  // Lounger pricing - Database-driven from dropdown_options metadata
+  // Lounger pricing - 5ft = 100%, +10% for every 6 inches
   if (configuration.lounger?.required) {
     const loungerSize = configuration.lounger?.size || "";
     const quantity = configuration.lounger?.quantity || 1;
 
-    // Fetch lounger size metadata from database
-    const loungerMetadata = await getLoungerSizeMetadata("sofa", loungerSize);
-    
-    // Use price multiplier from metadata, or fallback to formula-based calculation
-    let loungerPercent = 100; // Default fallback
-    
-    if (loungerMetadata.priceMultiplier !== undefined) {
-      // Use price multiplier directly (e.g., 1.0 = 100%, 1.1 = 110%, etc.)
-      loungerPercent = loungerMetadata.priceMultiplier * 100;
-    } else {
-      // Fallback: Try to get from formulas or use pattern matching
-      const loungerFormulaKey = loungerSize.toLowerCase().replace(/[^a-z0-9]/g, "_");
-      loungerPercent = getFormulaValue(formulas, `lounger_${loungerFormulaKey}_percent`, 100);
-      
-      // If still no match, try pattern matching as last resort
-      if (loungerPercent === 100) {
-        if (loungerSize.includes("7 ft") || loungerSize.includes("7'")) {
-          loungerPercent = getFormulaValue(formulas, "lounger_7ft_percent", 130);
-        } else if (loungerSize.includes("6'6") || loungerSize.includes("6 ft 6 in")) {
-          loungerPercent = getFormulaValue(formulas, "lounger_6ft6in_percent", 120);
-        } else if (loungerSize.includes("6 ft") || loungerSize.includes("6'")) {
-          loungerPercent = getFormulaValue(formulas, "lounger_6ft_percent", 110);
-        } else if (loungerSize.includes("5'6") || loungerSize.includes("5 ft 6 in")) {
-          loungerPercent = getFormulaValue(formulas, "lounger_5ft6in_percent", 100);
-        } else if (loungerSize.includes("5 ft") || loungerSize.includes("5'")) {
-          loungerPercent = getFormulaValue(formulas, "lounger_5ft_percent", 100);
-        }
-      }
+    let loungerPercent = 100; // Base 5ft = 100%
+
+    // Parse size to determine percentage
+    const sizeLower = loungerSize.toLowerCase();
+
+    if (sizeLower.includes("7 ft") || sizeLower.includes("7'")) {
+      loungerPercent = 140; // 5ft + 2ft (4 * 6in) = 100 + 40 = 140%
+    } else if (sizeLower.includes("6 ft 6") || sizeLower.includes("6'6")) {
+      loungerPercent = 130; // 5ft + 1.5ft (3 * 6in) = 100 + 30 = 130%
+    } else if (sizeLower.includes("6 ft") || sizeLower.includes("6'")) {
+      loungerPercent = 120; // 5ft + 1ft (2 * 6in) = 100 + 20 = 120%
+    } else if (sizeLower.includes("5 ft 6") || sizeLower.includes("5'6")) {
+      loungerPercent = 110; // 5ft + 0.5ft (1 * 6in) = 100 + 10 = 110%
+    } else if (sizeLower.includes("5 ft") || sizeLower.includes("5'")) {
+      loungerPercent = 100; // Base
     }
 
     // Calculate lounger price as percentage of base price
@@ -1085,14 +1075,14 @@ async function calculateSofaPricing(
             .map((id: any) => id.toString())
         )
       );
-      
+
       if (accessoryIds.length > 0) {
         const { data: accessories } = await supabase
           .from("accessories_prices")
           .select("id, sale_price")
           .in("id", accessoryIds as string[])
           .eq("is_active", true);
-        
+
         if (accessories && accessories.length > 0) {
           // Sum all accessory prices from active console placements only
           consoleAccessoriesTotal = accessories.reduce((sum: number, acc: any) => {
@@ -1120,7 +1110,7 @@ async function calculateSofaPricing(
 
     // Get pillow price from pillow_size metadata (price_matrix)
     let pillowPrice = 1200; // Default fallback
-    
+
     try {
       const { data: pillowSizeOption } = await supabase
         .from("dropdown_options")
@@ -1150,9 +1140,21 @@ async function calculateSofaPricing(
     // Price per pillow, multiplied by quantity
     breakdown.pillowsPrice = pillowPrice * quantity;
     totalPrice += breakdown.pillowsPrice;
+
+    // Calculate Pillow Fabric Price separately
+    // Default 0.6m per pillow
+    const pillowFabricMeters = 0.6 * quantity;
+
+    // Get fabric code for pillows (assuming same as sofa structure if not specified)
+    const pillowFabricCode = configuration.fabric?.structureCode;
+    const pillowFabricPricePerMeter = await getFabricPrice(pillowFabricCode);
+
+    // Calculate pillow fabric price
+    breakdown.pillowFabricPrice = pillowFabricMeters * pillowFabricPricePerMeter;
+    totalPrice += breakdown.pillowFabricPrice;
   }
 
-  // Fabric charges (single or multi colour)
+  // Fabric charges (single or multi colour) - EXCLUDING pillows as they are calculated separately
   const fabricMeters = await calculateFabricMeters("sofa", configuration, settings, productData);
   const fabricConfig = configuration.fabric || {};
   const claddingPlan = fabricConfig.claddingPlan || "Single Colour";
@@ -1214,6 +1216,15 @@ async function calculateSofaPricing(
       fetchFabricPrice(fabricConfig.headrestCode),
     ]);
 
+    // Calculate full fabric price, not just upgrade
+    // User requested "Sofa Fabric Price", implying the total cost of fabric
+    // However, usually base model includes some base fabric cost.
+    // If the requirement is "Sofa Fabric Price", it might mean the *upgrade* cost or the *total* cost.
+    // Given "Base Model Price" is separate, this likely refers to the fabric cost *on top* or the *total fabric value*.
+    // Usually in this system, it's the upgrade charge (difference from base).
+    // If the base price includes fabric, we charge the difference.
+    // The existing logic calculates `diff`.
+    // This `fabricCharges` field is for the *upgrade* cost of the fabric.
     const diff = (price: number) => Math.max(0, price - baseFabricPrice);
 
     const structureUpgrade = diff(structurePrice) * structureMeters;
@@ -1251,10 +1262,6 @@ async function calculateSofaPricing(
   totalPrice += breakdown.fabricCharges;
   breakdown.fabricMeters = totalFabricMetersForSummary;
 
-  breakdown.fabricMeters = fabricMeters;
-
-  breakdown.fabricMeters = fabricMeters;
-
   // Foam upgrade
   const foamType = configuration.foam?.type || "";
   if (foamType) {
@@ -1266,12 +1273,13 @@ async function calculateSofaPricing(
   // Dimension upgrades
   const seatDepth = configuration.seatDepth || configuration.dimensions?.seatDepth || 22;
   const seatWidth = configuration.seatWidth || configuration.dimensions?.seatWidth || 22;
-  
+
   const depthKey = `seat_depth_${seatDepth}`;
   const widthKey = `seat_width_${seatWidth}`;
   const depthUpgradePercent = getFormulaValue(formulas, depthKey, 0);
   const widthUpgradePercent = getFormulaValue(formulas, widthKey, 0);
-  
+
+  // Dimension upgrade is percentage of the *current* total price (base + seats + etc)
   breakdown.dimensionUpgrade = totalPrice * ((depthUpgradePercent + widthUpgradePercent) / 100);
   totalPrice += breakdown.dimensionUpgrade;
 
@@ -1316,7 +1324,7 @@ async function calculateSofaPricing(
         const armrestPrice = Number(metadata.price_rs || metadata.price || metadata.priceRs || 0);
         breakdown.armrestUpgrade = armrestPrice;
         totalPrice += armrestPrice;
-        
+
         if (armrestPrice > 0) {
           console.log(`✅ Armrest "${armrestType}" price: ₹${armrestPrice}`);
         } else {
@@ -1458,7 +1466,7 @@ async function calculateBedPricing(
 
   // 4. Get base price (use net_price_single_no_storage_rs as reference)
   const baseSinglePrice = productData.net_price_single_no_storage_rs || basePrice;
-  
+
   // 5. Adjust base price by area ratio (not by size multipliers)
   breakdown.basePrice = baseSinglePrice * areaRatio;
   let totalPrice = breakdown.basePrice;
@@ -1466,7 +1474,7 @@ async function calculateBedPricing(
   // 6. Storage pricing and fabric
   if (configuration.storage === "Yes" || configuration.storage === true) {
     const storageType = configuration.storageType || "Hydraulic";
-    
+
     try {
       const { data: storageOption } = await supabase
         .from("dropdown_options")
@@ -1518,18 +1526,18 @@ async function calculateBedPricing(
     // Multi-colour plan breakdown (60% Structure, 40% Headrest)
     const structureMeters = fabricMeters * 0.60;
     const headrestMeters = fabricMeters * 0.40;
-    
+
     const structureCode = configuration.fabric?.structureCode;
     const headrestCode = configuration.fabric?.headrestCode || configuration.fabric?.headboardCode; // Support both field names
-    
+
     if (structureCode && headrestCode) {
       const structurePrice = await getFabricPrice(structureCode);
       const headrestPrice = await getFabricPrice(headrestCode);
-      
+
       // Full fabric cost = meterage × price per meter
       const structureCost = structureMeters * structurePrice;
       const headrestCost = headrestMeters * headrestPrice;
-      
+
       breakdown.fabricCharges = structureCost + headrestCost;
       totalPrice += breakdown.fabricCharges;
     }
@@ -1537,18 +1545,18 @@ async function calculateBedPricing(
     // Dual colour: structure and headrest (60% structure, 40% headrest)
     const structureMeters = fabricMeters * 0.60;
     const headrestMeters = fabricMeters * 0.40;
-    
+
     const structureCode = configuration.fabric?.structureCode;
     const headrestCode = configuration.fabric?.headrestCode || configuration.fabric?.headboardCode;
-    
+
     if (structureCode && headrestCode) {
       const structurePrice = await getFabricPrice(structureCode);
       const headrestPrice = await getFabricPrice(headrestCode);
-      
+
       // Full fabric cost = meterage × price per meter
       const structureCost = structureMeters * structurePrice;
       const headrestCost = headrestMeters * headrestPrice;
-      
+
       breakdown.fabricCharges = structureCost + headrestCost;
       totalPrice += breakdown.fabricCharges;
     }
@@ -1572,7 +1580,7 @@ async function calculateBedPricing(
       .eq("description", legCode)
       .eq("is_active", true)
       .single();
-    
+
     if (leg?.price_per_unit) {
       breakdown.accessoriesPrice = leg.price_per_unit;
       totalPrice += breakdown.accessoriesPrice;
@@ -1683,29 +1691,29 @@ async function calculateReclinerPricing(
   const sections = {
     F: sanitizeSection(
       sectionsSource.F ??
-        sectionsSource.front ??
-        configuration.sections?.front ??
-        configuration.basic_recliner?.sections?.front
+      sectionsSource.front ??
+      configuration.sections?.front ??
+      configuration.basic_recliner?.sections?.front
     ),
     L1:
       normalizedShape === "L SHAPE"
         ? sanitizeSection(
-            sectionsSource.L1 ??
-              sectionsSource.left_l1 ??
-              configuration.sections?.L1 ??
-              configuration.sections?.left_l1 ??
-              configuration.basic_recliner?.sections?.left_l1
-          )
+          sectionsSource.L1 ??
+          sectionsSource.left_l1 ??
+          configuration.sections?.L1 ??
+          configuration.sections?.left_l1 ??
+          configuration.basic_recliner?.sections?.left_l1
+        )
         : null,
     L2:
       normalizedShape === "L SHAPE"
         ? sanitizeSection(
-            sectionsSource.L2 ??
-              sectionsSource.left_l2 ??
-              configuration.sections?.L2 ??
-              configuration.sections?.left_l2 ??
-              configuration.basic_recliner?.sections?.left_l2
-          )
+          sectionsSource.L2 ??
+          sectionsSource.left_l2 ??
+          configuration.sections?.L2 ??
+          configuration.sections?.left_l2 ??
+          configuration.basic_recliner?.sections?.left_l2
+        )
         : null,
   };
 
@@ -1864,8 +1872,7 @@ async function calculateReclinerPricing(
 
   if (import.meta.env.DEV) {
     console.log(
-      `⚙️ Mechanism Pricing: Front=${frontMechanism} (₹${frontMechanismPrice}), Left=${
-        isLShape ? leftMechanism || "N/A" : "N/A"
+      `⚙️ Mechanism Pricing: Front=${frontMechanism} (₹${frontMechanismPrice}), Left=${isLShape ? leftMechanism || "N/A" : "N/A"
       } (₹${leftMechanismPrice}), Total=₹${breakdown.mechanismUpgrade}`
     );
   }
@@ -1933,8 +1940,7 @@ async function calculateReclinerPricing(
 
     if (import.meta.env.DEV) {
       console.log(
-        `🪑 Recliner Console Pricing: Active=${activeConsoleCount}, Base=₹${
-          baseConsolePrice * activeConsoleCount
+        `🪑 Recliner Console Pricing: Active=${activeConsoleCount}, Base=₹${baseConsolePrice * activeConsoleCount
         }, Accessories=₹${consoleAccessoriesTotal}, Total=₹${breakdown.consolePrice}`
       );
     }
@@ -1948,7 +1954,7 @@ async function calculateReclinerPricing(
 
     // Get pillow price from pillow_size metadata (price_matrix)
     let pillowPrice = 1200; // Default fallback
-    
+
     try {
       const { data: pillowSizeOption } = await supabase
         .from("dropdown_options")
@@ -1997,7 +2003,7 @@ async function calculateReclinerPricing(
     26: 0.03, // 3%
     28: 0.06, // 6%
   };
-  
+
   const depthPercentDefault = depthUpgradePercentDefaults[seatDepth] ?? 0;
   const depthPercentRaw = getFormulaValue(
     formulas,
@@ -2016,7 +2022,7 @@ async function calculateReclinerPricing(
     26: 0.065, // 6.5%
     28: 0.13,  // 13%
   };
-  
+
   const widthPercentDefault = widthUpgradePercentDefaults[seatWidth] ?? 0;
   const widthPercentRaw = getFormulaValue(
     formulas,
@@ -2033,7 +2039,7 @@ async function calculateReclinerPricing(
   // Fabric charges (applied after dimension upgrades)
   const fabricMeters = await calculateFabricMeters("recliner", configuration, settings, productData);
   const fabricCode = configuration.fabric?.structureCode || configuration.fabric?.claddingPlan;
-  
+
   if (fabricCode) {
     const fabricPricePerMeter = await getFabricPrice(fabricCode);
     breakdown.fabricCharges = fabricMeters * fabricPricePerMeter;
@@ -2156,7 +2162,7 @@ async function calculateCinemaChairPricing(
 
     // Count only ACTIVE console placements (not "none" or null)
     // For Cinema Chairs, placements are stored as strings (e.g., "after_1") or null/"none"
-    const activePlacements = placements.filter((p: any) => 
+    const activePlacements = placements.filter((p: any) =>
       p && p !== null && p !== "none" && p !== undefined
     );
     const activeConsoleCount = activePlacements.length;
@@ -2177,14 +2183,14 @@ async function calculateCinemaChairPricing(
           }
         }
       });
-      
+
       if (activeAccessoryIds.length > 0) {
         const { data: accessories } = await supabase
           .from("accessories_prices")
           .select("id, sale_price")
           .in("id", activeAccessoryIds as string[])
           .eq("is_active", true);
-        
+
         if (accessories && accessories.length > 0) {
           consoleAccessoriesTotal = accessories.reduce((sum: number, acc: any) => {
             return sum + (Number(acc.sale_price) || 0);
@@ -2242,7 +2248,7 @@ async function calculateCinemaChairPricing(
   // Fabric charges (applied after dimension upgrades)
   const fabricMeters = await calculateFabricMeters("cinema_chairs", configuration, settings, productData);
   const fabricCode = configuration.fabric?.structureCode || configuration.fabric?.claddingPlan;
-  
+
   if (fabricCode) {
     const fabricPricePerMeter = await getFabricPrice(fabricCode);
     breakdown.fabricCharges = fabricMeters * fabricPricePerMeter;
@@ -2640,7 +2646,7 @@ async function calculateChairPricing(
   };
 
   const quantity = configuration.quantity || 1;
-  
+
   breakdown.baseSeatPrice = basePrice;
   let totalPrice = basePrice;
 
@@ -2660,7 +2666,7 @@ async function calculateChairPricing(
 
     // Get pillow price from pillow_size metadata (price_matrix)
     let pillowPrice = 1200; // Default fallback
-    
+
     try {
       const { data: pillowSizeOption } = await supabase
         .from("dropdown_options")
@@ -2693,7 +2699,7 @@ async function calculateChairPricing(
   // Fabric charges
   const fabricMeters = await calculateFabricMeters(category, configuration, settings, productData);
   const fabricCode = configuration.fabric?.structureCode || configuration.fabric?.claddingPlan;
-  
+
   if (fabricCode) {
     const fabricPricePerMeter = await getFabricPrice(fabricCode);
     breakdown.fabricCharges = fabricMeters * fabricPricePerMeter;
@@ -2809,10 +2815,10 @@ async function calculatePouffePricing(
   // Fabric upgrade charges
   const fabricPlan = configuration.fabricPlan || {};
   const baseFabricMeters = Number(
-    fabricPlan.baseFabricMeters || 
-    configuration.baseModel?.fabric || 
+    fabricPlan.baseFabricMeters ||
+    configuration.baseModel?.fabric ||
     productData.fabric_required_mtr ||
-    productData.fabric_mtrs || 
+    productData.fabric_mtrs ||
     3
   );
   const BASE_FABRIC_PRICE_PER_METER = 800;
@@ -2882,7 +2888,7 @@ async function calculatePouffePricing(
   // Discount
   if (configuration.discount?.discountCode || configuration.discount?.code) {
     const discountCode = configuration.discount.discountCode || configuration.discount.code;
-    
+
     // Try to get discount percentage from metadata first
     try {
       const { data: discountOption } = await supabase
@@ -2954,7 +2960,7 @@ async function calculateBenchPricing(
   };
 
   const seatingCapacity = configuration.seatingCapacity || configuration.qty || 1;
-  
+
   breakdown.baseSeatPrice = basePrice;
   let totalPrice = basePrice;
 
@@ -2976,7 +2982,7 @@ async function calculateBenchPricing(
   // Fabric charges
   const fabricMeters = await calculateFabricMeters(category, configuration, settings, productData);
   const fabricCode = configuration.fabric?.structureCode || configuration.fabric?.claddingPlan;
-  
+
   if (fabricCode) {
     const fabricPricePerMeter = await getFabricPrice(fabricCode);
     breakdown.fabricCharges = fabricMeters * fabricPricePerMeter;
@@ -3127,7 +3133,7 @@ async function calculateSofabedPricing(
       // Regular seater (2/3/4-seater, with or without mech)
       // "No Mech" options are priced the same as regular seats (mechanism cost is separate)
       const seatCount = parseSeatCount(section.seater);
-      
+
       for (let module = 0; module < qty; module++) {
         // Process each seat individually across all modules
         for (let seat = 0; seat < seatCount; seat++) {
@@ -3154,16 +3160,16 @@ async function calculateSofabedPricing(
 
   // Lounger pricing - Database-driven from dropdown_options metadata
   if (configuration.lounger?.required === "Yes" || configuration.lounger?.required === true) {
-    const numLoungers = configuration.lounger?.numberOfLoungers === "2 Nos." ? 2 : 
-                       (configuration.lounger?.quantity || 1);
+    const numLoungers = configuration.lounger?.numberOfLoungers === "2 Nos." ? 2 :
+      (configuration.lounger?.quantity || 1);
     const loungerSize = configuration.lounger?.size || "";
-    
+
     // Fetch lounger size metadata from database
     const loungerMetadata = await getLoungerSizeMetadata("sofabed", loungerSize);
-    
+
     // Calculate base lounger price using metadata
     let baseLoungerPercentage = 0.40; // Default fallback: 40%
-    
+
     if (loungerMetadata.basePercentage !== undefined) {
       // Use base percentage from metadata
       baseLoungerPercentage = loungerMetadata.basePercentage / 100;
@@ -3171,12 +3177,12 @@ async function calculateSofabedPricing(
       // Fallback: Try to get from formulas
       baseLoungerPercentage = getFormulaValue(formulas, "sofabed_lounger_base_percentage", 40) / 100;
     }
-    
+
     const baseLoungerPrice = basePriceFor2Seater * baseLoungerPercentage;
-    
+
     // Calculate price multiplier for size increments
     let priceMultiplier = 1.0; // Default: base price (5'6")
-    
+
     if (loungerMetadata.priceMultiplier !== undefined) {
       // Use price multiplier from metadata (e.g., 1.0 = base, 1.04 = +4%, etc.)
       priceMultiplier = loungerMetadata.priceMultiplier;
@@ -3190,9 +3196,9 @@ async function calculateSofabedPricing(
         "Lounger-6 ft 6 in": 78, // +12" from base (multiplier = 1.08)
         "Lounger-7 ft": 84       // +18" from base (multiplier = 1.12)
       };
-      
+
       let loungerInches = loungerSizeMap[loungerSize] || 66;
-      
+
       // Pattern matching fallback
       if (loungerInches === 66) {
         if (loungerSize.includes("7 ft") || loungerSize.includes("7'")) {
@@ -3207,23 +3213,23 @@ async function calculateSofabedPricing(
           loungerInches = 60;
         }
       }
-      
+
       // Calculate multiplier: base (66") = 1.0, each 6" increment = +0.04
       const baseInches = 66;
       const additionalInches = Math.max(0, loungerInches - baseInches);
       const additional6InchIncrements = additionalInches / 6;
       priceMultiplier = 1.0 + (additional6InchIncrements * 0.04);
     }
-    
+
     // Total lounger price per unit
     let loungerPricePerUnit = baseLoungerPrice * priceMultiplier;
-    
+
     // Storage option - fetch from formulas
     if (configuration.lounger?.storage === "Yes") {
       const storageCost = getFormulaValue(formulas, "sofabed_lounger_storage", 0);
       loungerPricePerUnit += storageCost;
     }
-    
+
     // Total for all loungers
     breakdown.loungerPrice = loungerPricePerUnit * numLoungers;
     totalPrice += breakdown.loungerPrice;
@@ -3233,7 +3239,7 @@ async function calculateSofabedPricing(
   const recliner = configuration.recliner || {};
   let reclinerTotal = 0;
   const reclinerPricePerSeat = getFormulaValue(formulas, "recliner_electric_cost", 14000);
-  
+
   const activeReclinerSections =
     SOFABED_RECLINER_ACTIVE_SECTIONS[normalizedShape] || SOFABED_RECLINER_ACTIVE_SECTIONS.STANDARD;
 
@@ -3244,7 +3250,7 @@ async function calculateSofabedPricing(
       reclinerTotal += reclinerPricePerSeat * numRecliners;
     }
   });
-  
+
   breakdown.mechanismUpgrade = reclinerTotal;
   totalPrice += breakdown.mechanismUpgrade;
 
@@ -3256,7 +3262,7 @@ async function calculateSofabedPricing(
 
     // Get pillow price from pillow_size metadata (price_matrix)
     let pillowPrice = 1200; // Default fallback
-    
+
     try {
       const { data: pillowSizeOption } = await supabase
         .from("dropdown_options")
@@ -3301,7 +3307,7 @@ async function calculateSofabedPricing(
 
     // Count only ACTIVE console placements (not "none")
     // Match the same logic used in Active Consoles Summary
-    const activePlacements = placements.filter((p: any) => 
+    const activePlacements = placements.filter((p: any) =>
       p && p.position && p.position !== null && p.section !== null && p.position !== "none"
     );
     const activeConsoleCount = activePlacements.length;
@@ -3348,25 +3354,25 @@ async function calculateSofabedPricing(
     "Memory": 3000,
     "Memory Foam": 3000,
   };
-  
+
   // Calculate total seats for foam pricing (excluding corners and backrests)
   let totalSeatsForFoam = 0;
   for (const sectionId of sectionOrder) {
     const section = sections[sectionId];
     if (!section || !section.seater || section.seater === "none") continue;
-    
+
     const seaterType = section.seater.toLowerCase();
     // Skip corners and backrests - they don't have seats
     if (seaterType.includes("corner") || seaterType.includes("backrest")) {
       continue;
     }
-    
+
     // Count seats in this section
     const seatCount = parseSeatCount(section.seater);
     const qty = section.qty || 1;
     totalSeatsForFoam += seatCount * qty;
   }
-  
+
   const foamPricePerSeat = foamPrices[foamType] || 0;
   breakdown.foamUpgrade = foamPricePerSeat * totalSeatsForFoam;
   totalPrice += breakdown.foamUpgrade;
@@ -3410,7 +3416,7 @@ async function calculateSofabedPricing(
   // Fabric charges (applied after dimension upgrades)
   const fabricMeters = await calculateFabricMeters("sofabed", configuration, settings, productData);
   const fabricCode = configuration.fabric?.structureCode || configuration.fabric?.claddingPlan;
-  
+
   if (fabricCode) {
     const fabricPricePerMeter = await getFabricPrice(fabricCode);
     breakdown.fabricCharges = fabricMeters * fabricPricePerMeter;
@@ -3463,7 +3469,7 @@ async function calculateSofabedPricing(
           .eq("option_value", armrestType)
           .eq("is_active", true)
           .single();
-        
+
         if (sofaArmrest && sofaArmrest.metadata) {
           const metadata = parseOptionMetadata(sofaArmrest.metadata);
           const armrestPrice = Number(metadata.price_rs || metadata.price || metadata.priceRs || 0);
@@ -3504,7 +3510,7 @@ async function calculateSofabedPricing(
           .eq("option_value", stitchType)
           .eq("is_active", true)
           .single();
-        
+
         if (sofaStitch && sofaStitch.metadata) {
           let rawMetadata = sofaStitch.metadata;
           if (typeof rawMetadata === 'string') {
@@ -3514,7 +3520,7 @@ async function calculateSofabedPricing(
               console.warn("Failed to parse stitch metadata as JSON:", e);
             }
           }
-          
+
           const metadata = parseOptionMetadata(stitchOption.metadata);
           const stitchPrice = Number(metadata.price_rs || metadata.price || metadata.priceRs || 0);
           breakdown.stitchTypePrice = stitchPrice;
@@ -3614,7 +3620,7 @@ async function calculateGenericPricing(
   // Calculate fabric cost
   const fabricMeters = await calculateFabricMeters(category, configuration, settings, productData);
   const fabricCode = configuration.fabric?.structureCode || configuration.fabric?.claddingPlan;
-  
+
   if (fabricCode) {
     const fabricPricePerMeter = await getFabricPrice(fabricCode);
     breakdown.fabricCharges = fabricMeters * fabricPricePerMeter;

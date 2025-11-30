@@ -1,6 +1,7 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Download, Printer } from "lucide-react";
+import { FabricPreview } from "@/components/common/FabricPreview";
 
 interface JobCardDocumentProps {
     data: {
@@ -36,188 +37,154 @@ const renderTechnicalSpecs = (specs: any) => {
     if (!specs) return null;
 
     return (
-        <div className="space-y-4">
-            {/* Sections */}
+        <div className="space-y-6">
+            {/* PRODUCT DESCRIPTION */}
+            <div className="border border-gray-300 rounded-md bg-[#F4F5F0] p-5">
+                <h4 className="text-base font-bold text-[#937867] border-b-2 border-[#D6B485] pb-1 mb-3 uppercase">PRODUCT DESCRIPTION</h4>
+                <div className="flex justify-between gap-4 text-sm">
+                    <div className="w-[48%] space-y-1.5">
+                        <div className="flex gap-2"><strong className="text-[#222] min-w-[100px]">Product:</strong> <span>{specs.product_type || "Sofa"}</span></div>
+                        <div className="flex gap-2"><strong className="text-[#222] min-w-[100px]">Model:</strong> <span>{specs.model_name}</span></div>
+                        <div className="flex gap-2"><strong className="text-[#222] min-w-[100px]">Sofa Type:</strong> <span>{specs.sofa_type}</span></div>
+                    </div>
+                    <div className="w-[48%] space-y-1.5">
+                        <div className="flex gap-2"><strong className="text-[#222] min-w-[100px]">Reference:</strong> <span>{specs.model_name}-{specs.sofa_type}</span></div>
+                        <div className="flex gap-2"><strong className="text-[#222] min-w-[100px]">Category:</strong> <span>{specs.category || "Living Room"}</span></div>
+                    </div>
+                </div>
+            </div>
+
+            {/* SEATING CONFIGURATION */}
             {specs.sections && specs.sections.length > 0 && (
-                <div>
-                    <h4 className="font-semibold mb-2">Sections</h4>
-                    <table className="w-full text-sm border border-gray-800">
-                        <thead>
-                            <tr className="bg-gray-100">
-                                <th className="border border-gray-800 p-2 text-left">Section</th>
-                                <th className="border border-gray-800 p-2 text-left">Seater</th>
-                                <th className="border border-gray-800 p-2 text-left">Quantity</th>
-                                <th className="border border-gray-800 p-2 text-left">Fabric (m)</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {specs.sections.map((section: any, idx: number) => (
-                                <tr key={idx}>
-                                    <td className="border border-gray-800 p-2">{section.section}</td>
-                                    <td className="border border-gray-800 p-2">{section.seater}</td>
-                                    <td className="border border-gray-800 p-2">{section.quantity}</td>
-                                    <td className="border border-gray-800 p-2">
-                                        {section.fabricMeters?.toFixed(2) || "0.00"}
-                                    </td>
-                                </tr>
+                <div className="border border-gray-300 rounded-md bg-[#F4F5F0] p-5">
+                    <h4 className="text-base font-bold text-[#937867] border-b-2 border-[#D6B485] pb-1 mb-3 uppercase">SEATING CONFIGURATION</h4>
+                    <div className="flex justify-between gap-4 text-sm">
+                        <div className="w-[48%] space-y-1.5">
+                            {specs.sections.filter((_: any, i: number) => i % 2 === 0).map((section: any, idx: number) => (
+                                <div key={idx} className="flex gap-2">
+                                    <strong className="text-[#222] min-w-[100px] capitalize">{section.section}:</strong>
+                                    <span>{section.seater}</span>
+                                </div>
                             ))}
-                        </tbody>
-                    </table>
+                        </div>
+                        <div className="w-[48%] space-y-1.5">
+                            {specs.sections.filter((_: any, i: number) => i % 2 !== 0).map((section: any, idx: number) => (
+                                <div key={idx} className="flex gap-2">
+                                    <strong className="text-[#222] min-w-[100px] capitalize">{section.section}:</strong>
+                                    <span>{section.seater}</span>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
                 </div>
             )}
 
-            {/* Console Summary */}
+            {/* CONSOLES */}
             {specs.console && specs.console.required && (
-                <div>
-                    <h4 className="font-semibold mb-2">Console Details</h4>
-                    <table className="w-full text-sm border border-gray-800">
-                        <tbody>
-                            <tr>
-                                <td className="border border-gray-800 p-2 font-medium">Count</td>
-                                <td className="border border-gray-800 p-2">{specs.console.count}</td>
-                            </tr>
-                            <tr>
-                                <td className="border border-gray-800 p-2 font-medium">Size</td>
-                                <td className="border border-gray-800 p-2">{specs.console.size}</td>
-                            </tr>
-                            <tr>
-                                <td className="border border-gray-800 p-2 font-medium">Fabric (m)</td>
-                                <td className="border border-gray-800 p-2">
-                                    {specs.console.fabricMeters?.toFixed(2) || "0.00"}
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
-                    {specs.console.placements && specs.console.placements.length > 0 && (
-                        <div className="mt-2">
-                            <p className="text-sm font-medium">Placements:</p>
-                            <ul className="list-disc pl-5 text-sm">
-                                {specs.console.placements.map((p: any, idx: number) => (
-                                    <li key={idx}>
-                                        {p.section} - {p.position}
-                                    </li>
-                                ))}
-                            </ul>
+                <div className="border border-gray-300 rounded-md bg-[#F4F5F0] p-5">
+                    <h4 className="text-base font-bold text-[#937867] border-b-2 border-[#D6B485] pb-1 mb-3 uppercase">CONSOLES</h4>
+                    <div className="flex justify-between gap-4 text-sm">
+                        <div className="w-[48%] space-y-1.5">
+                            <div className="flex gap-2"><strong className="text-[#222] min-w-[120px]">No. of Consoles:</strong> <span>{specs.console.count} Nos.</span></div>
+                            <div className="flex gap-2"><strong className="text-[#222] min-w-[120px]">Console Size:</strong> <span>{specs.console.size}</span></div>
                         </div>
-                    )}
+                        <div className="w-[48%] space-y-1.5">
+                            <div className="flex gap-2"><strong className="text-[#222]">Positioning:</strong></div>
+                            {specs.console.placements && specs.console.placements.map((p: any, idx: number) => (
+                                <div key={idx} className="pl-4">– {p.section} - {p.position}</div>
+                            ))}
+                        </div>
+                    </div>
                 </div>
             )}
 
-            {/* Dummy Seat Summary */}
-            {specs.dummySeat && specs.dummySeat.total > 0 && (
-                <div>
-                    <h4 className="font-semibold mb-2">Dummy Seats</h4>
-                    <table className="w-full text-sm border border-gray-800">
-                        <tbody>
-                            <tr>
-                                <td className="border border-gray-800 p-2 font-medium">Total</td>
-                                <td className="border border-gray-800 p-2">{specs.dummySeat.total}</td>
-                            </tr>
-                            <tr>
-                                <td className="border border-gray-800 p-2 font-medium">Fabric (m)</td>
-                                <td className="border border-gray-800 p-2">
-                                    {specs.dummySeat.fabricMeters?.toFixed(2) || "0.00"}
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
+            {/* LOUNGERS */}
+            {specs.lounger && specs.lounger.required && (
+                <div className="border border-gray-300 rounded-md bg-[#F4F5F0] p-5">
+                    <h4 className="text-base font-bold text-[#937867] border-b-2 border-[#D6B485] pb-1 mb-3 uppercase">LOUNGERS</h4>
+                    <div className="flex justify-between gap-4 text-sm">
+                        <div className="w-[48%] space-y-1.5">
+                            <div className="flex gap-2"><strong className="text-[#222] min-w-[120px]">No. of Loungers:</strong> <span>{specs.lounger.count} No.</span></div>
+                            <div className="flex gap-2"><strong className="text-[#222] min-w-[120px]">Lounger Size:</strong> <span>{specs.lounger.size}</span></div>
+                        </div>
+                        <div className="w-[48%] space-y-1.5">
+                            <div className="flex gap-2"><strong className="text-[#222] min-w-[100px]">Position:</strong> <span>{specs.lounger.positioning}</span></div>
+                        </div>
+                    </div>
                 </div>
             )}
 
-            {/* Fabric Plan */}
+            {/* FABRIC DESCRIPTION */}
             {specs.fabricPlan && (
-                <div>
-                    <h4 className="font-semibold mb-2">Fabric Plan</h4>
-                    <table className="w-full text-sm border border-gray-800">
-                        <tbody>
-                            <tr>
-                                <td className="border border-gray-800 p-2 font-medium">Plan Type</td>
-                                <td className="border border-gray-800 p-2">{specs.fabricPlan.planType}</td>
-                            </tr>
-                            <tr>
-                                <td className="border border-gray-800 p-2 font-medium">Base Meters</td>
-                                <td className="border border-gray-800 p-2">
-                                    {specs.fabricPlan.baseMeters?.toFixed(2) || "0.00"}
-                                </td>
-                            </tr>
-                            <tr>
-                                <td className="border border-gray-800 p-2 font-medium">Structure Meters</td>
-                                <td className="border border-gray-800 p-2">
-                                    {specs.fabricPlan.structureMeters?.toFixed(2) || "0.00"}
-                                </td>
-                            </tr>
-                            <tr>
-                                <td className="border border-gray-800 p-2 font-medium">Armrest Meters</td>
-                                <td className="border border-gray-800 p-2">
-                                    {specs.fabricPlan.armrestMeters?.toFixed(2) || "0.00"}
-                                </td>
-                            </tr>
-                            <tr>
-                                <td className="border border-gray-800 p-2 font-medium">Total Meters</td>
-                                <td className="border border-gray-800 p-2 font-bold">
-                                    {specs.fabricPlan.totalMeters?.toFixed(2) || "0.00"}
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
-                    {specs.fabricPlan.fabricCodes && (
-                        <div className="mt-4">
-                            <p className="text-sm font-medium mb-2">Fabric Selection:</p>
-                            <div className="grid grid-cols-2 gap-4">
-                                {Object.entries(specs.fabricPlan.fabricCodes).map(([key, value]) => (
-                                    <div key={key} className="border p-3 rounded flex items-center gap-3">
-                                        {/* Fabric Image Placeholder - In production this should be the actual fabric image URL */}
-                                        <div className="w-12 h-12 bg-gray-200 rounded border flex items-center justify-center overflow-hidden">
-                                            <img
-                                                src={`https://placehold.co/100x100/e2e8f0/64748b?text=${String(value).substring(0, 3)}`}
-                                                alt="Fabric"
-                                                className="w-full h-full object-cover"
-                                            />
-                                        </div>
-                                        <div className="text-sm">
-                                            <span className="font-medium block capitalize">{key}</span>
-                                            <span className="text-muted-foreground">{value as string}</span>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
+                <div className="border border-gray-300 rounded-md bg-[#F4F5F0] p-5">
+                    <h4 className="text-base font-bold text-[#937867] border-b-2 border-[#D6B485] pb-1 mb-3 uppercase">FABRIC DESCRIPTION</h4>
+                    <div className="flex justify-between gap-4 text-sm">
+                        <div className="w-[48%] space-y-2">
+                            <div className="flex gap-2"><strong className="text-[#222] min-w-[100px]">Colour Theme:</strong> <span>{specs.fabricPlan.planType}</span></div>
+                            {specs.fabricPlan.fabricCodes && Object.entries(specs.fabricPlan.fabricCodes).slice(0, Math.ceil(Object.keys(specs.fabricPlan.fabricCodes).length / 2)).map(([key, value]) => (
+                                <div key={key} className="flex items-center gap-2">
+                                    <strong className="text-[#222] min-w-[100px] capitalize">{key}:</strong>
+                                    <span className="font-mono text-xs">{value as string}</span>
+                                    <FabricPreview fabricCode={value as string} showDetails={false} compact className="border-0 p-0 h-6 w-6" />
+                                </div>
+                            ))}
                         </div>
-                    )}
+                        <div className="w-[48%] space-y-2">
+                            {specs.fabricPlan.fabricCodes && Object.entries(specs.fabricPlan.fabricCodes).slice(Math.ceil(Object.keys(specs.fabricPlan.fabricCodes).length / 2)).map(([key, value]) => (
+                                <div key={key} className="flex items-center gap-2">
+                                    <strong className="text-[#222] min-w-[100px] capitalize">{key}:</strong>
+                                    <span className="font-mono text-xs">{value as string}</span>
+                                    <FabricPreview fabricCode={value as string} showDetails={false} compact className="border-0 p-0 h-6 w-6" />
+                                </div>
+                            ))}
+                        </div>
+                    </div>
                 </div>
             )}
 
-            {/* Dimensions */}
+            {/* FRAME & DIMENSIONS */}
             {specs.dimensions && (
-                <div>
-                    <h4 className="font-semibold mb-2">Dimensions</h4>
-                    <table className="w-full text-sm border border-gray-800">
-                        <tbody>
-                            {specs.dimensions.seatDepth && (
-                                <tr>
-                                    <td className="border border-gray-800 p-2 font-medium">Seat Depth</td>
-                                    <td className="border border-gray-800 p-2">{specs.dimensions.seatDepth}"</td>
-                                </tr>
-                            )}
-                            {specs.dimensions.seatWidth && (
-                                <tr>
-                                    <td className="border border-gray-800 p-2 font-medium">Seat Width</td>
-                                    <td className="border border-gray-800 p-2">{specs.dimensions.seatWidth}"</td>
-                                </tr>
-                            )}
-                            {specs.dimensions.seatHeight && (
-                                <tr>
-                                    <td className="border border-gray-800 p-2 font-medium">Seat Height</td>
-                                    <td className="border border-gray-800 p-2">{specs.dimensions.seatHeight}"</td>
-                                </tr>
-                            )}
-                            {specs.dimensions.totalWidth && (
-                                <tr>
-                                    <td className="border border-gray-800 p-2 font-medium">Total Width</td>
-                                    <td className="border border-gray-800 p-2">{specs.dimensions.totalWidth}"</td>
-                                </tr>
-                            )}
-                        </tbody>
-                    </table>
+                <div className="border border-gray-300 rounded-md bg-[#F4F5F0] p-5">
+                    <h4 className="text-base font-bold text-[#937867] border-b-2 border-[#D6B485] pb-1 mb-3 uppercase">FRAME & DIMENSIONS</h4>
+                    <div className="flex justify-between gap-4 text-sm">
+                        <div className="w-[48%] space-y-1.5">
+                            <div className="flex gap-2"><strong className="text-[#222] min-w-[100px]">Wood Type:</strong> <span>{specs.attributes?.wood_type || "Pine (Default)"}</span></div>
+                            <div className="flex gap-2"><strong className="text-[#222] min-w-[100px]">Seat Depth:</strong> <span>{specs.dimensions.seatDepth} in</span></div>
+                            <div className="flex gap-2"><strong className="text-[#222] min-w-[100px]">Seat Height:</strong> <span>{specs.dimensions.seatHeight} in</span></div>
+                        </div>
+                        <div className="w-[48%] space-y-1.5">
+                            <div className="flex gap-2"><strong className="text-[#222] min-w-[120px]">Seat Width:</strong> <span>{specs.dimensions.seatWidth} in</span></div>
+                            <div className="flex gap-2"><strong className="text-[#222] min-w-[120px]">Total Width:</strong> <span>{specs.dimensions.totalWidth} in</span></div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* STITCHING & LEG DETAILS */}
+            <div className="border border-gray-300 rounded-md bg-[#F4F5F0] p-5">
+                <h4 className="text-base font-bold text-[#937867] border-b-2 border-[#D6B485] pb-1 mb-3 uppercase">STITCHING & LEG DETAILS</h4>
+                <div className="flex justify-between gap-4 text-sm">
+                    <div className="w-[48%] space-y-1.5">
+                        <div className="flex gap-2"><strong className="text-[#222] min-w-[100px]">Stitch Type:</strong> <span>{specs.attributes?.stitch_type || "Standard"}</span></div>
+                        <div className="flex gap-2"><strong className="text-[#222] min-w-[100px]">Leg Model:</strong> <span>{specs.attributes?.legs || "Standard"}</span></div>
+                    </div>
+                    <div className="w-[48%] space-y-1.5">
+                        <div className="flex gap-2"><strong className="text-[#222] min-w-[100px]">Armrest Type:</strong> <span>{specs.attributes?.armrest_type || "Default"}</span></div>
+                    </div>
+                </div>
+            </div>
+
+            {/* ACCESSORIES */}
+            {specs.accessories && specs.accessories.length > 0 && (
+                <div className="border border-gray-300 rounded-md bg-[#F4F5F0] p-5">
+                    <h4 className="text-base font-bold text-[#937867] border-b-2 border-[#D6B485] pb-1 mb-3 uppercase">ACCESSORIES</h4>
+                    <div className="space-y-1.5 text-sm">
+                        {specs.accessories.map((acc: any, idx: number) => (
+                            <div key={idx} className="flex gap-2">
+                                <span>– {acc.name} ({acc.quantity})</span>
+                            </div>
+                        ))}
+                    </div>
                 </div>
             )}
         </div>
@@ -230,30 +197,58 @@ export const JobCardDocument = ({ data }: JobCardDocumentProps) => {
     const handleDownload = () => {
         const printWindow = window.open("", "_blank");
         if (!printWindow) return;
+
+        // Get the content HTML
+        const content = document.getElementById("job-card-content")?.innerHTML || "";
+
         printWindow.document.write(`
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <title>Job Card - ${data.job_card_number}</title>
-          <style>
-            body { font-family: Arial, sans-serif; padding: 20px; }
-            table { width: 100%; border-collapse: collapse; margin: 10px 0; }
-            th, td { border: 1px solid #000; padding: 8px; text-align: left; }
-            th { background-color: #f0f0f0; font-weight: bold; }
-            .section-title { font-weight: bold; font-size: 16px; margin-top: 20px; }
-          </style>
-        </head>
-        <body>
-          ${document.getElementById("job-card-content")?.innerHTML || ""}
-        </body>
-      </html>
-    `);
+            <!DOCTYPE html>
+            <html lang="en">
+            <head>
+            <meta charset="UTF-8" />
+            <title>Estre – Job Card</title>
+            <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@300;400;600;700&family=Montserrat:wght@300;400;600;700&display=swap" rel="stylesheet">
+            <script src="https://cdn.tailwindcss.com"></script>
+            <style>
+                :root {
+                --estre-white: #F4F5F0;
+                --estre-gold: #D6B485;
+                --estre-brown: #937867;
+                --estre-dark: #664331;
+                --estre-accent1: #B57454;
+                --estre-accent2: #938E6C;
+                --font-primary: 'Montserrat', sans-serif; 
+                --font-secondary: 'Nunito', sans-serif;
+                }
+                body {
+                font-family: var(--font-primary);
+                background: white;
+                margin: 0;
+                padding: 20px;
+                color: #222;
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+                }
+                @media print {
+                    body { margin: 0; padding: 20px; }
+                    .no-print { display: none !important; }
+                }
+            </style>
+            </head>
+            <body>
+                ${content}
+            </body>
+            </html>
+        `);
         printWindow.document.close();
-        printWindow.print();
+        // Wait for images to load before printing
+        setTimeout(() => {
+            printWindow.print();
+        }, 500);
     };
 
     return (
-        <div className="space-y-4 print:p-0">
+        <div className="space-y-4 print:p-0 font-['Montserrat']">
             <div className="flex justify-end gap-2 print:hidden">
                 <Button variant="outline" onClick={handlePrint}>
                     <Printer className="mr-2 h-4 w-4" />
@@ -265,68 +260,59 @@ export const JobCardDocument = ({ data }: JobCardDocumentProps) => {
                 </Button>
             </div>
 
-            <Card id="job-card-content" className="print:border-0 print:shadow-none">
-                <CardContent className="p-8 print:p-4 space-y-6">
-                    {/* Header */}
-                    <div className="text-center border-2 border-gray-800 p-6">
-                        <h1 className="text-3xl font-bold mb-2">JOB CARD</h1>
-                        <p className="text-xl font-semibold">ESTRE GLOBAL PRIVATE LTD</p>
-                    </div>
-
-                    {/* Job Card Info */}
-                    <div className="grid grid-cols-2 gap-6 text-sm">
-                        <div>
-                            <h3 className="font-semibold text-base mb-2">Job Card Information</h3>
-                            <p><span className="font-medium">Job Card No.:</span> {data.job_card_number}</p>
-                            <p><span className="font-medium">Sale Order No.:</span> {data.so_number || data.order_number || "N/A"}</p>
-                            <p><span className="font-medium">Issue Date:</span> {formatDate(data.created_at)}</p>
-                            {data.expected_completion_date && (
-                                <p><span className="font-medium">Expected Completion:</span> {formatDate(data.expected_completion_date)}</p>
-                            )}
+            <Card id="job-card-content" className="print:border-0 print:shadow-none border-0 shadow-none">
+                <CardContent className="p-0 print:p-0 space-y-6 max-w-[800px] mx-auto bg-white">
+                    {/* HEADER */}
+                    <div className="flex justify-between items-start mb-8">
+                        <div className="logo">
+                            <img src="/lovable-uploads/estre-logo.png" alt="Estre Logo" className="w-[170px]" onError={(e) => e.currentTarget.style.display = 'none'} />
+                            <h1 className="text-2xl font-bold text-[#664331] mt-2">ESTRE</h1>
                         </div>
-                        <div>
-                            <h3 className="font-semibold text-base mb-2">Product Information</h3>
-                            <p><span className="font-medium">Product:</span> {data.product_title}</p>
-                            <p><span className="font-medium">Category:</span> {data.product_category}</p>
-                            {data.quantity && (
-                                <p><span className="font-medium">Quantity:</span> {data.quantity}</p>
-                            )}
+                        <div className="text-right text-[13px] leading-[18px]">
+                            <strong>ESTRE GLOBAL PRIVATE LTD</strong><br />
+                            Near Dhoni Public School, AECS Layout – A Block<br />
+                            Revenue Layout, Singasandra, Bengaluru – 560068<br />
+                            Ph: +91 8722200100<br />
+                            Email: support@estre.in<br />
+                            Website: www.estre.in
                         </div>
                     </div>
 
-                    {/* Customer Info */}
-                    <div>
-                        <h3 className="font-semibold text-base mb-2">Customer Information</h3>
-                        <div className="text-sm">
-                            <p><span className="font-medium">Name:</span> {data.customer_name}</p>
-                            {data.customer_phone && (
-                                <p><span className="font-medium">Phone:</span> {data.customer_phone}</p>
-                            )}
-                            {data.customer_email && (
-                                <p><span className="font-medium">Email:</span> {data.customer_email}</p>
-                            )}
+                    {/* JOB TITLE */}
+                    <div className="text-2xl font-bold text-[#664331] border-b-4 border-[#D6B485] inline-block pb-1.5 mb-5">
+                        JOB CARD
+                    </div>
+
+                    {/* JOB METADATA */}
+                    <div className="border border-gray-300 rounded-md bg-[#F4F5F0] p-5 mb-6">
+                        <div className="flex justify-between gap-4 text-sm">
+                            <div className="w-[48%] space-y-1.5">
+                                <div className="flex gap-2"><strong className="text-[#222] min-w-[100px]">Sale Order No:</strong> <span>{data.so_number || data.order_number}</span></div>
+                                <div className="flex gap-2"><strong className="text-[#222] min-w-[100px]">Job Card No:</strong> <span>{data.job_card_number}</span></div>
+                                <div className="flex gap-2"><strong className="text-[#222] min-w-[100px]">S.O. Date:</strong> <span>{formatDate(data.created_at)}</span></div>
+                            </div>
+                            <div className="w-[48%] space-y-1.5">
+                                <div className="flex gap-2"><strong className="text-[#222] min-w-[120px]">Job Issue Date:</strong> <span>{formatDate(new Date().toISOString())}</span></div>
+                                <div className="flex gap-2"><strong className="text-[#222] min-w-[120px]">Job Given To:</strong> <span>Production Team</span></div>
+                                {data.expected_completion_date && (
+                                    <div className="flex gap-2"><strong className="text-[#222] min-w-[120px]">Date of Delivery:</strong> <span>{formatDate(data.expected_completion_date)}</span></div>
+                                )}
+                            </div>
                         </div>
                     </div>
 
                     {/* Technical Specifications */}
-                    <div>
-                        <h3 className="font-semibold text-base mb-4">Technical Specifications</h3>
-                        {renderTechnicalSpecs(data.technical_specifications)}
-                    </div>
+                    {renderTechnicalSpecs(data.technical_specifications)}
 
                     {/* Admin Notes */}
                     {data.admin_notes && (
-                        <div>
-                            <h3 className="font-semibold text-base mb-2">Assembly Instructions</h3>
-                            <p className="text-sm whitespace-pre-wrap bg-gray-50 p-4 rounded">
+                        <div className="border border-gray-300 rounded-md bg-[#F4F5F0] p-5 mt-6">
+                            <h4 className="text-base font-bold text-[#937867] border-b-2 border-[#D6B485] pb-1 mb-3 uppercase">ASSEMBLY INSTRUCTIONS</h4>
+                            <p className="text-sm whitespace-pre-wrap">
                                 {data.admin_notes}
                             </p>
                         </div>
                     )}
-
-                    <p className="text-xs text-muted-foreground text-center mt-8">
-                        This is a computer-generated job card. Please verify all specifications before production.
-                    </p>
                 </CardContent>
             </Card>
         </div>

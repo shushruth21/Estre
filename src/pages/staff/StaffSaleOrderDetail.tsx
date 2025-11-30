@@ -23,7 +23,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Download, FileText, CheckCircle2, ArrowLeft, Tag, Eye, Edit } from "lucide-react";
+import { Loader2, Download, FileText, CheckCircle2, ArrowLeft, Tag, Eye, Edit, ClipboardList, Mail } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
@@ -31,6 +31,8 @@ import { PerfectSaleOrder } from "@/components/orders/PerfectSaleOrder";
 import { format } from "date-fns";
 import { generateSaleOrderData, SaleOrderGeneratedData } from "@/lib/sale-order-generator";
 import { calculateDynamicPrice } from "@/lib/dynamic-pricing";
+import { generateTechnicalSpecifications } from "@/lib/technical-specifications-generator";
+import { JobCardsDisplay } from "@/components/staff/JobCardsDisplay";
 
 
 const formatCurrency = (value: number | null | undefined) => {
@@ -38,15 +40,123 @@ const formatCurrency = (value: number | null | undefined) => {
   return `₹${Math.round(value).toLocaleString("en-IN")}`;
 };
 
-export default function StaffSaleOrderDetail() {
+const StaffSaleOrderDetail = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const [discount, setDiscount] = useState<string>("");
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
+  const [isCreatingJobCards, setIsCreatingJobCards] = useState(false);
+  const [discount, setDiscount] = useState<string>("");
   const [requireOTP, setRequireOTP] = useState(false);
+  const [otp, setOtp] = useState("");
+  const [showOtpInput, setShowOtpInput] = useState(false);
   const [showHTMLPreview, setShowHTMLPreview] = useState(false);
+
+  const handleCreateJobCards = async () => {
+    if (!saleOrder?.order?.order_items || saleOrder.order.order_items.length === 0) {
+      toast({
+        title: "Error",
+        description: "No order items found to create job cards from.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsCreatingJobCards(true);
+    try {
+      // Check if job cards already exist
+      const { data: existingJobCards } = await supabase
+        .from('job_cards')
+        .select('id')
+        .eq('sale_order_id', saleOrder.id);
+
+      if (existingJobCards && existingJobCards.length > 0) {
+        toast({
+          title: "Info",
+          description: "Job cards already exist for this order.",
+        });
+        setIsCreatingJobCards(false);
+        return;
+      }
+
+      const jobCardInserts: any[] = [];
+
+      for (const item of saleOrder.order.order_items) {
+        const pricing = await calculateDynamicPrice(
+          item.product_category,
+          item.product_id,
+          item.configuration
+        );
+
+        const saleData = await generateSaleOrderData(
+          saleOrder.order,
+          item,
+          item.configuration,
+          pricing.breakdown
+        );
+
+        saleData.jobCards.forEach((jobCard) => {
+          const technicalSpecs = generateTechnicalSpecifications(
+            item,
+            item.configuration,
+            jobCard
+          );
+
+          jobCardInserts.push({
+            job_card_number: jobCard.jobCardNumber,
+            so_number: jobCard.soNumber,
+            line_item_id: jobCard.lineItemId,
+            order_id: saleOrder.order_id,
+            order_item_id: item.id,
+            sale_order_id: saleOrder.id,
+            order_number: jobCard.soNumber,
+            customer_name: jobCard.customer.name,
+            customer_phone: jobCard.customer.phone,
+            customer_email: jobCard.customer.email || saleOrder.order.customer_email,
+            delivery_address: jobCard.customer.address,
+            product_category: jobCard.category,
+            product_type: technicalSpecs.sofa_type || technicalSpecs.product_type,
+            product_title: jobCard.modelName,
+            configuration: jobCard.configuration,
+            technical_specifications: technicalSpecs,
+            fabric_codes: jobCard.fabricPlan.fabricCodes,
+            fabric_meters: jobCard.fabricPlan,
+            accessories: {
+              console: jobCard.console,
+              dummySeats: jobCard.dummySeats,
+              sections: jobCard.sections,
+            },
+            dimensions: jobCard.dimensions,
+            status: "pending",
+            priority: "normal",
+          });
+        });
+      }
+
+      if (jobCardInserts.length > 0) {
+        const { error } = await supabase.from('job_cards').insert(jobCardInserts);
+        if (error) throw error;
+
+        toast({
+          title: "Success",
+          description: `Created ${jobCardInserts.length} job cards successfully.`,
+        });
+
+        queryClient.invalidateQueries({ queryKey: ["staff-sale-order-detail", id] });
+        queryClient.invalidateQueries({ queryKey: ["staff-job-cards"] });
+      }
+    } catch (error: any) {
+      console.error("Error creating job cards:", error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to create job cards",
+        variant: "destructive",
+      });
+    } finally {
+      setIsCreatingJobCards(false);
+    }
+  };
   const [editableHTML, setEditableHTML] = useState<string>("");
   const [saleOrderPreviewData, setSaleOrderPreviewData] = useState<SaleOrderGeneratedData | null>(null);
   const [isGeneratingPreview, setIsGeneratingPreview] = useState(false);
@@ -76,6 +186,7 @@ export default function StaffSaleOrderDetail() {
               total_price_rs,
               product_title,
               product_category,
+              product_id,
               configuration
             ),
             job_cards:job_cards(
@@ -408,6 +519,32 @@ export default function StaffSaleOrderDetail() {
   const orderNumber = saleOrder.order?.order_number || `SO-${id?.slice(0, 8).toUpperCase()}`;
   const currentDiscount = discount || saleOrder.discount || 0;
 
+  const handleSendToProduction = async () => {
+    try {
+      const { error } = await supabase
+        .from("sale_orders")
+        .update({
+          status: "in_production",
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", id);
+
+      if (error) throw error;
+
+      toast({
+        title: "Sent to Production",
+        description: "Order status updated to In Production.",
+      });
+      queryClient.invalidateQueries({ queryKey: ["staff-sale-order-detail", id] });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  };
+
   return (
     <StaffLayout>
       <div className="space-y-6">
@@ -427,7 +564,7 @@ export default function StaffSaleOrderDetail() {
             <Badge className="mt-2" variant={
               saleOrder.status === "pending_review" || saleOrder.status === "staff_editing"
                 ? "default"
-                : saleOrder.status === "staff_approved" || saleOrder.status === "staff_pdf_generated"
+                : saleOrder.status === "staff_approved" || saleOrder.status === "staff_pdf_generated" || saleOrder.status === "confirmed_by_customer"
                   ? "default"
                   : "secondary"
             }>
@@ -512,55 +649,30 @@ export default function StaffSaleOrderDetail() {
 
 
         {/* SECTION 2: Job Cards List */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Job Cards ({saleOrder.order?.job_cards?.length || 0})</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {saleOrder.order?.job_cards && saleOrder.order.job_cards.length > 0 ? (
-              <div className="space-y-4">
-                {saleOrder.order.job_cards.map((jobCard: any, index: number) => (
-                  <Card key={jobCard.id} className="bg-muted">
-                    <CardHeader>
-                      <CardTitle className="text-lg">
-                        Jobcard {index + 1} — Product {index + 1}
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-3">
-                      <div>
-                        <p className="font-semibold">Product: {jobCard.product_title}</p>
-                        <p className="text-sm text-muted-foreground">
-                          Category: {jobCard.product_category}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="font-semibold mb-2">Configuration:</p>
-                        <div className="bg-background p-3 rounded-lg">
-                          <pre className="text-xs overflow-auto">
-                            {JSON.stringify(jobCard.configuration, null, 2)}
-                          </pre>
-                        </div>
-                      </div>
-                      <Badge variant="outline">{jobCard.status}</Badge>
-                      <div className="pt-2">
-                        <Link to={`/production/job-card/${jobCard.id}`} target="_blank">
-                          <Button variant="outline" size="sm" className="w-full">
-                            <Printer className="mr-2 h-4 w-4" />
-                            Print for Production
-                          </Button>
-                        </Link>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            ) : (
-              <p className="text-muted-foreground text-center py-8">
-                No job cards found for this sale order.
-              </p>
-            )}
-          </CardContent>
-        </Card>
+        <div className="space-y-4">
+          <JobCardsDisplay
+            jobCards={saleOrder.order?.job_cards || []}
+            saleOrderNumber={saleOrder.order_number}
+            saleOrderDate={new Date(saleOrder.created_at).toLocaleDateString("en-IN")}
+          />
+
+          {(!saleOrder.order?.job_cards || saleOrder.order.job_cards.length === 0) && (
+            <div className="flex justify-center">
+              <Button
+                onClick={handleCreateJobCards}
+                disabled={isCreatingJobCards}
+                variant="outline"
+              >
+                {isCreatingJobCards ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <ClipboardList className="mr-2 h-4 w-4" />
+                )}
+                Create Job Cards Manually
+              </Button>
+            </div>
+          )}
+        </div>
 
         {/* SECTION 3: HTML Preview & PDF Generation */}
         <Card>
@@ -701,40 +813,70 @@ export default function StaffSaleOrderDetail() {
             <CardTitle>Order Management</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <Button
-              variant="destructive"
-              className="w-full"
-              onClick={async () => {
-                if (!confirm("Are you sure you want to delete this sale order? This action cannot be undone.")) {
-                  return;
-                }
+            <div className="grid grid-cols-1 gap-4">
+              {saleOrder.status === "confirmed_by_customer" && (
+                <Button
+                  onClick={handleSendToProduction}
+                  className="w-full bg-green-600 hover:bg-green-700"
+                >
+                  <CheckCircle2 className="mr-2 h-4 w-4" />
+                  Send to Production
+                </Button>
+              )}
 
-                const { error } = await supabase
-                  .from("sale_orders")
-                  .delete()
-                  .eq("id", id);
+              <Button
+                variant="outline"
+                className="w-full"
+                onClick={() => approveAndSendFinalPDFMutation.mutate()}
+                disabled={approveAndSendFinalPDFMutation.isPending}
+              >
+                {approveAndSendFinalPDFMutation.isPending ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <Mail className="mr-2 h-4 w-4" />
+                )}
+                Resend Customer Email (PDF)
+              </Button>
 
-                if (error) {
-                  toast({
-                    title: "Error",
-                    description: "Failed to delete order: " + error.message,
-                    variant: "destructive",
-                  });
-                } else {
-                  toast({
-                    title: "Order Deleted",
-                    description: "Sale order has been deleted successfully.",
-                  });
-                  navigate("/staff/sale-orders");
-                }
-              }}
-            >
-              Delete Order
-            </Button>
+              <Separator />
+
+              <Button
+                variant="destructive"
+                className="w-full"
+                onClick={async () => {
+                  if (!confirm("Are you sure you want to delete this sale order? This action cannot be undone.")) {
+                    return;
+                  }
+
+                  const { error } = await supabase
+                    .from("sale_orders")
+                    .delete()
+                    .eq("id", id);
+
+                  if (error) {
+                    toast({
+                      title: "Error",
+                      description: "Failed to delete order: " + error.message,
+                      variant: "destructive",
+                    });
+                  } else {
+                    toast({
+                      title: "Order Deleted",
+                      description: "Sale order has been deleted successfully.",
+                    });
+                    navigate("/staff/sale-orders");
+                  }
+                }}
+              >
+                Delete Order
+              </Button>
+            </div>
           </CardContent>
         </Card>
       </div>
     </StaffLayout>
   );
 }
+
+export default StaffSaleOrderDetail;
 

@@ -8,16 +8,13 @@ import { ArrowLeft, ArrowRight, Loader2 } from "lucide-react";
 import { StepIndicator } from "@/components/checkout/StepIndicator";
 import { DeliveryStep } from "@/components/checkout/DeliveryStep";
 import { ReviewStep } from "@/components/checkout/ReviewStep";
-import { PaymentStep } from "@/components/checkout/PaymentStep";
 import { calculateDynamicPrice } from "@/lib/dynamic-pricing";
 import { generateSaleOrderData } from "@/lib/sale-order-generator";
-import { generatePricingBreakdown, PricingBreakdownData } from "@/lib/pricing-breakdown-generator";
 import { generateTechnicalSpecifications } from "@/lib/technical-specifications-generator";
 
 const STEPS = [
   { id: 1, name: "Delivery", description: "Shipping details" },
-  { id: 2, name: "Review", description: "Confirm order" },
-  // Payment step removed - payment happens after staff review
+  { id: 2, name: "Review", description: "Confirm & Pay" },
 ];
 
 const Checkout = () => {
@@ -38,6 +35,10 @@ const Checkout = () => {
   const [paymentMethod, setPaymentMethod] = useState("cash");
   const [buyerGst, setBuyerGst] = useState<string>("");
   const [dispatchMethod, setDispatchMethod] = useState<string>("Safe Express");
+
+  // Discount state
+  const [discountCode, setDiscountCode] = useState<string>("");
+  const [discountAmount, setDiscountAmount] = useState<number>(0);
 
   const { data: user } = useQuery({
     queryKey: ["user"],
@@ -64,6 +65,58 @@ const Checkout = () => {
     enabled: !!user,
   });
 
+  const subtotal = cartItems?.reduce((sum, item) => sum + (item.calculated_price || 0), 0) || 0;
+  const total = Math.max(0, subtotal - discountAmount);
+  const advanceAmount = total * 0.5;
+
+  const applyDiscount = async (code: string) => {
+    try {
+      const { data, error } = await supabase
+        .from("discount_codes")
+        .select("*")
+        .eq("code", code)
+        .eq("is_active", true)
+        .single();
+
+      if (error || !data) {
+        throw new Error("Invalid or expired discount code");
+      }
+
+      // Check expiry
+      if (data.expires_at && new Date(data.expires_at) < new Date()) {
+        throw new Error("Discount code has expired");
+      }
+
+      // Check usage limits
+      if (data.max_usage && data.usage_count >= data.max_usage) {
+        throw new Error("Discount code usage limit reached");
+      }
+
+      let calculatedDiscount = 0;
+      if (data.type === "percent") {
+        calculatedDiscount = (subtotal * (data.percent || 0)) / 100;
+      } else {
+        calculatedDiscount = data.value || 0;
+      }
+
+      setDiscountCode(code);
+      setDiscountAmount(calculatedDiscount);
+
+      toast({
+        title: "Discount Applied",
+        description: `Saved ₹${Math.round(calculatedDiscount).toLocaleString()}`,
+      });
+    } catch (error: any) {
+      setDiscountCode("");
+      setDiscountAmount(0);
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  };
+
   const placeOrder = useMutation({
     mutationFn: async () => {
       if (!user || !cartItems || cartItems.length === 0) {
@@ -71,10 +124,8 @@ const Checkout = () => {
       }
 
       const orderNumber = `ORD-${Date.now()}`;
-      const subtotal = cartItems.reduce((sum, item) => sum + (item.calculated_price || 0), 0);
 
-      // Create order first (for reference and order_items)
-      // Build order data object conditionally to handle optional columns
+      // 1. Create Order
       const orderData: any = {
         order_number: orderNumber,
         customer_id: user.id,
@@ -85,23 +136,17 @@ const Checkout = () => {
         expected_delivery_date: expectedDeliveryDate?.toISOString().split('T')[0],
         special_instructions: specialInstructions,
         subtotal_rs: subtotal,
-        discount_code: null, // No discount at checkout - staff applies it
-        discount_amount_rs: 0,
-        net_total_rs: subtotal,
-        status: "pending",
+        discount_code: discountCode || null,
+        discount_amount_rs: discountAmount,
+        net_total_rs: total,
+        status: "confirmed", // Immediately confirmed
         payment_status: "pending",
         payment_method: paymentMethod,
         advance_percent: 50,
-        advance_amount_rs: 0, // Will be set after staff review
-        // balance_amount_rs is GENERATED ALWAYS, don't insert it
+        advance_amount_rs: advanceAmount,
         terms_accepted: termsAccepted,
         terms_accepted_at: new Date().toISOString(),
       };
-
-      // Note: buyer_gst and dispatch_method are optional columns added by migration
-      // Don't add them to insert if migration hasn't been run - prevents schema cache errors
-      // They can be added back after migration 20251121000001_add_order_enhancements.sql is run
-      // For now, we skip them to ensure orders can be placed successfully
 
       const { data: order, error: orderError } = await supabase
         .from("orders")
@@ -109,17 +154,9 @@ const Checkout = () => {
         .select()
         .single();
 
-      if (orderError) {
-        // If error is about buyer_gst or schema cache, provide helpful message
-        if (orderError.message?.includes("buyer_gst") || orderError.message?.includes("schema cache")) {
-          console.error("Schema cache error - buyer_gst column may not exist yet");
-          console.error("Run migration: 20251121000001_add_order_enhancements.sql");
-          throw new Error("Database schema needs to be updated. Please contact support.");
-        }
-        throw orderError;
-      }
+      if (orderError) throw orderError;
 
-
+      // 2. Create Order Items
       const orderItems = cartItems.map((item) => ({
         order_id: order.id,
         product_id: item.product_id,
@@ -138,8 +175,34 @@ const Checkout = () => {
 
       if (itemsError) throw itemsError;
 
-      const jobCardInserts: any[] = [];
+      // 3. Create Sale Order (Auto-generated)
+      const saleOrderData = {
+        customer_id: user.id,
+        order_id: order.id,
+        status: "confirmed_by_customer",
+        base_price: subtotal,
+        discount: discountAmount,
+        final_price: total,
+        advance_amount_rs: advanceAmount,
+        metadata: {
+          discount_code: discountCode,
+          auto_generated: true
+        }
+      };
 
+      const { data: saleOrder, error: saleOrderError } = await supabase
+        .from("sale_orders")
+        .insert(saleOrderData)
+        .select()
+        .single();
+
+      if (saleOrderError) {
+        console.error("Error creating sale order:", saleOrderError);
+        // Continue anyway, as order is created
+      }
+
+      // 4. Create Job Cards
+      const jobCardInserts: any[] = [];
       if (insertedItems && insertedItems.length > 0) {
         for (const item of insertedItems) {
           const pricing = await calculateDynamicPrice(
@@ -156,7 +219,6 @@ const Checkout = () => {
           );
 
           saleData.jobCards.forEach((jobCard) => {
-            // Generate technical specifications (NO pricing)
             const technicalSpecs = generateTechnicalSpecifications(
               item,
               item.configuration,
@@ -169,8 +231,8 @@ const Checkout = () => {
               line_item_id: jobCard.lineItemId,
               order_id: order.id,
               order_item_id: item.id,
+              sale_order_id: saleOrder?.id || null,
               order_number: jobCard.soNumber,
-              sale_order_id: null, // No sale order - simplified workflow
               customer_name: jobCard.customer.name,
               customer_phone: jobCard.customer.phone,
               customer_email: jobCard.customer.email || order.customer_email,
@@ -186,7 +248,6 @@ const Checkout = () => {
                 console: jobCard.console,
                 dummySeats: jobCard.dummySeats,
                 sections: jobCard.sections,
-                // NO pricing in accessories
               },
               dimensions: jobCard.dimensions,
               status: "pending",
@@ -196,52 +257,31 @@ const Checkout = () => {
         }
       }
 
-
-
       if (jobCardInserts.length > 0) {
-        const { data: createdJobCards, error: jobCardsError } = await supabase
-          .from("job_cards")
-          .insert(jobCardInserts)
-          .select("id");
+        await supabase.from("job_cards").insert(jobCardInserts);
+      }
 
-        if (jobCardsError) throw jobCardsError;
-
-        const defaultTasks = [
-          { task_name: "Fabric Cutting", task_type: "fabric_cutting", sort_order: 1 },
-          { task_name: "Frame Work", task_type: "frame_work", sort_order: 2 },
-          { task_name: "Upholstery", task_type: "upholstery", sort_order: 3 },
-          { task_name: "Assembly", task_type: "assembly", sort_order: 4 },
-          { task_name: "Finishing", task_type: "finishing", sort_order: 5 },
-          { task_name: "Quality Check", task_type: "quality_check", sort_order: 6 },
-        ];
-
-        const tasksToInsert =
-          createdJobCards?.flatMap((jobCard: any) =>
-            defaultTasks.map((task) => ({
-              job_card_id: jobCard.id,
-              task_name: task.task_name,
-              task_type: task.task_type as "fabric_cutting" | "frame_work" | "upholstery" | "assembly" | "finishing" | "quality_check",
-              sort_order: task.sort_order,
-            }))
-          ) ?? [];
-
-        if (tasksToInsert.length > 0) {
-          await supabase.from("job_card_tasks").insert(tasksToInsert);
+      // 5. Trigger PDF Generation & Email (via Edge Function)
+      if (saleOrder) {
+        try {
+          await supabase.functions.invoke("generate-sale-order-pdf", {
+            body: {
+              saleOrderId: saleOrder.id,
+              mode: "final", // Send final PDF immediately
+              requireOTP: false // No OTP needed as they just confirmed
+            },
+          });
+        } catch (err) {
+          console.error("Failed to trigger PDF generation:", err);
         }
       }
 
-      await supabase
-        .from("orders")
-        .update({ status: "confirmed" })
-        .eq("id", order.id);
-
-      // Create initial timeline entry
-      // Create timeline entry for order submission
+      // 6. Create Timeline & Cleanup
       await supabase.from("order_timeline").insert({
         order_id: order.id,
-        status: "pending",
-        title: "Order Submitted",
-        description: "Your order has been confirmed and is now being processed",
+        status: "confirmed",
+        title: "Order Confirmed",
+        description: "Order placed and confirmed by customer. Advance payment pending/authorized.",
         created_by: user.id,
       });
 
@@ -253,32 +293,26 @@ const Checkout = () => {
 
       if (deleteError) throw deleteError;
 
+      // Update discount usage if applicable
+      if (discountCode) {
+        await supabase.rpc('increment_discount_usage', { code: discountCode });
+      }
+
       return { order };
     },
     onSuccess: () => {
       toast({
         title: "Order Confirmed!",
-        description: "Your order has been placed successfully and is now being processed.",
+        description: "Your order has been placed successfully. Check your email for the sale order PDF.",
       });
       queryClient.invalidateQueries({ queryKey: ["cart"] });
       navigate("/dashboard");
     },
     onError: (error: any) => {
       console.error("Order creation error:", error);
-
-      let errorMessage = "An unexpected error occurred";
-
-      if (error?.message) {
-        errorMessage = error.message;
-      } else if (error?.code) {
-        errorMessage = `Database error: ${error.code}`;
-      } else if (typeof error === "string") {
-        errorMessage = error;
-      }
-
       toast({
         title: "Order Failed",
-        description: errorMessage,
+        description: error.message || "An unexpected error occurred",
         variant: "destructive",
       });
     },
@@ -286,9 +320,6 @@ const Checkout = () => {
 
   const isDeliveryValid = deliveryAddress.street && deliveryAddress.city &&
     deliveryAddress.state && deliveryAddress.pincode;
-
-  const subtotal = cartItems?.reduce((sum, item) => sum + (item.calculated_price || 0), 0) || 0;
-  const total = subtotal; // No discount at checkout
 
   const handleNext = () => {
     if (currentStep === 1 && !isDeliveryValid) {
@@ -371,14 +402,15 @@ const Checkout = () => {
               expectedDeliveryDate={expectedDeliveryDate}
               specialInstructions={specialInstructions}
               subtotal={subtotal}
-              discount={0}
-              discountCode={undefined}
+              discount={discountAmount}
+              discountCode={discountCode}
               total={total}
-              advanceAmount={0}
+              advanceAmount={advanceAmount}
               termsAccepted={termsAccepted}
               onTermsChange={setTermsAccepted}
               onEditDelivery={() => setCurrentStep(1)}
               onRequestReview={() => placeOrder.mutate()}
+              onApplyDiscount={applyDiscount}
               isSubmitting={placeOrder.isPending}
             />
           )}
@@ -395,7 +427,6 @@ const Checkout = () => {
                 <ArrowRight className="ml-2 h-4 w-4" />
               </Button>
             )}
-            {/* "Request Staff Review" button is now in ReviewStep component */}
           </div>
         </div>
       </div>
@@ -404,3 +435,4 @@ const Checkout = () => {
 };
 
 export default Checkout;
+

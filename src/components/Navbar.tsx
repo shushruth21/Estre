@@ -38,7 +38,7 @@ export const Navbar = () => {
                 {/* Logo */}
                 <Link to="/" className="flex items-center gap-2 group">
                     <img
-                        src="/estre-logo.jpg"
+                        src="/estre-logo.png"
                         alt="Estre"
                         className="h-12 w-auto object-contain transition-transform duration-300 group-hover:scale-105"
                     />

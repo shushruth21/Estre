@@ -111,7 +111,7 @@ export function generateTechnicalSpecifications(
   // Extract seat information
   const sections = configuration.sections || {};
   const noOfSeats: any = {};
-  
+
   if (sections.F?.seater) {
     noOfSeats.front = sections.F.seater;
   }
@@ -194,7 +194,7 @@ export function generateTechnicalSpecifications(
   // Extract fabric information
   const fabricPlan = configuration.fabric?.claddingPlan || "Single Colour";
   const colourBreakup: any = {};
-  
+
   if (configuration.fabric?.structureCode) {
     colourBreakup.structure = configuration.fabric.structureCode;
   }
@@ -263,7 +263,7 @@ export function generateTechnicalSpecifications(
     product_type: category,
     model,
     sofa_type: category === "sofa" ? productType : undefined,
-    no_of_seats,
+    no_of_seats: noOfSeats,
     consoles,
     loungers,
     recliner,

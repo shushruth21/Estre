@@ -11,7 +11,7 @@ export const Footer = () => {
                     <div className="space-y-6">
                         <Link to="/" className="inline-block">
                             <img
-                                src="/estre-logo.jpg"
+                                src="/estre-logo.png"
                                 alt="Estre"
                                 className="h-12 w-auto object-contain rounded-lg bg-white p-1"
                             />

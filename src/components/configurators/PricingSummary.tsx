@@ -3,6 +3,10 @@ import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Loader2, ShoppingCart } from "lucide-react";
 import { SummaryTile } from "@/components/ui/SummaryTile";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { Badge } from "@/components/ui/badge";
+import { getFirstImageUrl } from "@/lib/image-utils";
 
 interface PricingSummaryProps {
   pricing: any;
@@ -55,6 +59,28 @@ const PricingSummary = ({
     return true;
   })();
 
+  // Fetch fabric details for display
+  const fabricCode = configuration.fabric?.structureCode;
+  const { data: fabricDetails } = useQuery({
+    queryKey: ["fabric-details", fabricCode],
+    queryFn: async () => {
+      if (!fabricCode) return null;
+      const { data, error } = await supabase
+        .from("fabric_coding")
+        .select("*")
+        .eq("estre_code", fabricCode)
+        .single();
+
+      if (error) return null;
+      return data;
+    },
+    enabled: !!fabricCode,
+  });
+
+  const fabricImageUrl = fabricDetails
+    ? (getFirstImageUrl(fabricDetails.colour_link) || getFirstImageUrl(fabricDetails.colour))
+    : null;
+
   return (
     <Card className="border border-gold/20 shadow-lg bg-white/80 backdrop-blur-sm">
       <CardHeader className="bg-walnut text-ivory rounded-t-xl py-4">
@@ -83,23 +109,80 @@ const PricingSummary = ({
                 </>
               ) : (
                 <>
+                  {/* Sofa & Other Categories Pricing Summary */}
                   {(() => {
                     const baseProductCost = pricing.breakdown.baseSeatPrice > 0
                       ? pricing.breakdown.baseSeatPrice
                       : (pricing.breakdown.basePrice || 0);
                     return <SummaryTile label="Base Model" value={`₹${Math.round(baseProductCost).toLocaleString()}`} />;
                   })()}
-                  <SummaryTile label="Mechanism" value={`₹${Math.round(pricing.breakdown.mechanismUpgrade || 0).toLocaleString()}`} />
-                  <SummaryTile label="Consoles" value={`₹${Math.round(pricing.breakdown.consolePrice || 0).toLocaleString()}`} />
-                  <SummaryTile label="Armrest Accessories" value={`₹${Math.round(pricing.breakdown.armrestUpgrade || pricing.breakdown.accessoriesPrice || 0).toLocaleString()}`} />
-                  <SummaryTile label="Fabric Upgrade" value={`₹${Math.round(pricing.breakdown.fabricCharges || 0).toLocaleString()}`} />
-                  <SummaryTile label="Lounger" value={`₹${Math.round(pricing.breakdown.loungerPrice || 0).toLocaleString()}`} />
-                  <SummaryTile label="Total Fabric (m)" value={`${(pricing.breakdown.fabricMeters || 0) > 0 ? (pricing.breakdown.fabricMeters || 0).toFixed(1) : "0.0"} m`} />
-                  {typeof pricing.breakdown.seatBackrestFabric === "number" && (
-                    <SummaryTile label="Seat/Backrest Fabric" value={`${pricing.breakdown.seatBackrestFabric > 0 ? pricing.breakdown.seatBackrestFabric.toFixed(1) : "0.0"} m`} />
+
+                  {/* Additional Seats */}
+                  {(pricing.breakdown.additionalSeatsPrice > 0 || pricing.breakdown.cornerSeatsPrice > 0 || pricing.breakdown.backrestSeatsPrice > 0) && (
+                    <SummaryTile
+                      label="Additional Seats"
+                      value={`₹${Math.round((pricing.breakdown.additionalSeatsPrice || 0) + (pricing.breakdown.cornerSeatsPrice || 0) + (pricing.breakdown.backrestSeatsPrice || 0)).toLocaleString()}`}
+                    />
                   )}
-                  {typeof pricing.breakdown.structureFabric === "number" && (
-                    <SummaryTile label="Structure/Armrest Fabric" value={`${pricing.breakdown.structureFabric > 0 ? pricing.breakdown.structureFabric.toFixed(1) : "0.0"} m`} />
+
+                  {/* Lounger */}
+                  {(pricing.breakdown.loungerPrice || 0) > 0 && (
+                    <SummaryTile label="Lounger" value={`₹${Math.round(pricing.breakdown.loungerPrice).toLocaleString()}`} />
+                  )}
+
+                  {/* Consoles */}
+                  {(pricing.breakdown.consolePrice || 0) > 0 && (
+                    <SummaryTile label="Consoles" value={`₹${Math.round(pricing.breakdown.consolePrice).toLocaleString()}`} />
+                  )}
+
+                  {/* Pillows */}
+                  {(pricing.breakdown.pillowsPrice || 0) > 0 && (
+                    <SummaryTile label="Pillows" value={`₹${Math.round(pricing.breakdown.pillowsPrice).toLocaleString()}`} />
+                  )}
+
+                  {/* Pillow Fabric */}
+                  {(pricing.breakdown.pillowFabricPrice || 0) > 0 && (
+                    <SummaryTile label="Pillow Fabric" value={`₹${Math.round(pricing.breakdown.pillowFabricPrice).toLocaleString()}`} />
+                  )}
+
+                  {/* Sofa Fabric */}
+                  <SummaryTile label="Sofa Fabric Price" value={`₹${Math.round(pricing.breakdown.fabricCharges || 0).toLocaleString()}`} />
+
+                  {/* Foam Upgrade */}
+                  {(pricing.breakdown.foamUpgrade || 0) > 0 && (
+                    <SummaryTile label="Foam Upgrade" value={`₹${Math.round(pricing.breakdown.foamUpgrade).toLocaleString()}`} />
+                  )}
+
+                  {/* Seat Depth Upgrade */}
+                  {/* Note: dimensionUpgrade combines depth and width, but if we want to separate them we need to update backend or just show combined */}
+                  {/* For now, showing combined Dimension Upgrade if > 0 */}
+                  {(pricing.breakdown.dimensionUpgrade || 0) > 0 && (
+                    <SummaryTile label="Dimension Upgrade" value={`₹${Math.round(pricing.breakdown.dimensionUpgrade).toLocaleString()}`} />
+                  )}
+
+                  {/* Armrest Upgrade */}
+                  {(pricing.breakdown.armrestUpgrade || 0) > 0 && (
+                    <SummaryTile label="Armrest Upgrade" value={`₹${Math.round(pricing.breakdown.armrestUpgrade).toLocaleString()}`} />
+                  )}
+
+                  {/* Accessories (Legs) */}
+                  {(pricing.breakdown.accessoriesPrice || 0) > 0 && (
+                    <SummaryTile label="Legs & Accessories" value={`₹${Math.round(pricing.breakdown.accessoriesPrice).toLocaleString()}`} />
+                  )}
+
+                  {/* Mechanism */}
+                  {(pricing.breakdown.mechanismUpgrade || 0) > 0 && (
+                    <SummaryTile label="Mechanism" value={`₹${Math.round(pricing.breakdown.mechanismUpgrade).toLocaleString()}`} />
+                  )}
+
+                  {/* Fabric Meters Display */}
+                  <SummaryTile label="Total Fabric (m)" value={`${(pricing.breakdown.fabricMeters || 0) > 0 ? (pricing.breakdown.fabricMeters || 0).toFixed(1) : "0.0"} m`} />
+
+                  {typeof pricing.breakdown.seatBackrestFabric === "number" && pricing.breakdown.seatBackrestFabric > 0 && (
+                    <SummaryTile label="Seat/Backrest Fabric" value={`${pricing.breakdown.seatBackrestFabric.toFixed(1)} m`} />
+                  )}
+                  {typeof pricing.breakdown.structureFabric === "number" && pricing.breakdown.structureFabric > 0 && (
+                    <SummaryTile label="Structure/Armrest Fabric" value={`${pricing.breakdown.structureFabric.toFixed(1)} m`} />
                   )}
                   {typeof pricing.breakdown.approxWidth === "number" && (
                     <SummaryTile label="Approx Width" value={`${Math.round(pricing.breakdown.approxWidth)}"`} />
@@ -107,6 +190,33 @@ const PricingSummary = ({
                 </>
               )}
             </div>
+
+            {/* Fabric Preview Section */}
+            {fabricDetails && (
+              <>
+                <Separator className="bg-gold/20" />
+                <div className="space-y-2">
+                  <p className="text-sm font-medium text-walnut">Selected Fabric</p>
+                  <div className="flex items-center gap-3 p-2 bg-muted/30 rounded-lg border border-gold/10">
+                    <div
+                      className="w-12 h-12 rounded-md border border-gray-200 shadow-sm flex-shrink-0 bg-cover bg-center"
+                      style={{
+                        backgroundColor: fabricDetails.colour_link || `hsl(${(fabricDetails.estre_code.charCodeAt(0) || 0) % 360}, 70%, 75%)`,
+                        backgroundImage: fabricImageUrl ? `url(${fabricImageUrl})` : undefined
+                      }}
+                    />
+                    <div className="flex flex-col">
+                      <span className="text-sm font-semibold text-walnut">
+                        {fabricDetails.description || fabricDetails.colour || "Fabric"}
+                      </span>
+                      <Badge variant="outline" className="w-fit text-[10px] h-5 px-1.5">
+                        {fabricDetails.estre_code}
+                      </Badge>
+                    </div>
+                  </div>
+                </div>
+              </>
+            )}
 
             <Separator className="bg-gold/20" />
 

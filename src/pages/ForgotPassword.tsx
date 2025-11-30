@@ -96,7 +96,7 @@ const ForgotPassword = () => {
         <Card className="w-full max-w-md shadow-xl border-gold/20" id="main-content" role="main">
           <CardHeader className="space-y-2 text-center">
             <div className="mx-auto mb-6 flex justify-center">
-              <img src="/estre-logo.jpg" alt="Estre" className="h-16 w-auto object-contain" />
+              <img src="/estre-logo.png" alt="Estre" className="h-16 w-auto object-contain" />
             </div>
             <CardTitle className="text-3xl font-serif">Reset Password</CardTitle>
             <CardDescription className="text-base">

@@ -1,6 +1,7 @@
 import React from "react";
 import { SaleOrderGeneratedData, SaleOrderLineItem } from "@/lib/sale-order-generator";
 import { format } from "date-fns";
+import { FabricPreview } from "@/components/common/FabricPreview";
 
 interface PerfectSaleOrderProps {
     data: SaleOrderGeneratedData;
@@ -77,21 +78,61 @@ export const PerfectSaleOrder: React.FC<PerfectSaleOrderProps> = ({ data }) => {
                 </div>
                 <ul className="list-disc list-inside ml-2 text-gray-700 space-y-1 text-sm">
                     {fabric.single_colour && (
-                        <li>
-                            Full Body: {fabric.single_colour.fabric_code} - {fabric.single_colour.fabric_name}
+                        <li className="flex items-center gap-2">
+                            <span>Full Body: {fabric.single_colour.fabric_code} - {fabric.single_colour.fabric_name}</span>
+                            <FabricPreview
+                                fabricCode={fabric.single_colour.fabric_code}
+                                showDetails={false}
+                                compact
+                                className="border-0 p-0 inline-flex align-middle"
+                            />
                         </li>
                     )}
                     {fabric.multi_colour && (
                         <>
                             {fabric.multi_colour.structure && (
-                                <li>Structure: {fabric.multi_colour.structure.code}</li>
+                                <li className="flex items-center gap-2">
+                                    <span>Structure: {fabric.multi_colour.structure.code}</span>
+                                    <FabricPreview
+                                        fabricCode={fabric.multi_colour.structure.code}
+                                        showDetails={false}
+                                        compact
+                                        className="border-0 p-0 inline-flex align-middle"
+                                    />
+                                </li>
                             )}
                             {fabric.multi_colour.backrest && (
-                                <li>Backrest: {fabric.multi_colour.backrest.code}</li>
+                                <li className="flex items-center gap-2">
+                                    <span>Backrest: {fabric.multi_colour.backrest.code}</span>
+                                    <FabricPreview
+                                        fabricCode={fabric.multi_colour.backrest.code}
+                                        showDetails={false}
+                                        compact
+                                        className="border-0 p-0 inline-flex align-middle"
+                                    />
+                                </li>
                             )}
-                            {fabric.multi_colour.seat && <li>Seat: {fabric.multi_colour.seat.code}</li>}
+                            {fabric.multi_colour.seat && (
+                                <li className="flex items-center gap-2">
+                                    <span>Seat: {fabric.multi_colour.seat.code}</span>
+                                    <FabricPreview
+                                        fabricCode={fabric.multi_colour.seat.code}
+                                        showDetails={false}
+                                        compact
+                                        className="border-0 p-0 inline-flex align-middle"
+                                    />
+                                </li>
+                            )}
                             {fabric.multi_colour.headrest && (
-                                <li>Headrest: {fabric.multi_colour.headrest.code}</li>
+                                <li className="flex items-center gap-2">
+                                    <span>Headrest: {fabric.multi_colour.headrest.code}</span>
+                                    <FabricPreview
+                                        fabricCode={fabric.multi_colour.headrest.code}
+                                        showDetails={false}
+                                        compact
+                                        className="border-0 p-0 inline-flex align-middle"
+                                    />
+                                </li>
                             )}
                         </>
                     )}
@@ -137,7 +178,7 @@ export const PerfectSaleOrder: React.FC<PerfectSaleOrderProps> = ({ data }) => {
             <div className="flex justify-between items-start mb-8 border-b-2 border-estre-dark pb-4">
                 {/* Logo */}
                 <div className="logo w-40">
-                    <img src="/estre-logo.jpg" alt="Estre Logo" className="w-full h-auto object-contain" />
+                    <img src="/estre-logo.png" alt="Estre Logo" className="w-full h-auto object-contain" />
                     <p className="text-estre-brown text-xs font-secondary -mt-1 ml-1">GLOBAL PRIVATE LTD</p>
                 </div>
 

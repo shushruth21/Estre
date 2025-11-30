@@ -7,6 +7,7 @@ import {
     AccordionItem,
     AccordionTrigger,
 } from "@/components/ui/accordion";
+import { FabricPreview } from "@/components/common/FabricPreview";
 
 interface JobCard {
     id: string;
@@ -282,6 +283,17 @@ export function JobCardsDisplay({ jobCards, saleOrderNumber, saleOrderDate }: Jo
                                                         <p className="text-sm text-muted-foreground">Colour Details</p>
                                                         <p className="font-semibold">{safe(config.fabric.type, "Multi Colour")}</p>
                                                     </div>
+
+                                                    {/* Fabric Preview */}
+                                                    {(config.fabric.structure_code || config.fabric.claddingPlan) && (
+                                                        <div className="mt-2">
+                                                            <FabricPreview
+                                                                fabricCode={config.fabric.structure_code || config.fabric.claddingPlan}
+                                                                className="bg-background"
+                                                            />
+                                                        </div>
+                                                    )}
+
                                                     <div>
                                                         <p className="text-sm font-medium mb-2">Colour Breakup:</p>
                                                         <div className="space-y-2">

@@ -67,8 +67,36 @@ export const convertGoogleDriveUrl = (
 };
 
 /**
+ * Convert Supabase Storage signed URL to public URL
+ * Removes token and changes /sign/ to /public/
+ */
+export const convertSignedUrlToPublic = (url: string | null | undefined): string | null => {
+  if (!url || typeof url !== 'string') return null;
+  
+  // Check if it's a Supabase Storage signed URL
+  if (url.includes('/storage/v1/object/sign/')) {
+    // Extract the path after /sign/
+    const match = url.match(/\/storage\/v1\/object\/sign\/([^?]+)/);
+    if (match && match[1]) {
+      const filePath = match[1];
+      // Get Supabase URL from environment or extract from current URL
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 
+                         url.match(/https:\/\/[^/]+/)?.[0] || 
+                         'https://ljgmqwnamffvvrwgprsd.supabase.co';
+      
+      // Construct public URL (no token needed)
+      return `${supabaseUrl}/storage/v1/object/public/${filePath}`;
+    }
+  }
+  
+  // If already public URL or not Supabase Storage, return as is
+  return url;
+};
+
+/**
  * Normalize a single image URL - ensure it has proper protocol
  * Also converts Google Drive sharing URLs to direct image URLs
+ * AND converts Supabase signed URLs to public URLs
  */
 export const normalizeImageUrl = (url: string | null | undefined): string | null => {
   if (!url || url.trim() === '' || url === '/placeholder.svg') {
@@ -82,6 +110,14 @@ export const normalizeImageUrl = (url: string | null | undefined): string | null
   }
   
   url = urlStr;
+  
+  // Convert Supabase signed URLs to public URLs FIRST (before other processing)
+  if (url.includes('/storage/v1/object/sign/')) {
+    const publicUrl = convertSignedUrlToPublic(url);
+    if (publicUrl) {
+      return publicUrl;
+    }
+  }
   
   // Check if it's a Google Drive URL and convert it first
   if (url.includes('drive.google.com')) {
