@@ -44,7 +44,7 @@ serve(async (req) => {
   }
 
   try {
-    const { saleOrderId, mode = "final", requireOTP = false } = await req.json();
+    const { saleOrderId, mode = "final", requireOTP = false, skipEmail = false } = await req.json();
 
     if (!saleOrderId) {
       return new Response(
@@ -281,12 +281,20 @@ serve(async (req) => {
         throw updateError;
       }
 
+      // Convert PDF bytes to base64 for response
+      const base64Pdf = btoa(
+        Array.from(finalPdfBytes)
+          .map((byte: number) => String.fromCharCode(byte))
+          .join("")
+      );
+
       return new Response(
         JSON.stringify({
           success: true,
           message: "Draft PDF generated successfully",
           saleOrderId,
           pdfUrl: urlData.publicUrl,
+          pdfBase64: base64Pdf,
           mode: "draft",
         }),
         {
@@ -336,17 +344,18 @@ serve(async (req) => {
       throw updateError;
     }
 
-    // Send email with PDF and OTP (via Resend) - only for final mode
-    const resendApiKey = Deno.env.get("RESEND_API_KEY");
-    if (resendApiKey) {
-      try {
-        // Convert PDF bytes to base64 for email attachment
-        const base64Pdf = btoa(
-          Array.from(finalPdfBytes)
-            .map((byte: number) => String.fromCharCode(byte))
-            .join("")
-        );
+    // Convert PDF bytes to base64 (needed for both email and response)
+    const base64Pdf = btoa(
+      Array.from(finalPdfBytes)
+        .map((byte: number) => String.fromCharCode(byte))
+        .join("")
+    );
 
+    // Send email with PDF and OTP (via Resend) - only for final mode and if skipEmail is false
+    let emailSent = false;
+    const resendApiKey = Deno.env.get("RESEND_API_KEY");
+    if (resendApiKey && !skipEmail) {
+      try {
         // Generate email HTML using template
         const emailHTML = saleOrderApprovedEmailHTML({
           customerName: templateData.customer_name,
@@ -382,6 +391,7 @@ serve(async (req) => {
           // Don't throw - PDF generation succeeded, email can be retried
         } else {
           console.log("Email sent successfully to", templateData.customer_email);
+          emailSent = true;
         }
       } catch (emailError) {
         console.error("Email error:", emailError);
@@ -392,12 +402,14 @@ serve(async (req) => {
     return new Response(
       JSON.stringify({
         success: true,
-        message: mode === "draft" ? "Draft PDF generated successfully" : "Final PDF generated and email sent",
+        message: mode === "draft" ? "Draft PDF generated successfully" : "Final PDF generated" + (emailSent ? " and email sent" : ""),
         saleOrderId,
         pdfUrl: urlData.publicUrl,
+        pdfBase64: base64Pdf,
         mode: mode,
         requireOTP: requireOTP,
         otpGenerated: !!otp,
+        emailSent: emailSent,
       }),
       {
         status: 200,

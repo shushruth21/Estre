@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2 } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
 
 interface SSOButtonsProps {
   disabled?: boolean;
@@ -15,17 +16,25 @@ export const SSOButtons = ({ disabled = false }: SSOButtonsProps) => {
     setLoadingProvider(provider);
 
     try {
-      toast({
-        title: "Coming Soon",
-        description: `${provider.charAt(0).toUpperCase() + provider.slice(1)} sign-in will be available soon.`,
+      const supabaseProvider = provider === 'microsoft' ? 'azure' : provider;
+
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: supabaseProvider,
+        options: {
+          redirectTo: `${window.location.origin}/auth/callback`,
+        },
       });
-    } catch (error) {
+
+      if (error) throw error;
+
+      // No need to clear loading state here as we'll be redirecting
+    } catch (error: any) {
+      console.error(`${provider} login error:`, error);
       toast({
         title: "Sign In Failed",
-        description: `Failed to sign in with ${provider}. Please try again.`,
+        description: error.message || `Failed to sign in with ${provider}. Please try again.`,
         variant: "destructive",
       });
-    } finally {
       setLoadingProvider(null);
     }
   };
@@ -136,9 +145,7 @@ export const SSOButtons = ({ disabled = false }: SSOButtonsProps) => {
         </Button>
       </div>
 
-      <p className="text-xs text-center text-muted-foreground mt-3">
-        SSO providers are currently in development
-      </p>
+
     </div>
   );
 };

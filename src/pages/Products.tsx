@@ -90,6 +90,7 @@ type Product = {
   discount_percent?: number | null;
   discount_rs?: number | null;
   bom_rs?: number | null;
+  hash?: string;
 };
 
 const Products = () => {
@@ -213,8 +214,20 @@ const Products = () => {
         // End performance timer
         endTimer();
 
+        // Fetch hashes for these products
+        const productIds = (data || []).map((p: any) => p.id);
+        let hashes: any[] = [];
+        if (productIds.length > 0) {
+          const { data: hashData } = await supabase
+            .from("product_urls" as any)
+            .select("product_id, hash")
+            .in("product_id", productIds);
+          hashes = hashData || [];
+        }
+
         // Normalize the data
         const normalizedData = (data || []).map((item: any) => {
+          const hash = hashes.find((h: any) => h.product_id === item.id)?.hash;
           const imageData = category === "database_pouffes" ? item.image : item.images;
           const imageUrl = imageData ? getFirstImageUrl(imageData) : null;
 
@@ -238,7 +251,8 @@ const Products = () => {
             strikePrice: strikePriceNum,
             discount_percent: item.discount_percent,
             discount_rs: item.discount_rs,
-            bom_rs: (category === "sofabed" || category === "recliner" || category === "cinema_chairs" || category === "database_pouffes" || category === "sofa") ? undefined : item.bom_rs
+            bom_rs: (category === "sofabed" || category === "recliner" || category === "cinema_chairs" || category === "database_pouffes" || category === "sofa") ? undefined : item.bom_rs,
+            hash: hash
           };
         });
 
@@ -272,9 +286,6 @@ const Products = () => {
     refetchOnReconnect: false, // Don't refetch on reconnect
     // Add structural sharing for better performance
     structuralSharing: true,
-    onError: (error: any) => {
-      console.error('React Query error:', error);
-    }
   });
 
   return (
@@ -430,7 +441,7 @@ const Products = () => {
                     </div>
                   </CardContent>
                   <CardFooter className="p-6 pt-0">
-                    <Link to={`/configure/${category}/${product.id}`} className="w-full">
+                    <Link to={product.hash ? `/c/${product.hash}` : `/configure/${category}/${product.id}`} className="w-full">
                       <Button variant="luxury" className="w-full">
                         Configure Now
                       </Button>

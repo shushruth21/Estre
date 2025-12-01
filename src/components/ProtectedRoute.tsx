@@ -30,12 +30,13 @@ interface ProtectedRouteProps {
   requiredRole: "admin" | "staff" | "customer";
 }
 
-export function ProtectedRoute({ 
-  children, 
-  requiredRole 
+export function ProtectedRoute({
+  children,
+  requiredRole
 }: ProtectedRouteProps) {
   const { loading, role, isAdmin, isStaff, isCustomer, user } = useAuth();
-  const [roleLoading, setRoleLoading] = useState(true);
+  // Initialize loading state based on current auth state to prevent flicker
+  const [roleLoading, setRoleLoading] = useState(loading || (!!user && !role));
 
   // Wait for role to load (especially for staff/admin routes)
   useEffect(() => {
@@ -44,7 +45,7 @@ export function ProtectedRoute({
       if (requiredRole === "staff" || requiredRole === "admin") {
         let attempts = 0;
         const maxAttempts = 10; // 10 attempts * 200ms = 2 seconds
-        
+
         const checkRole = async () => {
           while (attempts < maxAttempts) {
             if (role) {
@@ -56,7 +57,7 @@ export function ProtectedRoute({
           }
           setRoleLoading(false);
         };
-        
+
         checkRole();
       } else {
         setRoleLoading(false);
@@ -122,13 +123,13 @@ export function ProtectedRoute({
  * </RequireAuth>
  * ```
  */
-export const RequireAuth = ({ 
-  children 
-}: { 
+export const RequireAuth = ({
+  children
+}: {
   children: JSX.Element;
 }) => {
   const { loading, role } = useAuth();
-  
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -139,11 +140,11 @@ export const RequireAuth = ({
       </div>
     );
   }
-  
+
   if (!role) {
     return <Navigate to="/login" replace />;
   }
-  
+
   return children;
 };
 
@@ -159,10 +160,10 @@ export const RequireAuth = ({
  * </RequireRole>
  * ```
  */
-export const RequireRole = ({ 
-  role, 
-  children 
-}: { 
+export const RequireRole = ({
+  role,
+  children
+}: {
   role: 'customer' | 'staff' | 'admin';
   children: JSX.Element;
 }) => {

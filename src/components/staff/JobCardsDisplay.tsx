@@ -8,6 +8,8 @@ import {
     AccordionTrigger,
 } from "@/components/ui/accordion";
 import { FabricPreview } from "@/components/common/FabricPreview";
+import { Button } from "@/components/ui/button";
+import { Printer } from "lucide-react";
 
 interface JobCard {
     id: string;
@@ -17,6 +19,7 @@ interface JobCard {
     status?: string;
     configuration?: any;
     order_item_id?: string;
+    final_html?: string;
 }
 
 interface JobCardsDisplayProps {
@@ -67,13 +70,34 @@ export function JobCardsDisplay({ jobCards, saleOrderNumber, saleOrderDate }: Jo
                                         <span className="font-semibold">
                                             {safe(jc.product_title || jc.product_category, "Product")}
                                         </span>
-                                        <Badge className="ml-auto" variant={
-                                            jc.status === "completed" ? "default" :
-                                                jc.status === "in_progress" ? "secondary" :
-                                                    "outline"
-                                        }>
-                                            {jc.status?.replace(/_/g, " ").toUpperCase() || "PENDING"}
-                                        </Badge>
+                                        <div className="ml-auto flex items-center gap-2">
+                                            {jc.final_html && (
+                                                <Button
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    className="h-8 w-8 p-0"
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        const printWindow = window.open('', '_blank');
+                                                        if (printWindow) {
+                                                            printWindow.document.write(jc.final_html!);
+                                                            printWindow.document.close();
+                                                            printWindow.print();
+                                                        }
+                                                    }}
+                                                    title="Print Job Card"
+                                                >
+                                                    <Printer className="h-4 w-4" />
+                                                </Button>
+                                            )}
+                                            <Badge variant={
+                                                jc.status === "completed" ? "default" :
+                                                    jc.status === "in_progress" ? "secondary" :
+                                                        "outline"
+                                            }>
+                                                {jc.status?.replace(/_/g, " ").toUpperCase() || "PENDING"}
+                                            </Badge>
+                                        </div>
                                     </div>
                                 </AccordionTrigger>
                                 <AccordionContent>

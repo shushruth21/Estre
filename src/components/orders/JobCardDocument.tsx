@@ -265,7 +265,7 @@ export const JobCardDocument = ({ data }: JobCardDocumentProps) => {
                     {/* HEADER */}
                     <div className="flex justify-between items-start mb-8">
                         <div className="logo">
-                            <img src="/lovable-uploads/estre-logo.png" alt="Estre Logo" className="w-[170px]" onError={(e) => e.currentTarget.style.display = 'none'} />
+                            <img src="/brand-logo.png" alt="Estre Logo" className="w-[170px]" onError={(e) => e.currentTarget.style.display = 'none'} />
                             <h1 className="text-2xl font-bold text-[#664331] mt-2">ESTRE</h1>
                         </div>
                         <div className="text-right text-[13px] leading-[18px]">

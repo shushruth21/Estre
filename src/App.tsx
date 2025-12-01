@@ -17,12 +17,14 @@ import Login from "./pages/Login";
 import Signup from "./pages/Signup";
 import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
+import VerifyOrderOTP from "./pages/VerifyOrderOTP";
 import NotFound from "./pages/NotFound";
 
 
 // Lazy load non-critical pages for better initial load performance
 const Products = lazy(() => import("./pages/Products"));
 const Configure = lazy(() => import("./pages/Configure"));
+const ConfigureByHash = lazy(() => import("./pages/ConfigureByHash"));
 const Cart = lazy(() => import("./pages/Cart"));
 const Checkout = lazy(() => import("./pages/Checkout"));
 const Orders = lazy(() => import("./pages/Orders"));
@@ -100,6 +102,11 @@ const App = () => (
                       <Configure />
                     </Suspense>
                   } />
+                  <Route path="/c/:hash" element={
+                    <Suspense fallback={<LoadingSpinner />}>
+                      <ConfigureByHash />
+                    </Suspense>
+                  } />
                   <Route path="/cart" element={
                     <Suspense fallback={<LoadingSpinner />}>
                       <Cart />
@@ -137,6 +144,7 @@ const App = () => (
                   <Route path="/signup" element={<Signup />} />
                   <Route path="/forgot-password" element={<ForgotPassword />} />
                   <Route path="/reset-password" element={<ResetPassword />} />
+                  <Route path="/verify-order/:id" element={<VerifyOrderOTP />} />
                   <Route path="/dashboard" element={
                     <Suspense fallback={<LoadingSpinner />}>
                       <ProtectedRoute requiredRole="customer">

@@ -33,6 +33,8 @@ import { generateSaleOrderData, SaleOrderGeneratedData } from "@/lib/sale-order-
 import { calculateDynamicPrice } from "@/lib/dynamic-pricing";
 import { generateTechnicalSpecifications } from "@/lib/technical-specifications-generator";
 import { JobCardsDisplay } from "@/components/staff/JobCardsDisplay";
+import { generatePremiumSaleOrderHTML, mapSaleOrderData } from "@/lib/sale-order-pdf";
+import { generatePremiumJobCardHTML, mapJobCardData } from "@/lib/job-card-pdf";
 
 
 const formatCurrency = (value: number | null | undefined) => {
@@ -48,115 +50,11 @@ const StaffSaleOrderDetail = () => {
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
   const [isCreatingJobCards, setIsCreatingJobCards] = useState(false);
   const [discount, setDiscount] = useState<string>("");
-  const [requireOTP, setRequireOTP] = useState(false);
-  const [otp, setOtp] = useState("");
-  const [showOtpInput, setShowOtpInput] = useState(false);
   const [showHTMLPreview, setShowHTMLPreview] = useState(false);
 
-  const handleCreateJobCards = async () => {
-    if (!saleOrder?.order?.order_items || saleOrder.order.order_items.length === 0) {
-      toast({
-        title: "Error",
-        description: "No order items found to create job cards from.",
-        variant: "destructive",
-      });
-      return;
-    }
 
-    setIsCreatingJobCards(true);
-    try {
-      // Check if job cards already exist
-      const { data: existingJobCards } = await supabase
-        .from('job_cards')
-        .select('id')
-        .eq('sale_order_id', saleOrder.id);
 
-      if (existingJobCards && existingJobCards.length > 0) {
-        toast({
-          title: "Info",
-          description: "Job cards already exist for this order.",
-        });
-        setIsCreatingJobCards(false);
-        return;
-      }
 
-      const jobCardInserts: any[] = [];
-
-      for (const item of saleOrder.order.order_items) {
-        const pricing = await calculateDynamicPrice(
-          item.product_category,
-          item.product_id,
-          item.configuration
-        );
-
-        const saleData = await generateSaleOrderData(
-          saleOrder.order,
-          item,
-          item.configuration,
-          pricing.breakdown
-        );
-
-        saleData.jobCards.forEach((jobCard) => {
-          const technicalSpecs = generateTechnicalSpecifications(
-            item,
-            item.configuration,
-            jobCard
-          );
-
-          jobCardInserts.push({
-            job_card_number: jobCard.jobCardNumber,
-            so_number: jobCard.soNumber,
-            line_item_id: jobCard.lineItemId,
-            order_id: saleOrder.order_id,
-            order_item_id: item.id,
-            sale_order_id: saleOrder.id,
-            order_number: jobCard.soNumber,
-            customer_name: jobCard.customer.name,
-            customer_phone: jobCard.customer.phone,
-            customer_email: jobCard.customer.email || saleOrder.order.customer_email,
-            delivery_address: jobCard.customer.address,
-            product_category: jobCard.category,
-            product_type: technicalSpecs.sofa_type || technicalSpecs.product_type,
-            product_title: jobCard.modelName,
-            configuration: jobCard.configuration,
-            technical_specifications: technicalSpecs,
-            fabric_codes: jobCard.fabricPlan.fabricCodes,
-            fabric_meters: jobCard.fabricPlan,
-            accessories: {
-              console: jobCard.console,
-              dummySeats: jobCard.dummySeats,
-              sections: jobCard.sections,
-            },
-            dimensions: jobCard.dimensions,
-            status: "pending",
-            priority: "normal",
-          });
-        });
-      }
-
-      if (jobCardInserts.length > 0) {
-        const { error } = await supabase.from('job_cards').insert(jobCardInserts);
-        if (error) throw error;
-
-        toast({
-          title: "Success",
-          description: `Created ${jobCardInserts.length} job cards successfully.`,
-        });
-
-        queryClient.invalidateQueries({ queryKey: ["staff-sale-order-detail", id] });
-        queryClient.invalidateQueries({ queryKey: ["staff-job-cards"] });
-      }
-    } catch (error: any) {
-      console.error("Error creating job cards:", error);
-      toast({
-        title: "Error",
-        description: error.message || "Failed to create job cards",
-        variant: "destructive",
-      });
-    } finally {
-      setIsCreatingJobCards(false);
-    }
-  };
   const [editableHTML, setEditableHTML] = useState<string>("");
   const [saleOrderPreviewData, setSaleOrderPreviewData] = useState<SaleOrderGeneratedData | null>(null);
   const [isGeneratingPreview, setIsGeneratingPreview] = useState(false);
@@ -250,6 +148,125 @@ const StaffSaleOrderDetail = () => {
     retry: 1,
   });
 
+  // Generate HTML for preview
+  const previewHTML = saleOrder ? generatePremiumSaleOrderHTML(mapSaleOrderData(saleOrder)) : "";
+
+  const handleCreateJobCards = async () => {
+    if (!saleOrder?.order?.order_items || saleOrder.order.order_items.length === 0) {
+      toast({
+        title: "Error",
+        description: "No order items found to create job cards from.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsCreatingJobCards(true);
+    try {
+      // Check if job cards already exist
+      const { data: existingJobCards } = await supabase
+        .from('job_cards')
+        .select('id')
+        .eq('sale_order_id', saleOrder.id);
+
+      if (existingJobCards && existingJobCards.length > 0) {
+        toast({
+          title: "Info",
+          description: "Job cards already exist for this order.",
+        });
+        setIsCreatingJobCards(false);
+        return;
+      }
+
+      const jobCardInserts: any[] = [];
+
+      for (const item of saleOrder.order.order_items) {
+        const pricing = await calculateDynamicPrice(
+          item.product_category,
+          item.product_id,
+          item.configuration
+        );
+
+        const saleData = await generateSaleOrderData(
+          saleOrder.order,
+          item,
+          item.configuration,
+          pricing.breakdown
+        );
+
+        saleData.jobCards.forEach((jobCard) => {
+          const technicalSpecs = generateTechnicalSpecifications(
+            item,
+            item.configuration,
+            jobCard
+          );
+
+          const jobCardData = {
+            job_card_number: jobCard.jobCardNumber,
+            so_number: jobCard.soNumber,
+            line_item_id: jobCard.lineItemId,
+            order_id: saleOrder.order_id,
+            order_item_id: item.id,
+            sale_order_id: saleOrder.id,
+            order_number: jobCard.soNumber,
+            customer_name: jobCard.customer.name,
+            customer_phone: jobCard.customer.phone,
+            customer_email: jobCard.customer.email || saleOrder.order.customer_email,
+            delivery_address: jobCard.customer.address,
+            product_category: jobCard.category,
+            product_type: technicalSpecs.sofa_type || technicalSpecs.product_type,
+            product_title: jobCard.modelName,
+            configuration: jobCard.configuration,
+            technical_specifications: technicalSpecs,
+            fabric_codes: jobCard.fabricPlan.fabricCodes,
+            fabric_meters: jobCard.fabricPlan,
+            accessories: {
+              console: jobCard.console,
+              dummySeats: jobCard.dummySeats,
+              sections: jobCard.sections,
+            },
+            dimensions: jobCard.dimensions,
+            status: "pending",
+            priority: "normal",
+            issue_date: new Date().toISOString(),
+          };
+
+          // Generate HTML
+          const templateData = mapJobCardData(jobCardData, saleOrder);
+          const finalHtml = generatePremiumJobCardHTML(templateData);
+
+          jobCardInserts.push({
+            ...jobCardData,
+            final_html: finalHtml,
+            draft_html: finalHtml,
+          });
+        });
+      }
+
+      if (jobCardInserts.length > 0) {
+        const { error } = await supabase.from('job_cards').insert(jobCardInserts);
+        if (error) throw error;
+
+        toast({
+          title: "Success",
+          description: `Created ${jobCardInserts.length} job cards successfully.`,
+        });
+
+        queryClient.invalidateQueries({ queryKey: ["staff-sale-order-detail", id] });
+        queryClient.invalidateQueries({ queryKey: ["staff-job-cards"] });
+      }
+    } catch (error: any) {
+      console.error("Error creating job cards:", error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to create job cards",
+        variant: "destructive",
+      });
+    } finally {
+      setIsCreatingJobCards(false);
+    }
+  };
+
   // Update discount mutation
   const updateDiscountMutation = useMutation({
     mutationFn: async (discountAmount: number) => {
@@ -334,7 +351,7 @@ const StaffSaleOrderDetail = () => {
         body: {
           saleOrderId: id,
           mode: "final",
-          requireOTP: requireOTP
+          requireOTP: false
         },
       });
 
@@ -363,9 +380,8 @@ const StaffSaleOrderDetail = () => {
       return data;
     },
     onSuccess: async (data) => {
-      // Auto-create job cards if they don't exist
+      // Auto-create job cards with full HTML if they don't exist
       if (saleOrder?.order?.order_items && saleOrder.order.order_items.length > 0) {
-        // Check if job cards already exist
         const { data: existingJobCards } = await supabase
           .from('job_cards')
           .select('id')
@@ -373,39 +389,122 @@ const StaffSaleOrderDetail = () => {
 
         // Only create if no job cards exist
         if (!existingJobCards || existingJobCards.length === 0) {
-          const jobCardsToCreate = saleOrder.order.order_items.map((item, index) => ({
-            sale_order_id: saleOrder.id,
-            order_id: saleOrder.order_id,
-            order_item_id: item.id,
-            job_card_number: `${orderNumber}/${String(index + 1).padStart(2, '0')}`,
-            product_title: item.product_title,
-            product_category: item.product_category,
-            configuration: item.configuration,
-            status: 'pending',
-            issue_date: new Date().toISOString(),
-          }));
+          try {
+            const jobCardsToCreate = [];
 
-          await supabase.from('job_cards').insert(jobCardsToCreate);
+            for (let index = 0; index < saleOrder.order.order_items.length; index++) {
+              const item = saleOrder.order.order_items[index];
+              const jobCardNumber = `${orderNumber}/${String(index + 1).padStart(2, '0')}`;
 
-          console.log(`✅ Created ${jobCardsToCreate.length} job cards for sale order ${orderNumber}`);
+              // Generate technical specifications
+              const technicalSpecs = generateTechnicalSpecifications(
+                item,
+                item.configuration,
+                { lineItemId: index + 1, jobCardNumber }
+              );
+
+              // Prepare job card data for HTML generation
+              const jobCardForHTML = {
+                job_card_number: jobCardNumber,
+                so_number: orderNumber,
+                order_number: orderNumber,
+                product_title: item.product_title,
+                product_category: item.product_category,
+                configuration: item.configuration,
+                technical_specifications: technicalSpecs,
+                customer_name: saleOrder.order.customer_name,
+                customer_email: saleOrder.order.customer_email,
+                created_at: new Date().toISOString(),
+              };
+
+              // Generate HTML
+              let finalHtml = "";
+              try {
+                const templateData = mapJobCardData(jobCardForHTML, saleOrder);
+                finalHtml = generatePremiumJobCardHTML(templateData);
+              } catch (e) {
+                console.error("Error generating Job Card HTML", e);
+              }
+
+              jobCardsToCreate.push({
+                sale_order_id: saleOrder.id,
+                order_id: saleOrder.order_id,
+                order_item_id: item.id,
+                job_card_number: jobCardNumber,
+                product_title: item.product_title,
+                product_category: item.product_category,
+                configuration: item.configuration,
+                technical_specifications: technicalSpecs,
+                status: 'pending',
+                issue_date: new Date().toISOString(),
+                final_html: finalHtml,
+                draft_html: finalHtml,
+              });
+            }
+
+            const { data: createdJobCards, error: jobCardError } = await supabase
+              .from('job_cards')
+              .insert(jobCardsToCreate)
+              .select();
+
+            if (jobCardError) {
+              console.error('Error creating job cards:', jobCardError);
+            } else {
+              console.log(`✅ Created ${createdJobCards.length} job cards for sale order ${orderNumber}`);
+
+              // Create QIRs for each job card
+              if (createdJobCards && createdJobCards.length > 0) {
+                const qirsToCreate = createdJobCards.map((jc, idx) => ({
+                  job_card_id: jc.id,
+                  qir_number: `QIR-${orderNumber}-${String(idx + 1).padStart(2, '0')}`,
+                  sale_order_number: orderNumber,
+                  job_card_number: jc.job_card_number,
+                  inspection_date: new Date().toISOString(),
+                  inspection_data: jc.technical_specifications || {},
+                  status: 'pending',
+                }));
+
+                const { error: qirError } = await supabase
+                  .from('quality_inspection_reports')
+                  .insert(qirsToCreate);
+
+                if (qirError) {
+                  console.error('Error creating QIRs:', qirError);
+                } else {
+                  console.log(`✅ Created ${qirsToCreate.length} QIRs`);
+                }
+              }
+            }
+          } catch (error) {
+            console.error('Error in job card/QIR creation:', error);
+          }
         }
       }
+
+      // Update sale order status to confirmed (no customer confirmation needed)
+      await supabase
+        .from('sale_orders')
+        .update({ status: 'confirmed', updated_at: new Date().toISOString() })
+        .eq('id', id);
 
       queryClient.invalidateQueries({ queryKey: ["staff-sale-order-detail", id] });
       queryClient.invalidateQueries({ queryKey: ["staff-sale-orders"] });
       queryClient.invalidateQueries({ queryKey: ["customer-sale-orders"] });
       queryClient.invalidateQueries({ queryKey: ["staff-job-cards"] });
+
       toast({
-        title: "Order Approved",
-        description: `Final PDF sent to customer. ${requireOTP ? 'OTP generated and sent.' : 'Customer can confirm directly.'}`,
+        title: "Order Sent to Customer",
+        description: `PDF sent to customer. Job cards and quality inspection reports created for production.`,
+        variant: data?.emailSent === false ? "destructive" : "default",
       });
+
       setIsGeneratingPDF(false);
       navigate("/staff/sale-orders");
     },
     onError: (error: any) => {
       toast({
         title: "Error",
-        description: error.message || "Failed to approve and send PDF",
+        description: error.message || "Failed to send order",
         variant: "destructive",
       });
       setIsGeneratingPDF(false);
@@ -454,6 +553,10 @@ const StaffSaleOrderDetail = () => {
       });
     },
   });
+
+  // Verify OTP Mutation
+  // Note: OTP verification now happens automatically when customer clicks link in email
+  // Staff no longer needs to manually enter OTP - workflow is streamlined
 
   if (isLoading) {
     return (
@@ -545,6 +648,11 @@ const StaffSaleOrderDetail = () => {
     }
   };
 
+
+
+
+  const isConfirmed = saleOrder?.status === "confirmed_by_customer" || saleOrder?.status === "in_production";
+
   return (
     <StaffLayout>
       <div className="space-y-6">
@@ -564,9 +672,9 @@ const StaffSaleOrderDetail = () => {
             <Badge className="mt-2" variant={
               saleOrder.status === "pending_review" || saleOrder.status === "staff_editing"
                 ? "default"
-                : saleOrder.status === "staff_approved" || saleOrder.status === "staff_pdf_generated" || saleOrder.status === "confirmed_by_customer"
-                  ? "default"
-                  : "secondary"
+                : saleOrder.status === "staff_approved"
+                  ? "secondary" // Waiting for OTP
+                  : "outline"
             }>
               {saleOrder.status?.replace(/_/g, " ").toUpperCase()}
             </Badge>
@@ -613,10 +721,11 @@ const StaffSaleOrderDetail = () => {
                   placeholder="Enter discount"
                   min="0"
                   max={saleOrder.base_price}
+                  disabled={isConfirmed}
                 />
                 <Button
                   onClick={() => updateDiscountMutation.mutate(Number(discount))}
-                  disabled={updateDiscountMutation.isPending || !discount}
+                  disabled={updateDiscountMutation.isPending || !discount || isConfirmed}
                 >
                   {updateDiscountMutation.isPending ? (
                     <Loader2 className="h-4 w-4 animate-spin" />
@@ -646,8 +755,6 @@ const StaffSaleOrderDetail = () => {
           </CardContent>
         </Card>
 
-
-
         {/* SECTION 2: Job Cards List */}
         <div className="space-y-4">
           <JobCardsDisplay
@@ -674,136 +781,66 @@ const StaffSaleOrderDetail = () => {
           )}
         </div>
 
-        {/* SECTION 3: HTML Preview & PDF Generation */}
+        {/* SECTION 3: HTML Preview & PDF Document */}
         <Card>
           <CardHeader>
-            <CardTitle>HTML Preview & PDF Document</CardTitle>
+            <CardTitle>Sale Order Document</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <Tabs defaultValue="document" className="w-full">
-              <TabsList>
-                <TabsTrigger value="document">Document Preview</TabsTrigger>
-              </TabsList>
-              <TabsContent value="document" className="space-y-4" id="pdf-preview-section">
-                <div className="flex items-center justify-between mb-4 no-print">
-                  <p className="text-sm text-muted-foreground">
-                    Live preview of the sale order document. Use Print/Download buttons below to save as PDF.
-                  </p>
-                  <div className="flex gap-2">
-                    <Button
-                      variant="outline"
-                      onClick={() => {
-                        const printContent = document.getElementById("printable-area");
-                        if (printContent) {
-                          const originalContents = document.body.innerHTML;
-                          document.body.innerHTML = printContent.innerHTML;
-                          window.print();
-                          document.body.innerHTML = originalContents;
-                          window.location.reload(); // Reload to restore state
-                        }
-                      }}
-                    >
-                      <Download className="mr-2 h-4 w-4" />
-                      Print / Download PDF
-                    </Button>
-                  </div>
-                </div>
+            <div className="flex items-center justify-between mb-4 no-print">
+              <p className="text-sm text-muted-foreground">
+                This document will be sent to the customer for approval.
+              </p>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    const printWindow = window.open('', '_blank');
+                    if (printWindow) {
+                      printWindow.document.write(previewHTML);
+                      printWindow.document.close();
+                      printWindow.print();
+                    }
+                  }}
+                >
+                  <Download className="mr-2 h-4 w-4" />
+                  Print / Download PDF
+                </Button>
+              </div>
+            </div>
 
-                <div id="printable-area" className="bg-white rounded-lg shadow overflow-hidden border">
-                  {saleOrder.draft_html ? (
-                    <div dangerouslySetInnerHTML={{ __html: saleOrder.draft_html }} />
-                  ) : (
-                    <PerfectSaleOrder data={{
-                      header: {
-                        so_number: saleOrder.order_number,
-                        order_date: format(new Date(saleOrder.created_at), "dd-MMM-yyyy"),
-                        company: {
-                          name: "ESTRE GLOBAL PRIVATE LTD",
-                          addressLines: [
-                            "Near Dhoni Public School, AECS Layout – A Block",
-                            "Revenue Layout, Singasandra, Bengaluru – 560068"
-                          ],
-                          phone: "+91 8722200100",
-                          email: "support@estre.in",
-                          gst: "29AAMCE9846D1ZU"
-                        },
-                        invoice_to: {
-                          customer_name: saleOrder.customer_name,
-                          addressLines: [saleOrder.customer_address?.street, saleOrder.customer_address?.landmark].filter(Boolean),
-                          city: saleOrder.customer_address?.city,
-                          pincode: saleOrder.customer_address?.pincode,
-                          mobile: saleOrder.customer_phone,
-                          email: saleOrder.customer_email
-                        },
-                        dispatch_to: {
-                          customer_name: saleOrder.customer_name,
-                          addressLines: [saleOrder.customer_address?.street, saleOrder.customer_address?.landmark].filter(Boolean),
-                          city: saleOrder.customer_address?.city,
-                          pincode: saleOrder.customer_address?.pincode,
-                          mobile: saleOrder.customer_phone,
-                          email: saleOrder.customer_email
-                        },
-                        payment_terms: {
-                          advance_percent: 50,
-                          advance_condition: "On placing Sale Order",
-                          balance_condition: "Upon intimation of product readiness, before dispatch"
-                        },
-                        delivery_terms: {
-                          delivery_days: 30,
-                          delivery_date: saleOrder.order?.expected_delivery_date || format(new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), "dd-MMM-yyyy"),
-                          dispatch_through: "Safe Express"
-                        },
-                        buyer_gst: saleOrder.order?.buyer_gst,
-                        status: saleOrder.status,
-                        created_at: saleOrder.created_at,
-                        updated_at: saleOrder.updated_at,
-                        created_by: "system",
-                        updated_by: "system"
-                      },
-                      lineItems: saleOrder.order?.order_items?.map((item: any) => ({
-                        line_item_id: item.id,
-                        so_number: saleOrder.order_number,
-                        category: item.product_category,
-                        model_name: item.product_title,
-                        shape: item.configuration?.shape || "",
-                        sections: [],
-                        fabric: {
-                          plan: item.configuration?.fabric?.claddingPlan || "Single Colour",
-                          upgrade_charge: 0,
-                          colour_variance_note: ""
-                        },
-                        seat_dimensions: {
-                          depth_in: 0,
-                          width_in: 0,
-                          height_in: 0,
-                          depth_upgrade_charge: 0,
-                          width_upgrade_charge: 0,
-                          height_upgrade_charge: 0
-                        },
-                        armrest_charge: 0,
-                        legs_charge: 0,
-                        accessories: [],
-                        approximate_widths: { overall_inches: 0 },
-                        line_total: item.total_price_rs || 0,
-                        ...((saleOrder.order?.metadata?.sale_orders?.[0]?.lineItems?.find((li: any) => li.line_item_id === item.id)) || {})
-                      })) || [],
-                      totals: {
-                        so_number: saleOrder.order_number,
-                        subtotal: saleOrder.base_price,
-                        discount_amount: saleOrder.discount,
-                        total_amount: saleOrder.final_price,
-                        advance_amount: saleOrder.final_price * 0.5,
-                        balance_amount: saleOrder.final_price * 0.5,
-                        paid_amount: 0,
-                        outstanding_amount: saleOrder.final_price
-                      },
-                      payments: [],
-                      jobCards: []
-                    }} />
-                  )}
-                </div>
-              </TabsContent>
-            </Tabs>
+            <div className="bg-white rounded-lg shadow overflow-hidden border p-4 h-[600px] overflow-y-auto">
+              <iframe
+                srcDoc={previewHTML}
+                className="w-full h-full border-0"
+                title="Sale Order Preview"
+              />
+            </div>
+
+            {/* Send to Customer Button */}
+            {!isConfirmed && (
+              <Button
+                size="lg"
+                onClick={() => approveAndSendFinalPDFMutation.mutate()}
+                disabled={approveAndSendFinalPDFMutation.isPending}
+              >
+                {approveAndSendFinalPDFMutation.isPending ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <Mail className="mr-2 h-4 w-4" />
+                )}
+                Send to Customer
+              </Button>
+            )}
+
+            {/* Confirmed Status */}
+            {isConfirmed && (
+              <div className="flex items-center text-green-600 font-medium">
+                <CheckCircle2 className="mr-2 h-5 w-5" />
+                Order Sent to Customer & Job Cards Created
+              </div>
+            )}
+
           </CardContent>
         </Card>
 

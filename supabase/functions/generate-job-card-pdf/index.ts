@@ -17,222 +17,207 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 // Import HTML template generator
-import { generateJobCardHTML } from "../_shared/htmlTemplates.ts";
+import { generatePremiumJobCardHTML } from "../_shared/premiumJobCardTemplate.ts";
 
-serve(async (req) => {
-  // Handle CORS
-  if (req.method === "OPTIONS") {
-    return new Response(null, {
-      status: 204,
-      headers: {
-        "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Methods": "POST, OPTIONS",
-        "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-      },
+// ... (imports)
+
+// ... (inside serve)
+
+// Get technical specifications from job card
+let technicalSpecs = jobCard.technical_specifications;
+if (!technicalSpecs) {
+  // Allow generation even without specs, just warn
+  console.warn("Job card missing technical_specifications");
+  technicalSpecs = {};
+}
+
+// Get sale order info
+const saleOrder = jobCard.sale_order || {};
+const soNumber = saleOrder.order_number || jobCard.so_number || jobCard.order_number || "N/A";
+
+// Map technical specs to template format
+// Assuming technicalSpecs is a JSON object. We'll try to group them or just list them.
+const specs: { category: string; items: { label: string; value: string }[] }[] = [];
+
+// Helper to format key
+const formatKey = (key: string) => key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+
+if (typeof technicalSpecs === 'object' && technicalSpecs !== null) {
+  // If it has categories (nested objects)
+  const hasCategories = Object.values(technicalSpecs).some(v => typeof v === 'object' && v !== null && !Array.isArray(v));
+
+  if (hasCategories) {
+    for (const [category, items] of Object.entries(technicalSpecs)) {
+      if (typeof items === 'object' && items !== null) {
+        specs.push({
+          category: formatKey(category),
+          items: Object.entries(items).map(([k, v]) => ({
+            label: formatKey(k),
+            value: String(v)
+          }))
+        });
+      }
+    }
+  } else {
+    // Flat object - put in "General Specifications"
+    specs.push({
+      category: "General Specifications",
+      items: Object.entries(technicalSpecs).map(([k, v]) => ({
+        label: formatKey(k),
+        value: String(v)
+      }))
     });
   }
+}
 
-  try {
-    const { jobCardId, mode = "final" } = await req.json();
+// Prepare template data
+const templateData = {
+  jobCardNumber: jobCard.job_card_number,
+  soNumber: soNumber,
+  soDate: saleOrder.created_at
+    ? new Date(saleOrder.created_at).toLocaleDateString("en-IN", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+    })
+    : "—",
+  jcIssueDate: new Date().toLocaleDateString("en-IN", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  }),
+  deliveryDate: jobCard.expected_completion_date
+    ? new Date(jobCard.expected_completion_date).toLocaleDateString("en-IN", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+    })
+    : "—",
 
-    if (!jobCardId) {
-      return new Response(
-        JSON.stringify({ error: "jobCardId is required" }),
-        { status: 400, headers: { "Content-Type": "application/json" } }
-      );
-    }
+  productTitle: jobCard.product_title || "Product",
+  productCategory: jobCard.product_category || "Furniture",
+  model: jobCard.product_name || "Custom",
 
-    if (mode !== "draft" && mode !== "final") {
-      return new Response(
-        JSON.stringify({ error: "mode must be 'draft' or 'final'" }),
-        { status: 400, headers: { "Content-Type": "application/json" } }
-      );
-    }
+  specs: specs
+};
 
-    const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
-    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+// Generate HTML
+const htmlContent = generatePremiumJobCardHTML(templateData);
 
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+// Convert HTML to PDF using Browserless API (recommended) or Playwright
+const browserlessApiKey = Deno.env.get("BROWSERLESS_API_KEY");
+const browserlessUrl = Deno.env.get("BROWSERLESS_URL") || "https://chrome.browserless.io";
 
-    // Fetch job card data with technical_specifications
-    const { data: jobCard, error: jobCardError } = await supabase
-      .from("job_cards")
-      .select(`
-        *,
-        sale_order:sale_orders(
-          order_number,
-          created_at
-        )
-      `)
-      .eq("id", jobCardId)
-      .single();
+let pdfBytes: Uint8Array;
 
-    if (jobCardError || !jobCard) {
-      throw new Error(`Job card not found: ${jobCardError?.message}`);
-    }
-
-    // Get technical specifications from job card
-    let technicalSpecs = jobCard.technical_specifications;
-    if (!technicalSpecs) {
-      throw new Error("Job card missing technical_specifications. Please regenerate job card.");
-    }
-
-    // Get sale order info
-    const saleOrder = jobCard.sale_order || {};
-    const soNumber = saleOrder.order_number || jobCard.so_number || jobCard.order_number;
-
-    // Prepare template data
-    const templateData = {
-      job_card_number: jobCard.job_card_number,
-      so_number: soNumber,
-      so_date: saleOrder.created_at 
-        ? new Date(saleOrder.created_at).toLocaleDateString("en-IN", {
-            day: "2-digit",
-            month: "short",
-            year: "numeric",
-          })
-        : new Date(jobCard.created_at).toLocaleDateString("en-IN", {
-            day: "2-digit",
-            month: "short",
-            year: "numeric",
-          }),
-      jc_issue_date: new Date().toLocaleDateString("en-IN", {
-        day: "2-digit",
-        month: "short",
-        year: "numeric",
-      }),
-      assigned_to: jobCard.assigned_to || "",
-      delivery_date: jobCard.expected_completion_date 
-        ? new Date(jobCard.expected_completion_date).toLocaleDateString("en-IN", {
-            day: "2-digit",
-            month: "short",
-            year: "numeric",
-          })
-        : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toLocaleDateString("en-IN", {
-            day: "2-digit",
-            month: "short",
-            year: "numeric",
-          }),
-      technical_specifications: technicalSpecs,
-    };
-
-    // Generate HTML
-    const htmlContent = generateJobCardHTML(templateData);
-
-    // Convert HTML to PDF using Browserless API (recommended) or Playwright
-    const browserlessApiKey = Deno.env.get("BROWSERLESS_API_KEY");
-    const browserlessUrl = Deno.env.get("BROWSERLESS_URL") || "https://chrome.browserless.io";
-
-    let pdfBytes: Uint8Array;
-
-    if (browserlessApiKey) {
-      // Use Browserless API
-      const browserlessResponse = await fetch(`${browserlessUrl}/pdf?token=${browserlessApiKey}`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
+if (browserlessApiKey) {
+  // Use Browserless API
+  const browserlessResponse = await fetch(`${browserlessUrl}/pdf?token=${browserlessApiKey}`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      html: htmlContent,
+      options: {
+        format: "A4",
+        printBackground: true,
+        margin: {
+          top: "10mm",
+          right: "10mm",
+          bottom: "10mm",
+          left: "10mm",
         },
-        body: JSON.stringify({
-          html: htmlContent,
-          options: {
-            format: "A4",
-            printBackground: true,
-            margin: {
-              top: "10mm",
-              right: "10mm",
-              bottom: "10mm",
-              left: "10mm",
-            },
-          },
-        }),
-      });
+      },
+    }),
+  });
 
-      if (!browserlessResponse.ok) {
-        throw new Error(`Browserless API error: ${browserlessResponse.statusText}`);
-      }
-
-      pdfBytes = new Uint8Array(await browserlessResponse.arrayBuffer());
-    } else {
-      // Fallback: Use Playwright in Deno (if available)
-      // For now, return error if Browserless is not configured
-      throw new Error(
-        "PDF generation requires Browserless API. Please set BROWSERLESS_API_KEY environment variable."
-      );
-    }
-
-    // Upload to Supabase Storage
-    const fileName = `job-cards/${mode}/${jobCardId}.pdf`;
-    
-    const { data: uploadData, error: uploadError } = await supabase.storage
-      .from("documents")
-      .upload(fileName, pdfBytes, {
-        contentType: "application/pdf",
-        upsert: true,
-      });
-
-    if (uploadError) {
-      console.error("Upload error:", uploadError);
-      throw uploadError;
-    }
-
-    // Get public URL
-    const { data: urlData } = supabase.storage
-      .from("documents")
-      .getPublicUrl(fileName);
-
-    // Update job card with PDF URL and HTML
-    const updateData: any = {
-      updated_at: new Date().toISOString(),
-    };
-
-    if (mode === "draft") {
-      updateData.draft_html = htmlContent;
-    } else {
-      updateData.final_html = htmlContent;
-      updateData.final_pdf_url = urlData.publicUrl;
-    }
-
-    const { error: updateError } = await supabase
-      .from("job_cards")
-      .update(updateData)
-      .eq("id", jobCardId);
-
-    if (updateError) {
-      console.error("Update error:", updateError);
-      throw updateError;
-    }
-
-    return new Response(
-      JSON.stringify({
-        success: true,
-        message: `${mode === "draft" ? "Draft" : "Final"} PDF generated successfully`,
-        jobCardId,
-        pdfUrl: urlData.publicUrl,
-        mode: mode,
-      }),
-      {
-        status: 200,
-        headers: {
-          "Content-Type": "application/json",
-          "Access-Control-Allow-Origin": "*",
-        },
-      }
-    );
-  } catch (error: any) {
-    console.error("Error:", error);
-    return new Response(
-      JSON.stringify({
-        error: error.message || "Failed to generate PDF",
-        details: error.toString(),
-      }),
-      {
-        status: 500,
-        headers: {
-          "Content-Type": "application/json",
-          "Access-Control-Allow-Origin": "*",
-        },
-      }
-    );
+  if (!browserlessResponse.ok) {
+    throw new Error(`Browserless API error: ${browserlessResponse.statusText}`);
   }
+
+  pdfBytes = new Uint8Array(await browserlessResponse.arrayBuffer());
+} else {
+  // Fallback: Use Playwright in Deno (if available)
+  // For now, return error if Browserless is not configured
+  throw new Error(
+    "PDF generation requires Browserless API. Please set BROWSERLESS_API_KEY environment variable."
+  );
+}
+
+// Upload to Supabase Storage
+const fileName = `job-cards/${mode}/${jobCardId}.pdf`;
+
+const { data: uploadData, error: uploadError } = await supabase.storage
+  .from("documents")
+  .upload(fileName, pdfBytes, {
+    contentType: "application/pdf",
+    upsert: true,
+  });
+
+if (uploadError) {
+  console.error("Upload error:", uploadError);
+  throw uploadError;
+}
+
+// Get public URL
+const { data: urlData } = supabase.storage
+  .from("documents")
+  .getPublicUrl(fileName);
+
+// Update job card with PDF URL and HTML
+const updateData: any = {
+  updated_at: new Date().toISOString(),
+};
+
+if (mode === "draft") {
+  updateData.draft_html = htmlContent;
+} else {
+  updateData.final_html = htmlContent;
+  updateData.final_pdf_url = urlData.publicUrl;
+}
+
+const { error: updateError } = await supabase
+  .from("job_cards")
+  .update(updateData)
+  .eq("id", jobCardId);
+
+if (updateError) {
+  console.error("Update error:", updateError);
+  throw updateError;
+}
+
+return new Response(
+  JSON.stringify({
+    success: true,
+    message: `${mode === "draft" ? "Draft" : "Final"} PDF generated successfully`,
+    jobCardId,
+    pdfUrl: urlData.publicUrl,
+    mode: mode,
+  }),
+  {
+    status: 200,
+    headers: {
+      "Content-Type": "application/json",
+      "Access-Control-Allow-Origin": "*",
+    },
+  }
+);
+  } catch (error: any) {
+  console.error("Error:", error);
+  return new Response(
+    JSON.stringify({
+      error: error.message || "Failed to generate PDF",
+      details: error.toString(),
+    }),
+    {
+      status: 500,
+      headers: {
+        "Content-Type": "application/json",
+        "Access-Control-Allow-Origin": "*",
+      },
+    }
+  );
+}
 });
 

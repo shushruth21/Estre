@@ -3,241 +3,233 @@
  * Aligned with actual sale_orders, orders, and order_items schema
  */
 
-import { formatIndianNumber, formatCurrency } from "./numberFormat.ts";
-import { safe, toTitle } from "./textUtils.ts";
-import type { SaleOrderTemplateData } from "./premiumSaleOrderTemplate.ts";
+import { SaleOrderTemplateData } from "./premiumSaleOrderTemplate.ts";
+// Import date-fns from esm.sh for Deno
+import { format } from "https://esm.sh/date-fns@2.30.0";
 
-/**
- * Generate template data from sale order database record
- * 
- * Expected schema structure:
- * saleOrder {
- *   order_number, final_price, base_price, discount, status, created_at,
- *   order: {
- *     customer_name, customer_email, customer_phone, delivery_address,
- *     order_items: [...],
- *     job_cards: [...]
- *   }
- * }
- */
+// --- Helpers ---
+
+const formatCurrency = (amount: number) =>
+  new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(amount);
+
+const safe = (val: any, fallback = "") => (val || fallback);
+const toTitle = (str: string) => str ? str.charAt(0).toUpperCase() + str.slice(1) : "";
+
+// --- Mapping Logic ---
+
 export function mapSaleOrderData(saleOrder: any): SaleOrderTemplateData {
-    const order = saleOrder.order || {};
-    const orderItems = order.order_items || [];
-    const jobCards = order.job_cards || [];
+  const order = saleOrder.order || {};
+  const orderItems = order.order_items || [];
 
-    // Extract customer address
-    const deliveryAddress = order.delivery_address || {};
-    const customerAddress = `${safe(deliveryAddress.street)}
-${safe(deliveryAddress.city)}, ${safe(deliveryAddress.state)} - ${safe(deliveryAddress.pincode)}`;
+  // Extract addresses
+  const deliveryAddress = order.delivery_address || {};
+  const billingAddress = order.billing_address || deliveryAddress;
 
-    //Generate products table HTML
-    const productsTableHTML = generateProductsTable(orderItems);
+  const formatAddress = (addr: any) => {
+    if (!addr) return "";
+    const parts = [
+      addr.street || addr.line1,
+      addr.line2,
+      addr.landmark,
+      `${addr.city || ''} - ${addr.pincode || ''}`,
+      addr.state
+    ].filter(Boolean);
+    return parts.join("\n");
+  };
 
-    // Generate cost breakdown HTML
-    const costBreakdownHTML = generateCostBreakdown(saleOrder);
+  const customerAddress = formatAddress(billingAddress);
+  const shippingAddress = formatAddress(deliveryAddress);
 
-    // Generate payment schedule HTML
-    const paymentScheduleHTML = generatePaymentSchedule(saleOrder);
+  const productsTableHTML = generateProductsTable(orderItems);
 
-    // Generate job cards HTML
-    const jobCardsHTML = generateJobCardsTable(jobCards);
+  const paymentTermsHTML = `
+        1) 50% advance on placing Sale Order<br>
+        2) Balance: upon intimation of product readiness, before dispatch
+    `;
 
-    // Generate terms HTML
-    const termsHTML = generateTermsHTML();
+  return {
+    orderNumber: safe(saleOrder.order_number, `SO-${saleOrder.id?.slice(0, 8)}`),
+    orderDate: saleOrder.created_at ? format(new Date(saleOrder.created_at), "dd-MMM-yyyy") : "",
+    deliveryDate: order.expected_delivery_date ? format(new Date(order.expected_delivery_date), "dd-MMM-yyyy") : "",
 
-    return {
-        orderNumber: safe(saleOrder.order_number, `SO-${saleOrder.id?.slice(0, 8)}`),
-        orderDate: formatDate(saleOrder.created_at),
-        deliveryDate: formatDate(order.expected_delivery_date || order.delivery_date),
-        customerName: safe(order.customer_name),
-        customerEmail: safe(order.customer_email),
-        customerPhone: safe(order.customer_phone),
-        customerAddress,
-        finalPrice: saleOrder.final_price || 0,
-        basePrice: saleOrder.base_price || 0,
-        discount: saleOrder.discount || 0,
-        productsTableHTML,
-        costBreakdownHTML,
-        paymentScheduleHTML,
-        jobCardsHTML,
-        termsHTML,
-    };
+    customerName: safe(order.customer_name),
+    customerEmail: safe(order.customer_email),
+    customerPhone: safe(order.customer_phone),
+    customerAddress,
+
+    shippingName: safe(order.customer_name),
+    shippingAddress,
+    shippingPhone: safe(order.customer_phone),
+    shippingEmail: safe(order.customer_email),
+
+    finalPrice: saleOrder.final_price || 0,
+    basePrice: saleOrder.base_price || 0,
+    discount: saleOrder.discount || 0,
+
+    productsTableHTML,
+    paymentTermsHTML,
+
+    dispatchThrough: order.logistics_partner || "Safe Express",
+    estreGst: "29AAMCE9846D1ZU",
+    buyerGst: order.buyer_gst || "",
+  };
 }
 
-// Helper: Generate products table
 function generateProductsTable(orderItems: any[]): string {
-    if (!orderItems || orderItems.length === 0) {
-        return `<p style="text-align: center; padding: 20px; color: #666;">No products in this order</p>`;
+  if (!orderItems || orderItems.length === 0) {
+    return `<tr><td colspan="4" style="text-align: center; padding: 20px;">No products in this order</td></tr>`;
+  }
+
+  return orderItems.map((item, index) => {
+    const productTitle = safe(item.product_title, safe(item.product_name, "Product"));
+    const category = safe(item.product_category, "Furniture");
+    const total = item.total_price_rs || 0;
+
+    let config: any = {};
+    try {
+      config = typeof item.configuration === 'string'
+        ? JSON.parse(item.configuration)
+        : item.configuration || {};
+    } catch (e) {
+      console.error("Error parsing configuration", e);
     }
 
-    const rows = orderItems.map((item, index) => {
-        const productTitle = safe(item.product_title, safe(item.product_name, "Product"));
-        const quantity = item.quantity || 1;
-        const price = item.unit_price_rs || item.total_price_rs || 0;
-        const total = item.total_price_rs || (quantity * price);
+    const descriptionHTML = generateDetailedDescription(productTitle, category, config);
 
-        return `
+    return `
       <tr>
-        <td>${index + 1}</td>
-        <td>${productTitle}</td>
-        <td>${quantity}</td>
-        <td>${formatCurrency(price)}</td>
-        <td>${formatCurrency(total)}</td>
+        <td style="text-align: center;">${index + 1}</td>
+        <td>
+          ${descriptionHTML}
+        </td>
+        <td style="text-align: right;">${formatCurrency(total)}</td>
+        <td style="text-align: right;">${formatCurrency(total)}</td>
       </tr>
     `;
-    }).join("");
-
-    return `
-    <table>
-      <thead>
-        <tr>
-          <th>Sl No.</th>
-          <th>Description</th>
-          <th>Qty</th>
-          <th>Unit Price</th>
-          <th>Total</th>
-        </tr>
-      </thead>
-      <tbody>
-        ${rows}
-      </tbody>
-    </table>
-  `;
+  }).join("");
 }
 
-// Helper: Generate cost breakdown
-function generateCostBreakdown(saleOrder: any): string {
-    const basePrice = saleOrder.base_price || 0;
-    const discount = saleOrder.discount || 0;
-    const finalPrice = saleOrder.final_price || 0;
+function generateDetailedDescription(title: string, category: string, config: any): string {
+  let html = `<strong>${toTitle(category)} – ${title}</strong><br><br>`;
 
-    // Calculate GST (assuming 18%)
-    const gstRate = 18;
-    const priceBeforeTax = finalPrice / (1 + gstRate / 100);
-    const gstAmount = finalPrice - priceBeforeTax;
-    const subtotal = priceBeforeTax + discount;
-
-    return `
-    <div class="cost-summary">
-      <div class="cost-row">
-        <span>Subtotal (Before Tax):</span>
-        <span>${formatCurrency(subtotal)}</span>
-      </div>
-      <div class="cost-row">
-        <span>Discount Applied:</span>
-        <span class="text-gold">- ${formatCurrency(discount)}</span>
-      </div>
-      <div class="cost-row">
-        <span>Subtotal After Discount:</span>
-        <span>${formatCurrency(priceBeforeTax)}</span>
-      </div>
-      <div class="cost-row">
-        <span>GST @ ${gstRate}%:</span>
-        <span>${formatCurrency(gstAmount)}</span>
-      </div>
-      <div class="cost-row total">
-        <span>GRAND TOTAL:</span>
-        <span>${formatCurrency(finalPrice)}</span>
-      </div>
-    </div>
-  `;
-}
-
-// Helper: Generate payment schedule
-function generatePaymentSchedule(saleOrder: any): string {
-    const finalPrice = saleOrder.final_price || 0;
-    const advance = Math.round(finalPrice * 0.5);
-    const balance = finalPrice - advance;
-
-    return `
-    <table>
-      <thead>
-        <tr>
-          <th>Stage</th>
-          <th>Amount</th>
-          <th>Details</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr>
-          <td>Advance Payment (50%)</td>
-          <td>${formatCurrency(advance)}</td>
-          <td>Due on placing Sale Order</td>
-        </tr>
-        <tr>
-          <td>Balance Payment (50%)</td>
-          <td>${formatCurrency(balance)}</td>
-          <td>Due upon intimation of product readiness, before dispatch</td>
-        </tr>
-      </tbody>
-    </table>
-    <p style="margin-top: 8px; font-size: 10pt; color: #666;">
-      <strong>Payment Method:</strong> Bank Transfer / UPI / Cash
-    </p>
-  `;
-}
-
-// Helper: Generate job cards table
-function generateJobCardsTable(jobCards: any[]): string {
-    if (!jobCards || jobCards.length === 0) {
-        return `<p style="text-align: center; padding: 20px; color: #666;">No job cards generated yet</p>`;
-    }
-
-    const rows = jobCards.map(jc => `
-    <tr>
-      <td>${safe(jc.job_card_number, `JC-${jc.id?.slice(0, 6)}`)}</td>
-      <td>${safe(jc.product_title, safe(jc.product_category))}</td>
-      <td>${toTitle(safe(jc.status, "Pending"))}</td>
-    </tr>
-  `).join("");
-
-    return `
-    <table>
-      <thead>
-        <tr>
-          <th>J.C. Number</th>
-          <th>Product</th>
-          <th>Status</th>
-        </tr>
-      </thead>
-      <tbody>
-        ${rows}
-      </tbody>
-    </table>
-  `;
-}
-
-// Helper: Generate terms & conditions
-function generateTermsHTML(): string {
-    return `
-    <div style="font-size: 10pt; line-height: 1.7; padding: 10px; background: #f9f9f9; border-radius: 4px;">
-      <ol style="margin-left: 20px;">
-        <li><strong>Payment:</strong> 50% advance payment required at the time of order confirmation. Balance 50% to be paid before dispatch.</li>
-        <li><strong>Delivery:</strong> Estimated delivery as per order date. Actual delivery may vary by ±7 days based on production schedule.</li>
-        <li><strong>Warranty:</strong> 1-year warranty on manufacturing defects. Warranty does not cover normal wear and tear, misuse, or accidental damage.</li>
-        <li><strong>Cancellation:</strong> Order cancellation after advance payment will incur 20% cancellation charges. No cancellation allowed once production starts.</li>
-        <li><strong>Customization:</strong> This is a customized order. Minor variations in color, texture, and dimensions (±5%) may occur.</li>
-        <li><strong>Installation:</strong> Installation services available at additional cost.</li>
-        <li><strong>Returns:</strong> Customized products are non-returnable unless there is a manufacturing defect.</li>
-        <li><strong>Complaints:</strong> Any complaints must be raised within 48 hours of delivery with photographic evidence.</li>
-        <li><strong>Force Majeure:</strong> Estre shall not be liable for any delay or failure due to circumstances beyond reasonable control.</li>
-        <li><strong>Governing Law:</strong> This agreement shall be governed by the laws of India. Disputes subject to Bangalore jurisdiction.</li>
-      </ol>
-    </div>
-  `;
-}
-
-// Helper: Format date
-function formatDate(dateStr?: string | null): string {
-    if (!dateStr) return "—";
-    try {
-        const date = new Date(dateStr);
-        return date.toLocaleDateString("en-IN", {
-            day: "2-digit",
-            month: "short",
-            year: "numeric",
+  // 1. Seating
+  if (config.seating || config.shape) {
+    html += `<div class="sub-header">Seating</div>`;
+    if (config.shape) html += `Shape: ${config.shape}<br>`;
+    if (config.seating) {
+      if (typeof config.seating === 'string') {
+        html += `${config.seating}<br>`;
+      } else if (typeof config.seating === 'object') {
+        Object.entries(config.seating).forEach(([key, val]) => {
+          if (val) html += `${toTitle(key)}: ${val}-Seater<br>`;
         });
-    } catch {
-        return "—";
+      }
     }
+    html += `<br>`;
+  }
+
+  // 2. Consoles
+  if (config.consoles && (Array.isArray(config.consoles) ? config.consoles.length > 0 : config.consoles)) {
+    html += `<div class="sub-header">Consoles</div>`;
+    if (Array.isArray(config.consoles)) {
+      html += `No. of Consoles: ${config.consoles.length} Nos.<br>`;
+      config.consoles.forEach((c: any, i: number) => {
+        html += `Console ${i + 1}: ${c.size || 'Standard'} (${c.position || 'Default'})<br>`;
+      });
+    } else {
+      html += `Details: ${JSON.stringify(config.consoles)}<br>`;
+    }
+    html += `<br>`;
+  }
+
+  // 3. Loungers
+  if (config.loungers && (Array.isArray(config.loungers) ? config.loungers.length > 0 : config.loungers)) {
+    html += `<div class="sub-header">Loungers</div>`;
+    if (Array.isArray(config.loungers)) {
+      html += `No. of Loungers: ${config.loungers.length} No.<br>`;
+      config.loungers.forEach((l: any, i: number) => {
+        html += `Lounger ${i + 1}: ${l.size || 'Standard'} - ${l.position || 'Default'}<br>`;
+      });
+    }
+    html += `<br>`;
+  }
+
+  // 4. Pillows
+  if (config.pillows && config.pillows.length > 0) {
+    html += `<div class="sub-header">Pillows</div>`;
+    config.pillows.forEach((p: any) => {
+      html += `${p.quantity || 1} Nos – ${p.type || 'Standard'} (${p.size || '18x18 in'})<br>`;
+      if (p.fabric) html += `Fabric: ${p.fabric}<br>`;
+    });
+    html += `<br>`;
+  }
+
+  // 5. Fabric Selection
+  if (config.fabric) {
+    html += `<div class="sub-header">Fabric Selection</div>`;
+    const f = config.fabric;
+    if (typeof f === 'string') {
+      html += `${f}<br>`;
+    } else {
+      if (f.structure) html += `Structure – ${f.structure}<br>`;
+      if (f.backrest) html += `Backrest – ${f.backrest}<br>`;
+      if (f.seat) html += `Seat – ${f.seat}<br>`;
+      if (f.headrest) html += `Headrest – ${f.headrest}<br>`;
+      if (f.overall) html += `Overall – ${f.overall}<br>`;
+    }
+    html += `<br>`;
+  }
+
+  // 6. Foam
+  if (config.foam) {
+    html += `<div class="sub-header">Foam</div>`;
+    html += `Type: ${config.foam.type || config.foam}<br>`;
+    if (config.foam.upgradeCharge) html += `Upgrade: ${formatCurrency(config.foam.upgradeCharge)}<br>`;
+    html += `<br>`;
+  }
+
+  // 7. Seat Dimensions
+  if (config.dimensions) {
+    html += `<div class="sub-header">Seat Dimensions</div>`;
+    const d = config.dimensions;
+    if (d.depth) html += `Depth: ${d.depth} in<br>`;
+    if (d.width) html += `Width: ${d.width} in<br>`;
+    if (d.height) html += `Height: ${d.height} in<br>`;
+    html += `<br>`;
+  }
+
+  // 8. Legs
+  if (config.legs) {
+    html += `<div class="sub-header">Legs</div>`;
+    html += `${config.legs}<br><br>`;
+  }
+
+  // 9. Accessories
+  if (config.accessories && config.accessories.length > 0) {
+    html += `<div class="sub-header">Accessories</div>`;
+    config.accessories.forEach((acc: any) => {
+      html += `${acc.name || acc.type} (${acc.position || 'Default'})<br>`;
+    });
+    html += `<br>`;
+  }
+
+  // 10. Wood Type
+  if (config.woodType) {
+    html += `<div class="sub-header">Wood Type</div>`;
+    html += `${config.woodType}<br><br>`;
+  }
+
+  // 11. Stitch Type
+  if (config.stitchType) {
+    html += `<div class="sub-header">Stitch Type</div>`;
+    html += `${config.stitchType}<br><br>`;
+  }
+
+  // 12. Approx Width
+  if (config.approxWidth) {
+    html += `<div class="sub-header">Approx Width</div>`;
+    html += `${config.approxWidth} inches (±5%)<br>`;
+  }
+
+  return html;
 }

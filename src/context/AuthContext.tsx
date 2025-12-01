@@ -46,7 +46,7 @@ function normalizeRole(role: string | null | undefined): "admin" | "staff" | "cu
   ];
 
   const normalized = role.toLowerCase().trim();
-  
+
   if (adminRoles.includes(normalized)) return "admin";
   if (staffRoles.includes(normalized)) return "staff";
   return "customer";
@@ -78,13 +78,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Fetch user profile from profiles table (with improved timeout handling)
   const fetchProfile = async (userId: string) => {
     let timeoutId: NodeJS.Timeout | null = null;
-    
+
     try {
-      // Create timeout promise (10 seconds - more reasonable for slow networks)
+      // Create timeout promise (10 seconds)
       const timeoutPromise = new Promise<never>((_, reject) => {
         timeoutId = setTimeout(() => {
           reject(new Error("Profile fetch timeout"));
-        }, 10000); // 10 seconds timeout
+        }, 10000);
       });
 
       // Create profile fetch promise
@@ -97,13 +97,40 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // Race between profile fetch and timeout
       const { data, error } = await Promise.race([profilePromise, timeoutPromise]);
 
-      // Clear timeout if we got here
+      // Clear timeout
       if (timeoutId) {
         clearTimeout(timeoutId);
         timeoutId = null;
       }
 
       if (error) {
+        console.warn("Error fetching profile:", error);
+
+        // Fallback: Try to get role via RPC (bypasses RLS recursion issues)
+        try {
+          const { data: roleData, error: roleError } = await supabase.rpc('get_user_role', { user_id: userId });
+
+          if (!roleError && roleData) {
+            console.log("Recovered role via RPC:", roleData);
+            // Construct a minimal profile with the recovered role
+            const minimalProfile: Profile = {
+              id: userId, // Placeholder
+              user_id: userId,
+              full_name: user?.email?.split('@')[0] || 'User',
+              phone: null,
+              avatar_url: null,
+              department: null,
+              role: roleData as string,
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString()
+            };
+            setProfile(minimalProfile);
+            return;
+          }
+        } catch (rpcError) {
+          console.warn("RPC role fetch failed:", rpcError);
+        }
+
         // If profile doesn't exist, create one with customer role
         if (error.code === "PGRST116") {
           try {
@@ -116,54 +143,40 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               .select()
               .single();
 
-            if (createError) {
-              if (import.meta.env.DEV) {
-                console.warn("Error creating profile:", createError);
-              }
-              // Don't set profile to null - allow app to work without profile
+            if (!createError) {
+              setProfile(newProfile as Profile);
               return;
             }
-
-            setProfile(newProfile as Profile);
-            return;
           } catch (createErr) {
-            if (import.meta.env.DEV) {
-              console.warn("Error creating profile:", createErr);
-            }
-            return;
+            console.warn("Error creating profile:", createErr);
           }
         }
-
-        // For other errors, log but don't break the app
-        if (import.meta.env.DEV) {
-          console.warn("Error fetching profile:", error.message || error);
-        }
-        // Don't set profile to null - keep existing state or allow app to work without profile
         return;
       }
 
       setProfile(data as Profile);
     } catch (error: any) {
-      // Clear timeout if still set
-      if (timeoutId) {
-        clearTimeout(timeoutId);
-      }
-      
-      // Handle timeout gracefully - don't break the app
-      if (error?.message?.includes("timeout")) {
-        if (import.meta.env.DEV) {
-          console.warn("Profile fetch timeout - continuing without profile. This is non-critical.");
+      if (timeoutId) clearTimeout(timeoutId);
+      console.warn("Error in fetchProfile:", error);
+
+      // Attempt RPC fallback even on timeout/exception
+      try {
+        const { data: roleData } = await supabase.rpc('get_user_role', { user_id: userId });
+        if (roleData) {
+          const minimalProfile: Profile = {
+            id: userId,
+            user_id: userId,
+            full_name: user?.email?.split('@')[0] || 'User',
+            phone: null,
+            avatar_url: null,
+            department: null,
+            role: roleData as string,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          };
+          setProfile(minimalProfile);
         }
-        // Don't throw - allow app to continue without profile
-        // The app should gracefully handle missing profile
-        return;
-      }
-      
-      // For other unexpected errors, log but don't break the app
-      if (import.meta.env.DEV) {
-        console.warn("Error in fetchProfile:", error?.message || error);
-      }
-      // Don't set profile to null - allow app to work without profile
+      } catch (e) { /* ignore */ }
     }
   };
 
@@ -182,7 +195,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (!mounted) return;
-      
+
       setSession(session);
       setUser(session?.user ?? null);
 
@@ -200,7 +213,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Check for existing session (optimized - don't wait for profile on initial load)
     supabase.auth.getSession().then(async ({ data: { session } }) => {
       if (!mounted) return;
-      
+
       setSession(session);
       setUser(session?.user ?? null);
 

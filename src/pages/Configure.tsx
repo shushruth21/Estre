@@ -22,8 +22,15 @@ import PouffeConfigurator from "@/components/configurators/PouffeConfigurator";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
 
-const Configure = () => {
-  const { category, productId } = useParams();
+interface ConfigureProps {
+  category?: string;
+  productId?: string;
+}
+
+const Configure = ({ category: propCategory, productId: propProductId }: ConfigureProps = {}) => {
+  const params = useParams();
+  const category = propCategory || params.category;
+  const productId = propProductId || params.productId;
   const navigate = useNavigate();
   const { toast } = useToast();
   const [configuration, setConfiguration] = useState<any>({});
