@@ -46,7 +46,7 @@ export async function sendSaleOrderEmail({
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        from: "Estre <orders@estre.in>",
+        from: "Estre <no-reply@estre.app>",
         to,
         subject: "Your Sale Order is Ready",
         html: `
@@ -105,7 +105,7 @@ export async function sendOTPEmail({
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        from: "Estre <orders@estre.in>",
+        from: "Estre <no-reply@estre.app>",
         to,
         subject: "Your Estre Order Confirmation OTP",
         html: `

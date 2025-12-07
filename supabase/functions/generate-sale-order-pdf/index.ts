@@ -372,7 +372,7 @@ serve(async (req) => {
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            from: "Estre <orders@estre.in>",
+            from: "Estre <no-reply@estre.app>",
             to: templateData.customer_email,
             subject: "Your Estre Sale Order is Ready",
             html: emailHTML,
