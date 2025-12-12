@@ -18,6 +18,7 @@ import Signup from "./pages/Signup";
 import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
 import VerifyOrderOTP from "./pages/VerifyOrderOTP";
+import AuthCallback from "./pages/AuthCallback";
 import NotFound from "./pages/NotFound";
 
 
@@ -50,9 +51,12 @@ const StaffSaleOrderDetail = lazy(() => import("./pages/staff/StaffSaleOrderDeta
 const StaffOrderDetail = lazy(() => import("./pages/staff/StaffOrderDetail"));
 const StaffJobCards = lazy(() => import("./pages/staff/StaffJobCards"));
 const StaffJobCardDetail = lazy(() => import("./pages/staff/StaffJobCardDetail"));
+const StaffQIRList = lazy(() => import("./pages/staff/StaffQIRList"));
+const StaffQIRDetail = lazy(() => import("./pages/staff/StaffQIRDetail"));
 
 // Lazy load order confirmation and payment pages
 const OrderConfirmation = lazy(() => import("./pages/OrderConfirmation"));
+const Payment = lazy(() => import("./pages/Payment"));
 
 // Lazy load production pages
 const ProductionJobCard = lazy(() => import("./pages/production/ProductionJobCard"));
@@ -144,6 +148,7 @@ const App = () => (
                   <Route path="/signup" element={<Signup />} />
                   <Route path="/forgot-password" element={<ForgotPassword />} />
                   <Route path="/reset-password" element={<ResetPassword />} />
+                  <Route path="/auth/callback" element={<AuthCallback />} />
                   <Route path="/verify-order/:id" element={<VerifyOrderOTP />} />
                   <Route path="/dashboard" element={
                     <Suspense fallback={<LoadingSpinner />}>
@@ -163,6 +168,13 @@ const App = () => (
                     <Suspense fallback={<LoadingSpinner />}>
                       <ProtectedRoute requiredRole="customer">
                         <OrderConfirmation />
+                      </ProtectedRoute>
+                    </Suspense>
+                  } />
+                  <Route path="/payment/:saleOrderId" element={
+                    <Suspense fallback={<LoadingSpinner />}>
+                      <ProtectedRoute requiredRole="customer">
+                        <Payment />
                       </ProtectedRoute>
                     </Suspense>
                   } />
@@ -272,6 +284,20 @@ const App = () => (
                     <Suspense fallback={<LoadingSpinner />}>
                       <ProtectedRoute requiredRole="staff">
                         <StaffJobCardDetail />
+                      </ProtectedRoute>
+                    </Suspense>
+                  } />
+                  <Route path="/staff/quality-reports" element={
+                    <Suspense fallback={<LoadingSpinner />}>
+                      <ProtectedRoute requiredRole="staff">
+                        <StaffQIRList />
+                      </ProtectedRoute>
+                    </Suspense>
+                  } />
+                  <Route path="/staff/quality-reports/:id" element={
+                    <Suspense fallback={<LoadingSpinner />}>
+                      <ProtectedRoute requiredRole="staff">
+                        <StaffQIRDetail />
                       </ProtectedRoute>
                     </Suspense>
                   } />

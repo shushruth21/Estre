@@ -6,9 +6,11 @@ import { ClipboardList, Clock, CheckCircle2, AlertCircle, ShoppingCart, FileText
 import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { useAuth } from "@/hooks/useAuth";
 
 export default function StaffDashboard() {
   const navigate = useNavigate();
+  const { loading: authLoading, profile } = useAuth();
 
   // Fetch ALL job cards (not just assigned to user)
   const { data: jobCards, isLoading: jobCardsLoading } = useQuery({
@@ -26,6 +28,7 @@ export default function StaffDashboard() {
       if (error) throw error;
       return data || [];
     },
+    enabled: !authLoading && !!profile, // Only fetch when auth is loaded and profile exists
   });
 
   // Fetch sale orders statistics
@@ -41,6 +44,7 @@ export default function StaffDashboard() {
       if (error) throw error;
       return data || [];
     },
+    enabled: !authLoading && !!profile, // Only fetch when auth is loaded and profile exists
   });
 
   // Calculate statistics

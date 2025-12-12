@@ -55,18 +55,34 @@ export default function StaffJobCardDetail() {
   const fetchJobCard = async () => {
     if (!user || !id) return;
 
-    const { data, error } = await supabase
+    // Build query - RLS will handle filtering based on role
+    // Factory staff: only assigned job cards
+    // Staff/Admin: all job cards
+    let query = supabase
       .from("job_cards")
       .select("*")
-      .eq("id", id)
-      .eq("assigned_to", user.id)
+      .eq("id", id);
+
+    // For factory_staff, add assigned_to filter (RLS also checks this)
+    // For staff/admin, RLS allows all, so no filter needed
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("role")
+      .eq("user_id", user.id)
       .single();
+
+    if (profile?.role === 'factory_staff') {
+      query = query.eq("assigned_to", user.id);
+    }
+    // Staff/admin can see all (RLS handles this)
+
+    const { data, error } = await query.single();
 
     if (error) {
       console.error("Error fetching job card:", error);
       toast({
         title: "Error",
-        description: "Failed to load job card",
+        description: error.message || "Failed to load job card. You may not have permission to view this job card.",
         variant: "destructive",
       });
       navigate("/staff/job-cards");

@@ -5,12 +5,15 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, ArrowLeft, Package, Eye, CheckCircle2 } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import { downloadPDF, getSaleOrderPDFUrl, generatePDFFilename } from "@/lib/pdf-download";
+import { Loader2, ArrowLeft, Package, Eye, CheckCircle2, Download, Mail } from "lucide-react";
 import { format } from "date-fns";
 
 const Orders = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { toast } = useToast();
 
   const { data: user } = useQuery({
     queryKey: ["user"],
@@ -75,6 +78,35 @@ const Orders = () => {
       return data || [];
     },
     enabled: !!user,
+  });
+
+  // Email resend mutation
+  const resendEmailMutation = useMutation({
+    mutationFn: async (saleOrderId: string) => {
+      const { data, error } = await supabase.functions.invoke(
+        "send-sale-order-pdf-after-otp",
+        {
+          body: { saleOrderId },
+        }
+      );
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["orders", user?.id] });
+      toast({
+        title: "Email Sent",
+        description: "Sale order PDF has been sent to your email.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error Sending Email",
+        description: error.message || "Failed to send email. Please try again.",
+        variant: "destructive",
+      });
+    },
   });
 
   const getStatusColor = (status: string) => {
@@ -240,13 +272,74 @@ const Orders = () => {
                             </span>
                           </div>
 
-                          <div className="flex gap-2">
+                          <div className="flex flex-wrap gap-2">
                             <Button variant="outline" size="sm" asChild>
-                              <Link to={`/sale-order/${so.id}`}>
+                              <Link to={`/orders/${order.id}`}>
                                 <Eye className="mr-2 h-4 w-4" />
-                                View Sale Order
+                                View Details
                               </Link>
                             </Button>
+
+                            {/* PDF Download Buttons */}
+                            {getSaleOrderPDFUrl(so) && (
+                              <>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => {
+                                    const pdfUrl = getSaleOrderPDFUrl(so);
+                                    if (pdfUrl) window.open(pdfUrl, '_blank');
+                                  }}
+                                >
+                                  <Eye className="mr-2 h-4 w-4" />
+                                  View PDF
+                                </Button>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={async () => {
+                                    const pdfUrl = getSaleOrderPDFUrl(so);
+                                    if (pdfUrl) {
+                                      try {
+                                        const filename = generatePDFFilename(so.order_number || `SO-${so.id.slice(0, 8)}`);
+                                        await downloadPDF(pdfUrl, filename);
+                                        toast({
+                                          title: "Download Started",
+                                          description: "Your PDF is being downloaded.",
+                                        });
+                                      } catch (error: any) {
+                                        toast({
+                                          title: "Download Failed",
+                                          description: error.message || "Failed to download PDF. Please try again.",
+                                          variant: "destructive",
+                                        });
+                                      }
+                                    }
+                                  }}
+                                >
+                                  <Download className="mr-2 h-4 w-4" />
+                                  Download PDF
+                                </Button>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => resendEmailMutation.mutate(so.id)}
+                                  disabled={resendEmailMutation.isPending}
+                                >
+                                  {resendEmailMutation.isPending ? (
+                                    <>
+                                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                      Sending...
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Mail className="mr-2 h-4 w-4" />
+                                      Email PDF
+                                    </>
+                                  )}
+                                </Button>
+                              </>
+                            )}
 
                             {so.status === 'awaiting_customer_confirmation' && (
                               <Button size="sm" className="bg-green-600 hover:bg-green-700">

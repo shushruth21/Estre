@@ -1,20 +1,15 @@
-/**
- * StaffLayout Component
- * 
- * Layout wrapper for staff pages with navigation menu.
- * Provides consistent navigation for staff routes.
- */
-
 import { ReactNode } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
+import { logout } from "@/lib/logout";
 import {
   LayoutDashboard,
   ClipboardList,
   ShoppingCart,
   LogOut,
   Loader2,
+  FileCheck,
 } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 
@@ -46,6 +41,11 @@ export function StaffLayout({ children }: StaffLayoutProps) {
       name: "Job Cards",
       href: "/staff/job-cards",
       icon: ClipboardList,
+    },
+    {
+      name: "Quality Reports",
+      href: "/staff/quality-reports",
+      icon: FileCheck,
     },
   ];
 
@@ -94,11 +94,7 @@ export function StaffLayout({ children }: StaffLayoutProps) {
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={async () => {
-                  const { supabase } = await import("@/integrations/supabase/client");
-                  await supabase.auth.signOut();
-                  window.location.href = "/";
-                }}
+                onClick={logout}
               >
                 <LogOut className="mr-2 h-4 w-4" />
                 Logout

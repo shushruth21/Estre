@@ -184,6 +184,10 @@ const Checkout = () => {
         discount: discountAmount,
         final_price: total,
         advance_amount_rs: advanceAmount,
+        // Add customer fields for reliable email sending
+        customer_email: user.email || order.customer_email,
+        customer_name: user.user_metadata?.full_name || order.customer_name || user.email || "Customer",
+        order_number: orderNumber,
         metadata: {
           discount_code: discountCode,
           auto_generated: true
@@ -198,8 +202,11 @@ const Checkout = () => {
 
       if (saleOrderError) {
         console.error("Error creating sale order:", saleOrderError);
-        // Continue anyway, as order is created
+        // Rollback: Delete the created order to prevent inconsistent state
+        await supabase.from("orders").delete().eq("id", order.id);
+        throw new Error(`Failed to create sale order: ${saleOrderError.message}`);
       }
+
 
       // 4. Create Job Cards
       const jobCardInserts: any[] = [];
@@ -227,29 +234,27 @@ const Checkout = () => {
 
             jobCardInserts.push({
               job_card_number: jobCard.jobCardNumber,
-              so_number: jobCard.soNumber,
-              line_item_id: jobCard.lineItemId,
+              so_number: jobCard.soNumber || order.order_number,
               order_id: order.id,
               order_item_id: item.id,
               sale_order_id: saleOrder?.id || null,
-              order_number: jobCard.soNumber,
-              customer_name: jobCard.customer.name,
-              customer_phone: jobCard.customer.phone,
-              customer_email: jobCard.customer.email || order.customer_email,
-              delivery_address: jobCard.customer.address,
-              product_category: jobCard.category,
-              product_type: technicalSpecs.sofa_type || technicalSpecs.product_type,
-              product_title: jobCard.modelName,
-              configuration: jobCard.configuration,
-              technical_specifications: technicalSpecs,
-              fabric_codes: jobCard.fabricPlan.fabricCodes,
-              fabric_meters: jobCard.fabricPlan,
+              order_number: jobCard.soNumber || order.order_number,
+              customer_name: (jobCard.customer?.name || order.customer_name || "").trim() || "Customer",
+              customer_phone: (jobCard.customer?.phone || order.customer_phone || "").trim() || "",
+              customer_email: (jobCard.customer?.email || order.customer_email || "").trim() || "",
+              delivery_address: jobCard.customer?.address || order.delivery_address || {},
+              product_category: jobCard.category || item.product_category,
+              product_title: jobCard.modelName || item.product_title || "Custom Product",
+              configuration: jobCard.configuration || item.configuration || {},
+              technical_specifications: technicalSpecs || {},
+              fabric_codes: jobCard.fabricPlan?.fabricCodes || {},
+              fabric_meters: jobCard.fabricPlan || {},
               accessories: {
                 console: jobCard.console,
                 dummySeats: jobCard.dummySeats,
                 sections: jobCard.sections,
-              },
-              dimensions: jobCard.dimensions,
+              } || {},
+              dimensions: jobCard.dimensions || {},
               status: "pending",
               priority: "normal",
             });
@@ -258,22 +263,53 @@ const Checkout = () => {
       }
 
       if (jobCardInserts.length > 0) {
-        await supabase.from("job_cards").insert(jobCardInserts);
+        // Insert without select to avoid 406 error
+        const { error: jobCardError } = await supabase
+          .from("job_cards")
+          .insert(jobCardInserts);
+
+        if (jobCardError) {
+          console.error("❌ Failed to create job cards:", jobCardError);
+          // Don't throw - order is created, job cards can be created manually
+          toast({
+            title: "Warning",
+            description: `Order created but job cards failed: ${jobCardError.message}. Staff can create them manually.`,
+            variant: "destructive",
+          });
+        } else {
+          console.log(`✅ Created ${jobCardInserts.length} job cards`);
+        }
       }
 
-      // 5. Trigger PDF Generation & Email (via Edge Function)
+      // 5. Trigger PDF Generation & Email (via Edge Function) - Fire-and-forget
+      // Don't await - let it run in background, don't block order creation
+      let pdfGenerated = false;
+      let emailSent = false;
+      let emailError: string | null = null;
+      
       if (saleOrder) {
-        try {
-          await supabase.functions.invoke("generate-sale-order-pdf", {
-            body: {
-              saleOrderId: saleOrder.id,
-              mode: "final", // Send final PDF immediately
-              requireOTP: false // No OTP needed as they just confirmed
-            },
-          });
-        } catch (err) {
-          console.error("Failed to trigger PDF generation:", err);
-        }
+        // Fire-and-forget: Trigger PDF generation without blocking
+        supabase.functions.invoke("generate-sale-order-pdf", {
+          body: {
+            saleOrderId: saleOrder.id,
+            mode: "final",
+            requireOTP: false,
+            skipEmail: false
+          },
+        }).then(({ data: pdfData, error: pdfError }) => {
+          if (pdfError) {
+            console.error("PDF generation error (non-blocking):", pdfError);
+            // Log but don't affect order creation
+          } else if (pdfData) {
+            console.log("✅ PDF generated successfully:", pdfData.pdfUrl);
+            pdfGenerated = pdfData.success === true;
+            emailSent = pdfData.emailSent === true;
+            emailError = pdfData.emailError || null;
+          }
+        }).catch((err: any) => {
+          console.error("PDF generation failed (non-blocking):", err);
+          // Silently fail - order is already created successfully
+        });
       }
 
       // 6. Create Timeline & Cleanup
@@ -298,14 +334,17 @@ const Checkout = () => {
         await supabase.rpc('increment_discount_usage', { code: discountCode });
       }
 
+      // Return order - PDF generation happens in background (fire-and-forget)
       return { order };
     },
     onSuccess: () => {
       toast({
         title: "Order Confirmed!",
-        description: "Your order has been placed successfully. Check your email for the sale order PDF.",
+        description: "Your order has been placed successfully. The invoice PDF will be sent to your email shortly.",
       });
+      
       queryClient.invalidateQueries({ queryKey: ["cart"] });
+      queryClient.invalidateQueries({ queryKey: ["orders"] });
       navigate("/dashboard");
     },
     onError: (error: any) => {

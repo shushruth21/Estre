@@ -145,20 +145,23 @@ const Products = () => {
           selectFields = `id, title, image, ${columns.netPrice}, ${columns.strikePrice}, discount_percent, discount_rs`;
         }
 
-        // Execute query with timeout (15 seconds)
+        // Execute query with optimized settings
         let query = supabase
           .from(tableName as any)
-          .select(selectFields);
+          .select(selectFields, { count: 'exact' });
 
         // Only filter by is_active if the table has that column
         if (category !== "database_pouffes") {
           query = query.eq("is_active", true);
         }
 
-        // Add timeout to prevent hanging queries (15 seconds)
-        const queryPromise = query.order("title", { ascending: true });
+        // Add limit to prevent large dataset queries (max 1000 products)
+        query = query.order("title", { ascending: true }).limit(1000);
+
+        // Add timeout to prevent hanging queries (10 seconds - reduced from 15)
+        const queryPromise = query;
         const timeoutPromise = new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error('Query timeout: Request took longer than 15 seconds')), 15000)
+          setTimeout(() => reject(new Error('Query timeout: Request took longer than 10 seconds')), 10000)
         );
 
         const result = await Promise.race([queryPromise, timeoutPromise]);
@@ -214,15 +217,29 @@ const Products = () => {
         // End performance timer
         endTimer();
 
-        // Fetch hashes for these products
+        // Fetch hashes for these products (with timeout protection)
         const productIds = (data || []).map((p: any) => p.id);
         let hashes: any[] = [];
         if (productIds.length > 0) {
-          const { data: hashData } = await supabase
-            .from("product_urls" as any)
-            .select("product_id, hash")
-            .in("product_id", productIds);
-          hashes = hashData || [];
+          try {
+            // Batch hash queries in chunks of 100 to avoid timeout
+            const chunkSize = 100;
+            const hashPromises = [];
+            for (let i = 0; i < productIds.length; i += chunkSize) {
+              const chunk = productIds.slice(i, i + chunkSize);
+              hashPromises.push(
+                supabase
+                  .from("product_urls" as any)
+                  .select("product_id, hash")
+                  .in("product_id", chunk)
+              );
+            }
+            const hashResults = await Promise.all(hashPromises);
+            hashes = hashResults.flatMap((result: any) => result.data || []);
+          } catch (hashError) {
+            console.warn("Failed to fetch product hashes (non-critical):", hashError);
+            // Continue without hashes - not critical for product display
+          }
         }
 
         // Normalize the data

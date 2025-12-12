@@ -34,6 +34,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { useQuery } from "@tanstack/react-query";
+import { logout } from "@/lib/logout";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -143,15 +144,6 @@ export function AdminLayout({ children }: AdminLayoutProps) {
   // Role checking is handled by ProtectedRoute, but we can verify here
   // This component only renders if user is admin (via ProtectedRoute guard)
 
-  const handleLogout = async () => {
-    await supabase.auth.signOut();
-    toast({
-      title: "Logged out",
-      description: "You have been logged out successfully",
-    });
-    navigate("/login");
-  };
-
   // Get user initials for avatar
   const getUserInitials = () => {
     if (!user?.email) return "A";
@@ -240,8 +232,8 @@ export function AdminLayout({ children }: AdminLayoutProps) {
                       item.href === "/admin/orders" && pendingOrders
                         ? pendingOrders
                         : item.href === "/admin/job-cards" && activeJobCards
-                        ? activeJobCards
-                        : undefined;
+                          ? activeJobCards
+                          : undefined;
 
                     return (
                       <Link
@@ -304,7 +296,7 @@ export function AdminLayout({ children }: AdminLayoutProps) {
               variant="outline"
               size="sm"
               className="flex-1"
-              onClick={handleLogout}
+              onClick={logout}
             >
               <LogOut className="h-4 w-4 mr-2" />
               Logout
@@ -365,8 +357,8 @@ export function AdminLayout({ children }: AdminLayoutProps) {
                                 ? pendingOrders
                                 : item.href === "/admin/job-cards" &&
                                   activeJobCards
-                                ? activeJobCards
-                                : undefined;
+                                  ? activeJobCards
+                                  : undefined;
 
                             return (
                               <Link
@@ -411,7 +403,7 @@ export function AdminLayout({ children }: AdminLayoutProps) {
                   <Button
                     variant="outline"
                     className="w-full"
-                    onClick={handleLogout}
+                    onClick={logout}
                   >
                     <LogOut className="h-4 w-4 mr-2" />
                     Logout
@@ -500,7 +492,7 @@ export function AdminLayout({ children }: AdminLayoutProps) {
                     Dashboard
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={handleLogout}>
+                  <DropdownMenuItem onClick={logout}>
                     <LogOut className="mr-2 h-4 w-4" />
                     Logout
                   </DropdownMenuItem>

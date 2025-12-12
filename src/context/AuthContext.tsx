@@ -210,6 +210,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     });
 
+    // Failsafe: Force loading to false after 5 seconds to prevent infinite loading state
+    const failsafeTimeout = setTimeout(() => {
+      if (mounted && loading) {
+        console.warn("AuthContext: Loading state timed out, forcing false");
+        setLoading(false);
+      }
+    }, 5000);
+
     // Check for existing session (optimized - don't wait for profile on initial load)
     supabase.auth.getSession().then(async ({ data: { session } }) => {
       if (!mounted) return;
@@ -221,6 +229,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // Profile will load in background
       if (mounted) {
         setLoading(false);
+        clearTimeout(failsafeTimeout);
       }
 
       // Fetch profile in background (non-blocking)
@@ -232,11 +241,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           }
         });
       }
+    }).catch(err => {
+      console.error("AuthContext: getSession failed", err);
+      if (mounted) {
+        setLoading(false);
+        clearTimeout(failsafeTimeout);
+      }
     });
 
     return () => {
       mounted = false;
       subscription.unsubscribe();
+      clearTimeout(failsafeTimeout);
     };
   }, []);
 

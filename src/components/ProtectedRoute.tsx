@@ -102,10 +102,12 @@ export function ProtectedRoute({
 
   // Customer-only
   if (requiredRole === "customer") {
-    if (!isCustomer()) {
-      return <Navigate to="/" replace />;
+    // Be lenient while role is loading: allow any authenticated user;
+    // staff/admin are redirected by their own dashboards elsewhere.
+    if (isCustomer() || (!role && user)) {
+      return children;
     }
-    return children;
+    return <Navigate to="/" replace />;
   }
 
   return children;

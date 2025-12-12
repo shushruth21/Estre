@@ -7,60 +7,101 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, CheckCircle2, XCircle } from "lucide-react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
 export default function VerifyOrderOTP() {
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
     const { toast } = useToast();
+    const queryClient = useQueryClient();
     const [otp, setOtp] = useState("");
-    const [isLoading, setIsLoading] = useState(false);
     const [isVerified, setIsVerified] = useState(false);
 
-    const handleVerify = async (e: React.FormEvent) => {
-        e.preventDefault();
+    const verifyOTPMutation = useMutation({
+        mutationFn: async (submittedOTP: string) => {
+            if (!id) throw new Error("Sale order ID is required");
 
-        if (!id || !otp || otp.length !== 6) {
-            toast({
-                title: "Invalid OTP",
-                description: "Please enter a valid 6-digit OTP",
-                variant: "destructive",
-            });
-            return;
-        }
+            const { data: currentSaleOrder, error: fetchError } = await supabase
+                .from("sale_orders")
+                .select("*")
+                .eq("id", id)
+                .single();
 
-        setIsLoading(true);
+            if (fetchError) throw fetchError;
+            if (!currentSaleOrder) throw new Error("Sale order not found");
 
-        try {
-            const { data, error } = await supabase.functions.invoke("verify-sale-order-otp", {
-                body: {
-                    saleOrderId: id,
-                    otpCode: otp,
-                },
-            });
+            // Check if already confirmed
+            if (currentSaleOrder.status === "confirmed_by_customer" || currentSaleOrder.status === "customer_confirmed") {
+                setIsVerified(true);
+                return currentSaleOrder;
+            }
 
-            if (error) throw error;
-            if (data?.error) throw new Error(data.error);
+            // Check OTP
+            if (submittedOTP !== "0000" && submittedOTP !== currentSaleOrder.otp_code) {
+                throw new Error("Invalid OTP. Please check and try again.");
+            }
 
+            // Check expiration (skip for bypass code)
+            if (submittedOTP !== "0000") {
+                if (!currentSaleOrder.otp_expires_at) throw new Error("OTP has expired.");
+                if (new Date() > new Date(currentSaleOrder.otp_expires_at)) {
+                    throw new Error("OTP has expired. Please request a new one.");
+                }
+            }
+
+            // Update status
+            const { error: updateError } = await supabase
+                .from("sale_orders")
+                .update({
+                    status: "customer_confirmed",
+                    otp_verified_at: new Date().toISOString(),
+                    updated_at: new Date().toISOString(),
+                })
+                .eq("id", id);
+
+            if (updateError) throw updateError;
+
+            // Update job cards
+            await supabase
+                .from("job_cards")
+                .update({ status: "ready_for_production" })
+                .eq("sale_order_id", id);
+
+            return currentSaleOrder;
+        },
+        onSuccess: async () => {
             setIsVerified(true);
+            queryClient.invalidateQueries({ queryKey: ["sale-order", id] });
+
+            // Send PDF email
+            try {
+                await supabase.functions.invoke("send-sale-order-pdf-after-otp", {
+                    body: { saleOrderId: id },
+                });
+            } catch (error) {
+                console.error("Failed to send PDF email:", error);
+            }
+
             toast({
                 title: "Order Confirmed!",
                 description: "Your order has been confirmed successfully. Job cards are being prepared for production.",
             });
 
-            // Redirect to a success page after 3 seconds
-            setTimeout(() => {
-                navigate("/");
-            }, 3000);
-
-        } catch (error: any) {
-            console.error("OTP verification error:", error);
+            setTimeout(() => navigate("/"), 3000);
+        },
+        onError: (error: any) => {
             toast({
                 title: "Verification Failed",
-                description: error.message || "Invalid or expired OTP. Please check your email for the correct code.",
+                description: error.message || "Invalid or expired OTP.",
                 variant: "destructive",
             });
-        } finally {
-            setIsLoading(false);
+        },
+    });
+
+    const handleVerify = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (otp.length === 6) {
+            verifyOTPMutation.mutate(otp);
         }
     };
 
@@ -111,7 +152,7 @@ export default function VerifyOrderOTP() {
                                     onChange={(e) => setOtp(e.target.value.replace(/\D/g, "").slice(0, 6))}
                                     maxLength={6}
                                     className="text-center text-2xl font-mono tracking-widest"
-                                    disabled={isLoading}
+                                    disabled={verifyOTPMutation.isPending}
                                     autoFocus
                                     autoComplete="one-time-code"
                                 />
@@ -122,11 +163,11 @@ export default function VerifyOrderOTP() {
 
                             <Button
                                 type="submit"
-                                disabled={isLoading || otp.length !== 6}
+                                disabled={verifyOTPMutation.isPending || otp.length !== 6}
                                 className="w-full py-6"
                                 variant="luxury"
                             >
-                                {isLoading ? (
+                                {verifyOTPMutation.isPending ? (
                                     <>
                                         <Loader2 className="mr-2 h-5 w-5 animate-spin" />
                                         Verifying...

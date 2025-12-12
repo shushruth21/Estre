@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
+import { useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, Loader2, Eye, EyeOff, AlertCircle } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { SSOButtons } from "@/components/auth/SSOButtons";
@@ -22,6 +23,7 @@ const Login = () => {
   const [passwordError, setPasswordError] = useState("");
   const navigate = useNavigate();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   const { user, loading: authLoading, role, isAdmin, isStaff, isCustomer, refreshProfile, profile } = useAuth();
 
   const redirectByRole = useCallback(() => {
@@ -141,6 +143,9 @@ const Login = () => {
         title: "Welcome back!",
         description: "Logged in successfully",
       });
+
+      // Invalidate all queries to ensure fresh data after login
+      queryClient.invalidateQueries();
 
       // Force refresh profile and wait for it (with timeout)
       if (refreshProfile) {

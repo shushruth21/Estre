@@ -7,6 +7,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { logout } from "@/lib/logout";
 
 export const Navbar = () => {
     const { user, loading, isAdmin, isStaff, isCustomer } = useAuth();
@@ -95,11 +96,7 @@ export const Navbar = () => {
                         <Button
                             variant="ghost"
                             className="text-walnut hover:text-red-600 hover:bg-red-50"
-                            onClick={async () => {
-                                const { supabase } = await import("@/integrations/supabase/client");
-                                await supabase.auth.signOut();
-                                window.location.href = "/";
-                            }}
+                            onClick={logout}
                         >
                             Logout
                         </Button>
@@ -147,10 +144,9 @@ export const Navbar = () => {
                             <Button
                                 variant="ghost"
                                 className="w-full justify-start text-lg font-medium text-red-600 hover:text-red-700 hover:bg-red-50"
-                                onClick={async () => {
-                                    const { supabase } = await import("@/integrations/supabase/client");
-                                    await supabase.auth.signOut();
-                                    window.location.href = "/";
+                                onClick={() => {
+                                    setMobileMenuOpen(false);
+                                    logout();
                                 }}
                             >
                                 Logout

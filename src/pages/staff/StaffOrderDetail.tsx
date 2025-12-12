@@ -5,16 +5,27 @@ import { StaffLayout } from "@/components/staff/StaffLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, FileText, Loader2 } from "lucide-react";
+import { ArrowLeft, FileText, Loader2, Download, Eye } from "lucide-react";
+import { downloadPDF, getSaleOrderPDFUrl, generatePDFFilename } from "@/lib/pdf-download";
+import { useToast } from "@/hooks/use-toast";
 
 const formatCurrency = (value: number | null | undefined) => {
     if (!value || Number.isNaN(value)) return "₹0";
     return `₹${Math.round(value).toLocaleString("en-IN")}`;
 };
 
+const parsedConfig = (config: any) => {
+    try {
+        return typeof config === 'string' ? JSON.parse(config) : config;
+    } catch (e) {
+        return {};
+    }
+};
+
 export default function StaffOrderDetail() {
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
+    const { toast } = useToast();
 
     const { data: order, isLoading, error } = useQuery({
         queryKey: ["staff-order-detail", id],
@@ -35,14 +46,17 @@ export default function StaffOrderDetail() {
           sale_orders:sale_orders(
             id,
             order_number,
-            status
+            status,
+            final_pdf_url,
+            draft_pdf_url,
+            pdf_url
           )
         `)
                 .eq("id", id)
                 .single();
 
             if (error) throw error;
-            return data;
+            return data as any;
         },
     });
 
@@ -98,10 +112,53 @@ export default function StaffOrderDetail() {
                         </Badge>
                     </div>
                     {hasSaleOrder && (
-                        <Button onClick={() => navigate(`/staff/sale-orders/${order.sale_orders[0].id}`)}>
-                            <FileText className="mr-2 h-4 w-4" />
-                            View Sale Order
-                        </Button>
+                        <div className="flex gap-2">
+                            <Button onClick={() => navigate(`/staff/sale-orders/${order.sale_orders[0].id}`)}>
+                                <FileText className="mr-2 h-4 w-4" />
+                                View Sale Order
+                            </Button>
+                            {getSaleOrderPDFUrl(order.sale_orders[0]) && (
+                                <>
+                                    <Button
+                                        variant="outline"
+                                        onClick={() => {
+                                            const pdfUrl = getSaleOrderPDFUrl(order.sale_orders[0]);
+                                            if (pdfUrl) window.open(pdfUrl, '_blank');
+                                        }}
+                                    >
+                                        <Eye className="mr-2 h-4 w-4" />
+                                        View PDF
+                                    </Button>
+                                    <Button
+                                        variant="outline"
+                                        onClick={async () => {
+                                            const pdfUrl = getSaleOrderPDFUrl(order.sale_orders[0]);
+                                            if (pdfUrl) {
+                                                try {
+                                                    const filename = generatePDFFilename(
+                                                        order.sale_orders[0].order_number || order.order_number || `SO-${order.sale_orders[0].id.slice(0, 8)}`
+                                                    );
+                                                    await downloadPDF(pdfUrl, filename);
+                                                    toast({
+                                                        title: "Download Started",
+                                                        description: "PDF is being downloaded.",
+                                                    });
+                                                } catch (error: any) {
+                                                    toast({
+                                                        title: "Download Failed",
+                                                        description: error.message || "Failed to download PDF.",
+                                                        variant: "destructive",
+                                                    });
+                                                }
+                                            }
+                                        }}
+                                    >
+                                        <Download className="mr-2 h-4 w-4" />
+                                        Download PDF
+                                    </Button>
+                                </>
+                            )}
+                        </div>
                     )}
                 </div>
 
@@ -176,16 +233,43 @@ export default function StaffOrderDetail() {
                                                 <p className="font-medium">{formatCurrency(item.unit_price_rs)}</p>
                                             </div>
                                         </div>
+
+                                        {/* Configuration Display */}
                                         {item.configuration && (
-                                            <details className="mt-3">
-                                                <summary className="cursor-pointer text-sm font-medium text-primary">
-                                                    View Configuration
-                                                </summary>
-                                                <pre className="mt-2 p-3 bg-muted rounded text-xs overflow-auto">
-                                                    {JSON.stringify(item.configuration, null, 2)}
-                                                </pre>
-                                            </details>
+                                            <div className="mt-4 bg-muted/30 rounded-md p-3 text-sm border">
+                                                <p className="font-semibold mb-2">Configuration Details:</p>
+                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-2">
+                                                    {Object.entries(item.configuration).map(([key, value]) => {
+                                                        if (typeof value === 'object' && value !== null) return null; // Skip nested objects for now
+                                                        if (key === 'price') return null; // Skip internal price fields
+
+                                                        // Format key text (e.g. "sofa_type" -> "Sofa Type")
+                                                        const label = key
+                                                            .replace(/_/g, " ")
+                                                            .replace(/([A-Z])/g, " $1")
+                                                            .replace(/^./, str => str.toUpperCase());
+
+                                                        return (
+                                                            <div key={key} className="flex justify-between border-b border-muted/20 pb-1 last:border-0">
+                                                                <span className="text-muted-foreground">{label}:</span>
+                                                                <span className="font-medium text-right">{String(value)}</span>
+                                                            </div>
+                                                        );
+                                                    })}
+                                                    {/* Handle fabric specifically if it exists */}
+                                                    {parsedConfig(item.configuration)?.fabric && (
+                                                        <div className="flex justify-between border-b border-muted/20 pb-1 col-span-1 md:col-span-2 mt-1 pt-1 bg-white/50 px-2 rounded">
+                                                            <span className="text-muted-foreground font-medium">Fabric:</span>
+                                                            <span className="font-medium text-right">
+                                                                {parsedConfig(item.configuration).fabric.claddingPlan}
+                                                                {parsedConfig(item.configuration).fabric.type ? ` - ${parsedConfig(item.configuration).fabric.type}` : ''}
+                                                            </span>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
                                         )}
+
                                     </div>
                                 ))}
                             </div>
@@ -230,6 +314,6 @@ export default function StaffOrderDetail() {
                     </CardContent>
                 </Card>
             </div>
-        </StaffLayout>
+        </StaffLayout >
     );
 }

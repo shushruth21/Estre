@@ -10,7 +10,7 @@
  * - Approve sale order
  */
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -35,6 +35,7 @@ import { generateTechnicalSpecifications } from "@/lib/technical-specifications-
 import { JobCardsDisplay } from "@/components/staff/JobCardsDisplay";
 import { generatePremiumSaleOrderHTML, mapSaleOrderData } from "@/lib/sale-order-pdf";
 import { generatePremiumJobCardHTML, mapJobCardData } from "@/lib/job-card-pdf";
+import { downloadPDF, getSaleOrderPDFUrl, generatePDFFilename } from "@/lib/pdf-download";
 
 
 const formatCurrency = (value: number | null | undefined) => {
@@ -150,6 +151,19 @@ const StaffSaleOrderDetail = () => {
 
   // Generate HTML for preview
   const previewHTML = saleOrder ? generatePremiumSaleOrderHTML(mapSaleOrderData(saleOrder)) : "";
+
+  const [blobUrl, setBlobUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (previewHTML) {
+      const blob = new Blob([previewHTML], { type: "text/html" });
+      const url = URL.createObjectURL(blob);
+      setBlobUrl(url);
+      return () => URL.revokeObjectURL(url);
+    } else {
+      setBlobUrl(null);
+    }
+  }, [previewHTML]);
 
   const handleCreateJobCards = async () => {
     if (!saleOrder?.order?.order_items || saleOrder.order.order_items.length === 0) {
@@ -431,11 +445,22 @@ const StaffSaleOrderDetail = () => {
                 order_id: saleOrder.order_id,
                 order_item_id: item.id,
                 job_card_number: jobCardNumber,
+                so_number: orderNumber,
+                order_number: orderNumber,
+                customer_name: saleOrder.order.customer_name,
+                customer_email: saleOrder.order.customer_email,
+                customer_phone: saleOrder.order.customer_phone,
+                delivery_address: saleOrder.order.delivery_address,
                 product_title: item.product_title,
                 product_category: item.product_category,
                 configuration: item.configuration,
                 technical_specifications: technicalSpecs,
+                fabric_codes: {},
+                fabric_meters: {},
+                accessories: {},
+                dimensions: {},
                 status: 'pending',
+                priority: 'normal',
                 issue_date: new Date().toISOString(),
                 final_html: finalHtml,
                 draft_html: finalHtml,
@@ -464,14 +489,16 @@ const StaffSaleOrderDetail = () => {
                   status: 'pending',
                 }));
 
-                const { error: qirError } = await supabase
-                  .from('quality_inspection_reports')
-                  .insert(qirsToCreate);
+                if (qirsToCreate.length > 0) {
+                  const { error: qirError } = await supabase
+                    .from('quality_inspections')
+                    .insert(qirsToCreate);
 
-                if (qirError) {
-                  console.error('Error creating QIRs:', qirError);
-                } else {
-                  console.log(`✅ Created ${qirsToCreate.length} QIRs`);
+                  if (qirError) {
+                    console.error('Error creating QIRs:', qirError);
+                  } else {
+                    console.log(`✅ Created ${qirsToCreate.length} QIRs`);
+                  }
                 }
               }
             }
@@ -653,6 +680,8 @@ const StaffSaleOrderDetail = () => {
 
   const isConfirmed = saleOrder?.status === "confirmed_by_customer" || saleOrder?.status === "in_production";
 
+  console.log("DEBUG PREVIEW HTML:", previewHTML ? previewHTML.substring(0, 200) : "EMPTY");
+
   return (
     <StaffLayout>
       <div className="space-y-6">
@@ -680,13 +709,55 @@ const StaffSaleOrderDetail = () => {
             </Badge>
           </div>
           <div className="flex gap-2 no-print">
-            <Button
-              variant="outline"
-              onClick={() => window.print()}
-            >
-              <Download className="mr-2 h-4 w-4" />
-              Download PDF
-            </Button>
+            {getSaleOrderPDFUrl(saleOrder) ? (
+              <>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    const pdfUrl = getSaleOrderPDFUrl(saleOrder);
+                    if (pdfUrl) window.open(pdfUrl, '_blank');
+                  }}
+                >
+                  <Eye className="mr-2 h-4 w-4" />
+                  View PDF
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={async () => {
+                    const pdfUrl = getSaleOrderPDFUrl(saleOrder);
+                    if (pdfUrl) {
+                      try {
+                        const filename = generatePDFFilename(
+                          saleOrder.order_number || saleOrder.order?.order_number || `SO-${saleOrder.id.slice(0, 8)}`
+                        );
+                        await downloadPDF(pdfUrl, filename);
+                        toast({
+                          title: "Download Started",
+                          description: "PDF is being downloaded.",
+                        });
+                      } catch (error: any) {
+                        toast({
+                          title: "Download Failed",
+                          description: error.message || "Failed to download PDF.",
+                          variant: "destructive",
+                        });
+                      }
+                    }
+                  }}
+                >
+                  <Download className="mr-2 h-4 w-4" />
+                  Download PDF
+                </Button>
+              </>
+            ) : (
+              <Button
+                variant="outline"
+                onClick={() => window.print()}
+              >
+                <Download className="mr-2 h-4 w-4" />
+                Print Order
+              </Button>
+            )}
           </div>
         </div>
 
@@ -740,6 +811,11 @@ const StaffSaleOrderDetail = () => {
               {saleOrder.discount > 0 && (
                 <p className="text-sm text-green-600">
                   Current discount: {formatCurrency(saleOrder.discount)}
+                </p>
+              )}
+              {isConfirmed && (
+                <p className="text-sm text-amber-600 mt-2">
+                  ⚠️ This sale order has been confirmed by the customer. Manual discount editing is disabled. Use discount codes before customer confirmation.
                 </p>
               )}
             </div>
@@ -810,11 +886,17 @@ const StaffSaleOrderDetail = () => {
             </div>
 
             <div className="bg-white rounded-lg shadow overflow-hidden border p-4 h-[600px] overflow-y-auto">
-              <iframe
-                srcDoc={previewHTML}
-                className="w-full h-full border-0"
-                title="Sale Order Preview"
-              />
+              {blobUrl ? (
+                <iframe
+                  src={blobUrl}
+                  className="w-full h-full border-0"
+                  title="Sale Order Preview"
+                />
+              ) : (
+                <div className="flex items-center justify-center h-full text-muted-foreground">
+                  Generating preview...
+                </div>
+              )}
             </div>
 
             {/* Send to Customer Button */}

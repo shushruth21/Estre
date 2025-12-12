@@ -180,7 +180,7 @@ serve(async (req) => {
 
                     if (qirsToCreate.length > 0) {
                         const { error: qirError } = await supabase
-                            .from("quality_inspection_reports")
+                            .from("quality_inspections")
                             .insert(qirsToCreate);
 
                         if (qirError) {

@@ -23,6 +23,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { useRealtimeOrders } from "@/hooks/useRealtimeOrders";
 import { DiscountCodeSelector } from "@/components/DiscountCodeSelector";
+import { downloadPDF, getSaleOrderPDFUrl, generatePDFFilename } from "@/lib/pdf-download";
 import {
   Loader2,
   ArrowLeft,
@@ -32,6 +33,9 @@ import {
   Tag,
   FileText,
   Calendar,
+  Mail,
+  Download,
+  Eye,
 } from "lucide-react";
 
 const formatCurrency = (value: number | null | undefined) => {
@@ -43,14 +47,14 @@ const OrderDetail = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { user, isCustomer } = useAuth();
+  const { user } = useAuth();
   const queryClient = useQueryClient();
 
   // Set up realtime subscription for this order
   useRealtimeOrders({ orderIds: id ? [id] : [], enabled: !!id });
 
   // Fetch order details
-  const { data: order, isLoading: orderLoading } = useQuery({
+  const { data: order, isLoading: orderLoading, error: orderError } = useQuery({
     queryKey: ["order", id],
     queryFn: async () => {
       if (!id || !user) return null;
@@ -65,18 +69,25 @@ const OrderDetail = () => {
             total_price_rs,
             product_title,
             product_category,
-            configuration,
-            product:products(id, title, category, images)
-          ), discount_codes(code, label, percent)`
+            configuration
+          ), discount_codes!left(code, label, percent),
+          sale_orders(
+            id,
+            order_number,
+            status,
+            final_pdf_url,
+            draft_pdf_url,
+            pdf_url
+          )`
         )
         .eq("id", id)
-        .eq("customer_id", user.id)
         .single();
 
       if (error) throw error;
-      return data;
+      return data as any;
     },
-    enabled: !!id && !!user && isCustomer(),
+    enabled: !!id && !!user, // RLS enforces access; avoid blocking while role loads
+    retry: false, // Prevent infinite retries on 400 errors
   });
 
   // Fetch job cards for this order
@@ -185,6 +196,34 @@ const OrderDetail = () => {
     },
   });
 
+  // Email resend mutation
+  const resendEmailMutation = useMutation({
+    mutationFn: async (saleOrderId: string) => {
+      const { data, error } = await supabase.functions.invoke(
+        "send-sale-order-pdf-after-otp",
+        {
+          body: { saleOrderId },
+        }
+      );
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      toast({
+        title: "Email Sent",
+        description: "Sale order PDF has been sent to your email.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error Sending Email",
+        description: error.message || "Failed to send email",
+        variant: "destructive",
+      });
+    },
+  });
+
   const isLoading = orderLoading || jobCardsLoading || timelineLoading;
 
   if (isLoading) {
@@ -198,7 +237,7 @@ const OrderDetail = () => {
     );
   }
 
-  if (!order) {
+  if (orderError || !order) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <Card className="max-w-md">
@@ -206,12 +245,21 @@ const OrderDetail = () => {
             <div className="text-center space-y-4">
               <h2 className="text-2xl font-bold">Order Not Found</h2>
               <p className="text-muted-foreground">
-                The order you're looking for doesn't exist or you don't have access to it.
+                {orderError
+                  ? orderError.message || "Could not load order details. Please check if this order belongs to you."
+                  : "The order you're looking for doesn't exist or you don't have access to it."}
               </p>
-              <Button onClick={() => navigate("/dashboard")}>
-                <ArrowLeft className="mr-2 h-4 w-4" />
-                Back to Dashboard
-              </Button>
+              <div className="flex gap-2 justify-center">
+                <Button asChild>
+                  <Link to="/dashboard">
+                    <ArrowLeft className="mr-2 h-4 w-4" />
+                    Back to Dashboard
+                  </Link>
+                </Button>
+                <Button variant="outline" asChild>
+                  <Link to="/orders">View All Orders</Link>
+                </Button>
+              </div>
             </div>
           </CardContent>
         </Card>
@@ -227,9 +275,11 @@ const OrderDetail = () => {
         <div className="container mx-auto px-4 py-6">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
-              <Button variant="ghost" onClick={() => navigate("/dashboard")}>
-                <ArrowLeft className="mr-2 h-4 w-4" />
-                Back to Dashboard
+              <Button variant="ghost" asChild>
+                <Link to="/dashboard">
+                  <ArrowLeft className="mr-2 h-4 w-4" />
+                  Back to Dashboard
+                </Link>
               </Button>
               <div>
                 <h1 className="text-3xl lg:text-4xl font-serif font-bold tracking-tight">
@@ -258,19 +308,18 @@ const OrderDetail = () => {
                 </p>
               </div>
               <Badge
-                className={`uppercase tracking-wide ${
-                  order.status === "delivered"
-                    ? "bg-green-500/10 text-green-600 border-green-500/30"
-                    : order.status === "shipped"
+                className={`uppercase tracking-wide ${order.status === "delivered"
+                  ? "bg-green-500/10 text-green-600 border-green-500/30"
+                  : order.status === "shipped"
                     ? "bg-blue-500/10 text-blue-600 border-blue-500/30"
                     : order.status === "ready_for_delivery"
-                    ? "bg-purple-500/10 text-purple-600 border-purple-500/30"
-                    : order.status === "production"
-                    ? "bg-orange-500/10 text-orange-600 border-orange-500/30"
-                    : order.status === "confirmed"
-                    ? "bg-cyan-500/10 text-cyan-600 border-cyan-500/30"
-                    : "bg-yellow-500/10 text-yellow-600 border-yellow-500/30"
-                }`}
+                      ? "bg-purple-500/10 text-purple-600 border-purple-500/30"
+                      : order.status === "production"
+                        ? "bg-orange-500/10 text-orange-600 border-orange-500/30"
+                        : order.status === "confirmed"
+                          ? "bg-cyan-500/10 text-cyan-600 border-cyan-500/30"
+                          : "bg-yellow-500/10 text-yellow-600 border-yellow-500/30"
+                  }`}
               >
                 {order.status?.replace(/_/g, " ") || "PENDING"}
               </Badge>
@@ -346,8 +395,8 @@ const OrderDetail = () => {
                     <span className="font-medium">Expected Delivery:</span>{" "}
                     {order.expected_delivery_date || order.delivery_date
                       ? new Date(
-                          order.expected_delivery_date || order.delivery_date
-                        ).toLocaleDateString()
+                        order.expected_delivery_date || order.delivery_date
+                      ).toLocaleDateString()
                       : "TBD"}
                   </p>
                   {order.delivery_method && (
@@ -386,6 +435,108 @@ const OrderDetail = () => {
             </div>
           </CardContent>
         </Card>
+
+        {/* Sale Order Documents Card */}
+        {order.sale_orders && order.sale_orders.length > 0 && (
+          <Card className="border-2">
+            <CardHeader>
+              <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                <div>
+                  <CardTitle className="text-2xl font-serif flex items-center gap-2">
+                    <FileText className="h-6 w-6" />
+                    Sale Order Documents
+                  </CardTitle>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Order #{order.sale_orders[0].order_number}
+                  </p>
+                </div>
+                <Badge className="uppercase tracking-wide" variant="outline">
+                  {order.sale_orders[0].status?.replace(/_/g, " ").toUpperCase() || "PENDING"}
+                </Badge>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {getSaleOrderPDFUrl(order.sale_orders[0]) ? (
+                <>
+                  <div className="bg-muted/50 rounded-lg p-4 border border-muted">
+                    <p className="text-sm font-semibold mb-3 flex items-center gap-2">
+                      <FileText className="h-4 w-4 text-gold" />
+                      PDF Document Available
+                    </p>
+                    <p className="text-sm text-muted-foreground mb-4">
+                      Your sale order PDF is ready. You can view, download, or request it to be sent to your email.
+                    </p>
+                    <div className="flex flex-col sm:flex-row gap-3">
+                      <Button
+                        variant="default"
+                        className="flex-1 bg-gold text-walnut border-gold hover:bg-gold/90"
+                        onClick={() => {
+                          const pdfUrl = getSaleOrderPDFUrl(order.sale_orders[0]);
+                          if (pdfUrl) window.open(pdfUrl, '_blank');
+                        }}
+                      >
+                        <Eye className="mr-2 h-4 w-4" />
+                        View PDF
+                      </Button>
+                      <Button
+                        variant="outline"
+                        className="flex-1"
+                        onClick={async () => {
+                          const pdfUrl = getSaleOrderPDFUrl(order.sale_orders[0]);
+                          if (pdfUrl) {
+                            try {
+                              const filename = generatePDFFilename(
+                                order.sale_orders[0].order_number || order.order_number || `SO-${order.sale_orders[0].id.slice(0, 8)}`
+                              );
+                              await downloadPDF(pdfUrl, filename);
+                              toast({
+                                title: "Download Started",
+                                description: "Your PDF is being downloaded.",
+                              });
+                            } catch (error: any) {
+                              toast({
+                                title: "Download Failed",
+                                description: error.message || "Failed to download PDF. Please try again.",
+                                variant: "destructive",
+                              });
+                            }
+                          }
+                        }}
+                      >
+                        <Download className="mr-2 h-4 w-4" />
+                        Download PDF
+                      </Button>
+                      <Button
+                        variant="outline"
+                        className="flex-1"
+                        onClick={() => resendEmailMutation.mutate(order.sale_orders[0].id)}
+                        disabled={resendEmailMutation.isPending}
+                      >
+                        {resendEmailMutation.isPending ? (
+                          <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            Sending...
+                          </>
+                        ) : (
+                          <>
+                            <Mail className="mr-2 h-4 w-4" />
+                            Email PDF
+                          </>
+                        )}
+                      </Button>
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <div className="bg-muted/30 rounded-lg p-4 border border-muted text-center">
+                  <p className="text-sm text-muted-foreground">
+                    PDF is being generated. Please check back later.
+                  </p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
 
         {/* Line Items */}
         <Card>

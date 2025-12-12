@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { useToast } from "@/hooks/use-toast";
 import { ArrowLeft, Loader2 } from "lucide-react";
 import { z } from "zod";
+import { SSOButtons } from "@/components/auth/SSOButtons";
 
 // Strong password validation schema
 const signupSchema = z.object({
@@ -194,6 +195,11 @@ const Signup = () => {
                 Create Account
               </Button>
             </form>
+
+            <div className="mt-6">
+              <SSOButtons disabled={isLoading} />
+            </div>
+
             <div className="mt-6 text-center text-sm">
               <span className="text-walnut/60">Already have an account? </span>
               <Link to="/login" className="text-gold hover:text-gold-dark hover:underline font-semibold transition-colors">

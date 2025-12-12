@@ -18,6 +18,7 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { logEmail } from "../_shared/emailLogger.ts";
 
 // Import HTML template generator
 import { generateSaleOrderHTML } from "../_shared/htmlTemplates.ts";
@@ -353,8 +354,25 @@ serve(async (req) => {
 
     // Send email with PDF and OTP (via Resend) - only for final mode and if skipEmail is false
     let emailSent = false;
+    let emailError: string | null = null;
     const resendApiKey = Deno.env.get("RESEND_API_KEY");
-    if (resendApiKey && !skipEmail) {
+    
+    if (!resendApiKey && !skipEmail) {
+      emailError = "RESEND_API_KEY not configured. Please configure Resend API key in Supabase secrets.";
+      console.warn("⚠️ Email not sent:", emailError);
+      
+      // Log missing configuration
+      await logEmail(supabase, {
+        recipientEmail: templateData.customer_email,
+        recipientName: templateData.customer_name,
+        subject: "Your Estre Sale Order is Ready",
+        emailType: 'sale_order',
+        saleOrderId: saleOrderId,
+        orderId: saleOrder.order_id || order.id || null,
+        status: 'failed',
+        errorMessage: emailError,
+      });
+    } else if (resendApiKey && !skipEmail) {
       try {
         // Generate email HTML using template
         const emailHTML = saleOrderApprovedEmailHTML({
@@ -372,7 +390,7 @@ serve(async (req) => {
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            from: "Estre <orders@estre.in>",
+            from: "Estre <no-reply@estre.app>",
             to: templateData.customer_email,
             subject: "Your Estre Sale Order is Ready",
             html: emailHTML,
@@ -388,13 +406,58 @@ serve(async (req) => {
         if (!emailResponse.ok) {
           const errorText = await emailResponse.text();
           console.error("Email failed:", errorText);
+          
+          emailError = errorText;
+          
+          // Log failed email
+          await logEmail(supabase, {
+            recipientEmail: templateData.customer_email,
+            recipientName: templateData.customer_name,
+            subject: "Your Estre Sale Order is Ready",
+            emailType: 'sale_order',
+            saleOrderId: saleOrderId,
+            orderId: saleOrder.order_id || order.id || null,
+            status: 'failed',
+            errorMessage: errorText,
+          });
+          
           // Don't throw - PDF generation succeeded, email can be retried
         } else {
           console.log("Email sent successfully to", templateData.customer_email);
           emailSent = true;
+          
+          // Log successful email send
+          const emailResult = await emailResponse.json();
+          await logEmail(supabase, {
+            recipientEmail: templateData.customer_email,
+            recipientName: templateData.customer_name,
+            subject: "Your Estre Sale Order is Ready",
+            emailType: 'sale_order',
+            saleOrderId: saleOrderId,
+            orderId: saleOrder.order_id || order.id || null,
+            status: 'sent',
+            providerMessageId: emailResult?.id || null,
+            providerResponse: emailResult,
+            metadata: { otp_sent: !!otp, mode: 'final' },
+          });
         }
       } catch (emailError) {
         console.error("Email error:", emailError);
+        
+        emailError = emailError instanceof Error ? emailError.message : String(emailError);
+        
+        // Log email error
+        await logEmail(supabase, {
+          recipientEmail: templateData.customer_email,
+          recipientName: templateData.customer_name,
+          subject: "Your Estre Sale Order is Ready",
+          emailType: 'sale_order',
+          saleOrderId: saleOrderId,
+          orderId: saleOrder.order_id || order.id || null,
+          status: 'failed',
+          errorMessage: emailError,
+        });
+        
         // Don't throw - PDF generation succeeded, email can be retried
       }
     }
@@ -402,7 +465,9 @@ serve(async (req) => {
     return new Response(
       JSON.stringify({
         success: true,
-        message: mode === "draft" ? "Draft PDF generated successfully" : "Final PDF generated" + (emailSent ? " and email sent" : ""),
+        message: mode === "draft" 
+          ? "Draft PDF generated successfully" 
+          : "Final PDF generated" + (emailSent ? " and email sent" : (emailError ? " but email failed" : "")),
         saleOrderId,
         pdfUrl: urlData.publicUrl,
         pdfBase64: base64Pdf,
@@ -410,6 +475,7 @@ serve(async (req) => {
         requireOTP: requireOTP,
         otpGenerated: !!otp,
         emailSent: emailSent,
+        emailError: emailError || undefined,
       }),
       {
         status: 200,

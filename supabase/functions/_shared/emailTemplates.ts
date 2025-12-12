@@ -3,14 +3,14 @@
  * Simple HTML template (no React Email dependency - works in Deno)
  */
 
-export function saleOrderApprovedEmailHTML({ 
-  customerName, 
-  pdfUrl, 
+export function saleOrderApprovedEmailHTML({
+  customerName,
+  pdfUrl,
   otp,
-  orderNumber 
-}: { 
-  customerName: string; 
-  pdfUrl: string; 
+  orderNumber
+}: {
+  customerName: string;
+  pdfUrl: string;
   otp?: string | null;
   orderNumber?: string;
 }) {
@@ -82,6 +82,69 @@ export function saleOrderApprovedEmailHTML({
               </p>
             </div>
           ` : ''}
+          <p style="margin-top: 30px; color: #666; line-height: 1.6;">
+            Thank you for choosing Estre.<br>
+            <em style="color: #999;">Where Luxury Meets Comfort.</em>
+          </p>
+        </div>
+      </body>
+    </html>
+  `;
+}
+
+export function saleOrderConfirmedEmailHTML({
+  customerName,
+  pdfUrl,
+  orderNumber
+}: {
+  customerName: string;
+  pdfUrl: string;
+  orderNumber?: string;
+}) {
+  return `
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <style>
+          body { 
+            font-family: 'Inter', Arial, sans-serif; 
+            background-color: #f6f6f6; 
+            padding: 20px; 
+            margin: 0; 
+          }
+          .container { 
+            max-width: 600px; 
+            margin: 0 auto; 
+            background-color: #ffffff; 
+            padding: 28px; 
+            border-radius: 12px; 
+          }
+          .button { 
+            display: inline-block; 
+            margin-top: 18px; 
+            padding: 12px 18px; 
+            background-color: #0b0b0b; 
+            color: #ffffff; 
+            text-decoration: none; 
+            border-radius: 8px; 
+            font-weight: 500; 
+          }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <h2 style="font-size: 22px; font-weight: 600; margin: 0 0 8px 0; color: #0b0b0b;">
+            Hello ${customerName},
+          </h2>
+          <p style="margin: 8px 0; color: #333; line-height: 1.6;">
+            Your order has been confirmed! Please find your sale order PDF attached.
+          </p>
+          ${orderNumber ? `<p style="margin: 8px 0; color: #666; font-size: 14px;">Order Number: <strong>${orderNumber}</strong></p>` : ''}
+          <a href="${pdfUrl}" class="button">
+            Download Sale Order PDF
+          </a>
           <p style="margin-top: 30px; color: #666; line-height: 1.6;">
             Thank you for choosing Estre.<br>
             <em style="color: #999;">Where Luxury Meets Comfort.</em>

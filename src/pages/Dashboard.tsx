@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, useCallback } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -9,6 +9,8 @@ import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { useRealtimeOrders } from "@/hooks/useRealtimeOrders";
+import { logout } from "@/lib/logout";
+import { downloadPDF, getSaleOrderPDFUrl, generatePDFFilename } from "@/lib/pdf-download";
 import {
   Loader2,
   LogOut,
@@ -23,6 +25,7 @@ import {
   CheckCircle2,
   CreditCard,
   Download,
+  Mail,
 } from "lucide-react";
 
 const formatCurrency = (value: number | null | undefined) => {
@@ -40,6 +43,7 @@ const Dashboard = () => {
   const [ordersState, setOrdersState] = useState(emptyOrderState);
   const navigate = useNavigate();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
 
   // Get order IDs for realtime subscriptions
   const orderIds = useMemo(() => {
@@ -51,7 +55,7 @@ const Dashboard = () => {
     setOrdersState((prev) => ({ ...prev, isLoading: true }));
 
     try {
-      // Add timeout to prevent hanging (10 seconds)
+      // Fetch orders with longer timeout (30 seconds) to handle slow connections
       const ordersPromise = supabase
         .from("orders")
         .select(
@@ -59,10 +63,10 @@ const Dashboard = () => {
         )
         .eq("customer_id", currentUser.id)
         .order("created_at", { ascending: false })
-        .limit(50); // Limit to 50 most recent orders for performance
+        .limit(50);
 
       const timeoutPromise = new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error("Orders fetch timeout")), 10000)
+        setTimeout(() => reject(new Error("Orders fetch timeout")), 30000)
       );
 
       const { data: orders, error } = await Promise.race([ordersPromise, timeoutPromise]);
@@ -74,7 +78,6 @@ const Dashboard = () => {
       const orderIds = orders?.map((order) => order.id) ?? [];
       let jobCardsByOrder: Record<string, any[]> = {};
       let timelineByOrder: Record<string, any[]> = {};
-      let saleOrdersByOrder: Record<string, any> = {};
 
       if (orderIds.length > 0) {
         // Ensure all orderIds are strings (UUIDs)
@@ -86,7 +89,6 @@ const Dashboard = () => {
             orders: orders || [],
             jobCardsByOrder: {},
             timelineByOrder: {},
-            saleOrdersByOrder: {},
           };
         }
 
@@ -104,33 +106,13 @@ const Dashboard = () => {
           .in("order_id", validOrderIds)
           .order("created_at", { ascending: false });
 
-        // Handle sale_orders query separately with better error handling
-        // The .in() method can sometimes fail with UUID arrays, so we'll catch errors gracefully
-        let saleOrdersResult: { data: any[] | null; error: any } = { data: null, error: null };
-        try {
-          const saleOrdersResponse = await supabase
-            .from("sale_orders")
-            .select("id, order_id, final_pdf_url, draft_pdf_url, pdf_url, status")
-            .in("order_id", validOrderIds);
-          saleOrdersResult = saleOrdersResponse;
-        } catch (saleOrdersError: any) {
-          if (import.meta.env.DEV) {
-            console.warn("Error fetching sale orders (non-critical):", saleOrdersError);
-          }
-          // Continue without sale orders data - this is non-critical
-          saleOrdersResult = { data: [], error: saleOrdersError };
-        }
-
-        const timeoutPromise = new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error("Related data fetch timeout")), 5000)
-        );
-
         const [{ data: jobCards }, { data: timeline }] = await Promise.race([
           Promise.all([jobCardsPromise, timelinePromise]),
           timeoutPromise.then(() => [{ data: null, error: null }, { data: null, error: null }] as any)
         ]).catch(() => [{ data: null, error: null }, { data: null, error: null }] as any);
 
-        const saleOrders = saleOrdersResult.data;
+        // Note: Sale orders are fetched separately via the useQuery hook below
+        // (lines 201-241), so we don't need to fetch them here
 
         jobCardsByOrder =
           jobCards?.reduce((acc: Record<string, any[]>, card) => {
@@ -147,13 +129,6 @@ const Dashboard = () => {
             acc[key].push(entry);
             return acc;
           }, {}) ?? {};
-
-        saleOrdersByOrder =
-          saleOrders?.reduce((acc: Record<string, any>, saleOrder) => {
-            const key = saleOrder.order_id || '';
-            if (!acc[key]) acc[key] = saleOrder;
-            return acc;
-          }, {}) ?? {};
       }
 
       const enrichedOrders =
@@ -161,7 +136,7 @@ const Dashboard = () => {
           ...order,
           jobCards: jobCardsByOrder[order.id] ?? [],
           timeline: timelineByOrder[order.id] ?? [],
-          saleOrder: saleOrdersByOrder[order.id] ?? null,
+          saleOrder: null, // Sale orders fetched separately via useQuery
         })) ?? [];
 
       setOrdersState({
@@ -217,9 +192,17 @@ const Dashboard = () => {
             "staff_approved",
             "customer_confirmation_pending",
             "customer_confirmed",
+            "confirmed_by_customer",
             "payment_pending",
             "payment_completed",
-            "ready_for_production"
+            "ready_for_production",
+            "in_production",
+            "qc_pending",
+            "qc_done",
+            "ready_for_dispatch",
+            "out_for_delivery",
+            "delivered",
+            "completed"
           ])
           .order("created_at", { ascending: false });
 
@@ -310,14 +293,57 @@ const Dashboard = () => {
     }
   }, [user, authLoading, navigate, fetchOrders, isAdmin, isStaff]);
 
-  const handleLogout = async () => {
-    await supabase.auth.signOut();
-    toast({
-      title: "Logged out",
-      description: "You have been logged out successfully",
-    });
-    navigate("/");
-  };
+  // Email resend mutation for sale orders
+  const resendSaleOrderEmailMutation = useMutation({
+    mutationFn: async (saleOrderId: string) => {
+      const { data, error } = await supabase.functions.invoke("send-sale-order-pdf-after-otp", {
+        body: { saleOrderId },
+      });
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["customer-sale-orders", user?.id] });
+      toast({
+        title: "Email Sent",
+        description: "Sale order PDF has been sent to your email address.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error Sending Email",
+        description: error.message || "Failed to send email. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Email resend mutation for orders
+  const resendOrderEmailMutation = useMutation({
+    mutationFn: async (saleOrderId: string) => {
+      const { data, error } = await supabase.functions.invoke("send-sale-order-pdf-after-otp", {
+        body: { saleOrderId },
+      });
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["orders", user?.id] });
+      toast({
+        title: "Email Sent",
+        description: "Sale order PDF has been sent to your email address.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error Sending Email",
+        description: error.message || "Failed to send email. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
 
   // Add timeout for authLoading (max 5 seconds)
   const [authLoadingTimeout, setAuthLoadingTimeout] = useState(false);
@@ -352,7 +378,7 @@ const Dashboard = () => {
             <Package className="mr-2 h-4 w-4" />
             Browse Products
           </Button>
-          <Button onClick={handleLogout} variant="outline" className="border-gold/30 hover:border-gold hover:text-gold transition-colors">
+          <Button onClick={logout} variant="outline" className="border-gold/30 hover:border-gold hover:text-gold transition-colors">
             <LogOut className="mr-2 h-4 w-4" />
             Logout
           </Button>
@@ -453,28 +479,72 @@ const Dashboard = () => {
                   <Separator />
 
                   {/* PDF Download Section - Show for ALL orders that have a PDF */}
-                  {(saleOrder.final_pdf_url || saleOrder.draft_pdf_url || saleOrder.pdf_url) && (
-                    <div className="flex gap-2">
-                      <Button
-                        asChild
-                        variant="default"
-                        className="flex-1 bg-gold text-walnut border-gold hover:bg-gold/90"
-                      >
-                        <a href={saleOrder.final_pdf_url || saleOrder.draft_pdf_url || saleOrder.pdf_url} target="_blank" rel="noopener noreferrer">
+                  {getSaleOrderPDFUrl(saleOrder) ? (
+                    <div className="space-y-3">
+                      <div className="flex flex-col sm:flex-row gap-2">
+                        <Button
+                          variant="default"
+                          className="flex-1 bg-gold text-walnut border-gold hover:bg-gold/90"
+                          onClick={() => {
+                            const pdfUrl = getSaleOrderPDFUrl(saleOrder);
+                            if (pdfUrl) window.open(pdfUrl, '_blank');
+                          }}
+                        >
                           <Eye className="mr-2 h-4 w-4" />
                           View PDF
-                        </a>
-                      </Button>
-                      <Button
-                        asChild
-                        variant="outline"
-                        className="flex-1"
-                      >
-                        <a href={saleOrder.final_pdf_url || saleOrder.draft_pdf_url || saleOrder.pdf_url} download target="_blank" rel="noopener noreferrer">
+                        </Button>
+                        <Button
+                          variant="outline"
+                          className="flex-1"
+                          onClick={async () => {
+                            const pdfUrl = getSaleOrderPDFUrl(saleOrder);
+                            if (pdfUrl) {
+                              try {
+                                const filename = generatePDFFilename(saleOrder.order_number || `SO-${saleOrder.id.slice(0, 8)}`);
+                                await downloadPDF(pdfUrl, filename);
+                                toast({
+                                  title: "Download Started",
+                                  description: "Your PDF is being downloaded.",
+                                });
+                              } catch (error: any) {
+                                toast({
+                                  title: "Download Failed",
+                                  description: error.message || "Failed to download PDF. Please try again.",
+                                  variant: "destructive",
+                                });
+                              }
+                            }
+                          }}
+                        >
                           <Download className="mr-2 h-4 w-4" />
                           Download PDF
-                        </a>
-                      </Button>
+                        </Button>
+                        <Button
+                          variant="outline"
+                          className="flex-1"
+                          onClick={() => resendSaleOrderEmailMutation.mutate(saleOrder.id)}
+                          disabled={resendSaleOrderEmailMutation.isPending}
+                        >
+                          {resendSaleOrderEmailMutation.isPending ? (
+                            <>
+                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                              Sending...
+                            </>
+                          ) : (
+                            <>
+                              <Mail className="mr-2 h-4 w-4" />
+                              Email PDF
+                            </>
+                          )}
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="bg-muted/30 rounded-lg p-4 border border-muted text-center">
+                      <p className="text-sm text-muted-foreground flex items-center justify-center gap-2">
+                        <Clock className="h-4 w-4" />
+                        PDF is being generated. You'll receive an email when it's ready.
+                      </p>
                     </div>
                   )}
 
@@ -595,7 +665,22 @@ const Dashboard = () => {
                           Under Review
                         </p>
                         <p className="text-sm text-muted-foreground">
-                          Your order is being reviewed by Estre Staff. You'll receive a confirmation email with PDF {saleOrder.require_otp ? "and OTP" : ""} shortly.
+                          Your order is being reviewed by Estre Staff. Once approved, your sale order PDF will be generated and sent to your email.
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Show message for confirmed orders waiting for PDF */}
+                  {saleOrder.status === "confirmed_by_customer" && !getSaleOrderPDFUrl(saleOrder) && (
+                    <div className="flex items-start gap-3 p-4 bg-green-500/10 rounded-lg border border-green-500/30 mt-4">
+                      <CheckCircle2 className="h-5 w-5 text-green-600 mt-0.5" />
+                      <div className="flex-1">
+                        <p className="font-semibold text-green-600 mb-1">
+                          Order Confirmed
+                        </p>
+                        <p className="text-sm text-muted-foreground">
+                          Your order has been confirmed. Your sale order PDF is being generated and will be sent to your email shortly.
                         </p>
                       </div>
                     </div>
@@ -740,28 +825,65 @@ const Dashboard = () => {
                   <Separator />
 
                   {/* PDF Download Section for Orders */}
-                  {order.saleOrder && (order.saleOrder.final_pdf_url || order.saleOrder.draft_pdf_url || order.saleOrder.pdf_url) && (
-                    <div className="flex gap-2 mb-4">
-                      <Button
-                        asChild
-                        variant="default"
-                        className="flex-1 bg-gold text-walnut border-gold hover:bg-gold/90"
-                      >
-                        <a href={order.saleOrder.final_pdf_url || order.saleOrder.draft_pdf_url || order.saleOrder.pdf_url} target="_blank" rel="noopener noreferrer">
+                  {order.saleOrder && getSaleOrderPDFUrl(order.saleOrder) && (
+                    <div className="space-y-3 mb-4">
+                      <div className="flex flex-col sm:flex-row gap-2">
+                        <Button
+                          variant="default"
+                          className="flex-1 bg-gold text-walnut border-gold hover:bg-gold/90"
+                          onClick={() => {
+                            const pdfUrl = getSaleOrderPDFUrl(order.saleOrder);
+                            if (pdfUrl) window.open(pdfUrl, '_blank');
+                          }}
+                        >
                           <Eye className="mr-2 h-4 w-4" />
                           View Sale Order PDF
-                        </a>
-                      </Button>
-                      <Button
-                        asChild
-                        variant="outline"
-                        className="flex-1"
-                      >
-                        <a href={order.saleOrder.final_pdf_url || order.saleOrder.draft_pdf_url || order.saleOrder.pdf_url} download target="_blank" rel="noopener noreferrer">
+                        </Button>
+                        <Button
+                          variant="outline"
+                          className="flex-1"
+                          onClick={async () => {
+                            const pdfUrl = getSaleOrderPDFUrl(order.saleOrder);
+                            if (pdfUrl) {
+                              try {
+                                const filename = generatePDFFilename(order.saleOrder.order_number || order.order_number || `SO-${order.saleOrder.id.slice(0, 8)}`);
+                                await downloadPDF(pdfUrl, filename);
+                                toast({
+                                  title: "Download Started",
+                                  description: "Your PDF is being downloaded.",
+                                });
+                              } catch (error: any) {
+                                toast({
+                                  title: "Download Failed",
+                                  description: error.message || "Failed to download PDF. Please try again.",
+                                  variant: "destructive",
+                                });
+                              }
+                            }
+                          }}
+                        >
                           <Download className="mr-2 h-4 w-4" />
                           Download PDF
-                        </a>
-                      </Button>
+                        </Button>
+                        <Button
+                          variant="outline"
+                          className="flex-1"
+                          onClick={() => resendOrderEmailMutation.mutate(order.saleOrder.id)}
+                          disabled={resendOrderEmailMutation.isPending}
+                        >
+                          {resendOrderEmailMutation.isPending ? (
+                            <>
+                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                              Sending...
+                            </>
+                          ) : (
+                            <>
+                              <Mail className="mr-2 h-4 w-4" />
+                              Email PDF
+                            </>
+                          )}
+                        </Button>
+                      </div>
                     </div>
                   )}
 

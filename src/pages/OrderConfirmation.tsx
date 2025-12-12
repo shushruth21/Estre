@@ -125,9 +125,26 @@ export default function OrderConfirmation() {
       queryClient.invalidateQueries({ queryKey: ["sale-order", saleOrderId] });
       queryClient.invalidateQueries({ queryKey: ["customer-sale-orders"] });
       
+      // Send PDF to customer email after OTP verification
+      try {
+        const { data, error } = await supabase.functions.invoke("send-sale-order-pdf-after-otp", {
+          body: { saleOrderId },
+        });
+
+        if (error) {
+          console.error("Failed to send PDF email:", error);
+          // Don't fail the OTP verification if email fails
+        } else if (data?.emailSent) {
+          console.log("✅ PDF sent to customer email");
+        }
+      } catch (emailError) {
+        console.error("Failed to send PDF email:", emailError);
+        // Don't fail the OTP verification if email fails
+      }
+      
       toast({
         title: "Order Confirmed!",
-        description: "Your order has been confirmed. Proceed to payment.",
+        description: "Your order has been confirmed. Check your email for the sale order PDF.",
       });
       
       // Fetch sale order to get payment method
