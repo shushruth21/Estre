@@ -18,10 +18,20 @@ export const SSOButtons = ({ disabled = false }: SSOButtonsProps) => {
     try {
       const supabaseProvider = provider === 'microsoft' ? 'azure' : provider;
 
+      // Use a more robust redirect URL that works in all environments
+      const getRedirectUrl = () => {
+        // In production, use the actual origin
+        if (import.meta.env.PROD) {
+          return `${window.location.origin}/auth/callback`;
+        }
+        // In development, use localhost to avoid webcontainer URL issues
+        return 'http://localhost:5173/auth/callback';
+      };
+
       const { error } = await supabase.auth.signInWithOAuth({
         provider: supabaseProvider,
         options: {
-          redirectTo: `${window.location.origin}/auth/callback`,
+          redirectTo: getRedirectUrl(),
         },
       });
 
