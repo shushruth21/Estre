@@ -25,6 +25,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { Loader2, Save } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { AutoRefreshSettings } from "@/components/ui/AutoRefreshSettings";
 
 interface SystemSettings {
   // Tax rates
@@ -249,6 +250,7 @@ const AdminSettings = () => {
             <TabsTrigger value="delivery">Delivery Terms</TabsTrigger>
             <TabsTrigger value="company">Company Profile</TabsTrigger>
             <TabsTrigger value="discounts">Discount Defaults</TabsTrigger>
+            <TabsTrigger value="performance">Performance</TabsTrigger>
           </TabsList>
 
           {/* Tax Rates */}
@@ -461,6 +463,10 @@ const AdminSettings = () => {
                 </div>
               </CardContent>
             </Card>
+          </TabsContent>
+
+          <TabsContent value="performance">
+            <AutoRefreshSettings />
           </TabsContent>
         </Tabs>
       </div>
