@@ -33,7 +33,7 @@ export function logout(): void {
     sessionStorage.clear();
     
     // 3. Redirect IMMEDIATELY (don't wait for signOut)
-    window.location.href = "/login";
+    window.location.href = "/";
     
     // 4. Sign out from Supabase in background (fire-and-forget)
     // This invalidates the session on the server
