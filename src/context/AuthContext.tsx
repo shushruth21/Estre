@@ -189,6 +189,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let mounted = true;
+    let currentUserId: string | undefined = undefined;
 
     // Set up auth state listener
     const {
@@ -196,12 +197,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (!mounted) return;
 
+      const newUserId = session?.user?.id;
+
       setSession(session);
       setUser(session?.user ?? null);
 
       if (session?.user) {
-        await fetchProfile(session.user.id);
+        if (newUserId !== currentUserId) {
+          currentUserId = newUserId;
+          await fetchProfile(session.user.id);
+        }
       } else {
+        currentUserId = undefined;
         setProfile(null);
       }
 

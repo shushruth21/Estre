@@ -65,16 +65,19 @@ const ProductionJobCard = lazy(() => import("./pages/production/ProductionJobCar
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      retry: 1, // Reduced retries for faster failure
+      retry: 1,
       refetchOnWindowFocus: false,
-      refetchOnMount: false, // Don't refetch on mount if data is fresh
+      refetchOnMount: false,
       refetchOnReconnect: true,
-      staleTime: 10 * 60 * 1000, // 10 minutes - increased cache time
-      gcTime: 30 * 60 * 1000, // 30 minutes - keep cached data longer
-      structuralSharing: true, // Enable structural sharing for better performance
+      refetchIntervalInBackground: false,
+      staleTime: 10 * 60 * 1000,
+      gcTime: 30 * 60 * 1000,
+      structuralSharing: true,
+      networkMode: 'online',
     },
     mutations: {
-      retry: 0, // Don't retry mutations
+      retry: 0,
+      networkMode: 'online',
     },
   },
 });

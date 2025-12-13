@@ -35,6 +35,8 @@ import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { useQuery } from "@tanstack/react-query";
 import { logout } from "@/lib/logout";
+import { usePageVisibility } from "@/hooks/usePageVisibility";
+import { useAutoRefreshSettings } from "@/hooks/useAutoRefreshSettings";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -99,8 +101,13 @@ export function AdminLayout({ children }: AdminLayoutProps) {
   const navigate = useNavigate();
   const { user, isAdmin, loading, role } = useAuth();
   const { toast } = useToast();
+  const isVisible = usePageVisibility();
+  const { settings } = useAutoRefreshSettings();
 
-  // Fetch quick stats for badges/notifications (optimized)
+  const shouldRefetch = settings.enabled && (settings.pauseOnInactive ? isVisible : true);
+  const notificationInterval = Math.max(settings.interval * 2, 60000);
+
+  // Fetch quick stats for badges/notifications (optimized with smart refresh)
   const { data: pendingOrders } = useQuery({
     queryKey: ["pending-orders-count"],
     queryFn: async () => {
@@ -110,8 +117,9 @@ export function AdminLayout({ children }: AdminLayoutProps) {
         .eq("status", "pending");
       return count || 0;
     },
-    refetchInterval: 60000, // Refresh every 60 seconds (reduced frequency)
-    staleTime: 30 * 1000, // Consider fresh for 30 seconds
+    refetchInterval: shouldRefetch ? notificationInterval : false,
+    refetchIntervalInBackground: false,
+    staleTime: 60 * 1000,
   });
 
   const { data: activeJobCards } = useQuery({
@@ -123,8 +131,9 @@ export function AdminLayout({ children }: AdminLayoutProps) {
         .in("status", ["pending", "fabric_cutting", "upholstery", "finishing", "quality_check", "frame_assembly"]);
       return count || 0;
     },
-    refetchInterval: 60000, // Refresh every 60 seconds (reduced frequency)
-    staleTime: 30 * 1000, // Consider fresh for 30 seconds
+    refetchInterval: shouldRefetch ? notificationInterval : false,
+    refetchIntervalInBackground: false,
+    staleTime: 60 * 1000,
   });
 
   // Debug logging for role detection

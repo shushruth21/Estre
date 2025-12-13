@@ -12,6 +12,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
+import { usePageVisibility } from "@/hooks/usePageVisibility";
+import { useAutoRefreshSettings } from "@/hooks/useAutoRefreshSettings";
 import {
   Mail,
   CheckCircle2,
@@ -20,9 +22,12 @@ import {
   RefreshCw,
   AlertCircle,
   Download,
-  ExternalLink
+  ExternalLink,
+  Pause,
+  Play
 } from "lucide-react";
 import { format } from "date-fns";
+import { useState, useEffect } from "react";
 
 interface EmailDeliveryMonitorProps {
   saleOrderId: string;
@@ -37,9 +42,15 @@ export const EmailDeliveryMonitor = ({
 }: EmailDeliveryMonitorProps) => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const isVisible = usePageVisibility();
+  const { settings, updateSettings } = useAutoRefreshSettings();
+  const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
+  const [isPaused, setIsPaused] = useState(false);
+
+  const shouldRefetch = settings.enabled && !isPaused && (settings.pauseOnInactive ? isVisible : true);
 
   // Fetch email logs for this sale order
-  const { data: emailLogs, isLoading } = useQuery({
+  const { data: emailLogs, isLoading, refetch: refetchLogs } = useQuery({
     queryKey: ["email-logs", saleOrderId],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -49,13 +60,15 @@ export const EmailDeliveryMonitor = ({
         .order("created_at", { ascending: false });
 
       if (error) throw error;
+      setLastRefresh(new Date());
       return data || [];
     },
-    refetchInterval: 10000, // Auto-refresh every 10 seconds
+    refetchInterval: shouldRefetch ? settings.interval : false,
+    refetchIntervalInBackground: false,
   });
 
   // Fetch sale order metadata
-  const { data: saleOrder } = useQuery({
+  const { data: saleOrder, refetch: refetchOrder } = useQuery({
     queryKey: ["sale-order-email-status", saleOrderId],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -67,8 +80,15 @@ export const EmailDeliveryMonitor = ({
       if (error) throw error;
       return data;
     },
-    refetchInterval: 10000,
+    refetchInterval: shouldRefetch ? settings.interval : false,
+    refetchIntervalInBackground: false,
   });
+
+  const handleManualRefresh = () => {
+    refetchLogs();
+    refetchOrder();
+    setLastRefresh(new Date());
+  };
 
   // Resend email mutation (only for failed deliveries)
   const resendEmailMutation = useMutation({
@@ -156,6 +176,8 @@ export const EmailDeliveryMonitor = ({
   const emailStatus = getEmailStatus();
   const StatusIcon = emailStatus.icon;
 
+  const timeSinceRefresh = Math.floor((Date.now() - lastRefresh.getTime()) / 1000);
+
   return (
     <Card>
       <CardHeader>
@@ -164,10 +186,28 @@ export const EmailDeliveryMonitor = ({
             <Mail className="h-5 w-5" />
             Email Delivery Status
           </span>
-          <Badge variant={emailStatus.variant} className="flex items-center gap-1">
-            <StatusIcon className="h-3 w-3" />
-            {emailStatus.label}
-          </Badge>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setIsPaused(!isPaused)}
+              title={isPaused ? "Resume auto-refresh" : "Pause auto-refresh"}
+            >
+              {isPaused ? <Play className="h-4 w-4" /> : <Pause className="h-4 w-4" />}
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleManualRefresh}
+              disabled={isLoading}
+            >
+              <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
+            </Button>
+            <Badge variant={emailStatus.variant} className="flex items-center gap-1">
+              <StatusIcon className="h-3 w-3" />
+              {emailStatus.label}
+            </Badge>
+          </div>
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -284,9 +324,22 @@ export const EmailDeliveryMonitor = ({
         )}
 
         {/* Auto-refresh indicator */}
-        <p className="text-xs text-muted-foreground text-center">
-          Status auto-refreshes every 10 seconds
-        </p>
+        <div className="flex items-center justify-between text-xs text-muted-foreground border-t pt-3">
+          <span>
+            {isPaused ? (
+              "Auto-refresh paused"
+            ) : !isVisible ? (
+              "Auto-refresh paused (tab not visible)"
+            ) : !settings.enabled ? (
+              "Auto-refresh disabled"
+            ) : (
+              `Refreshes every ${settings.interval / 1000}s`
+            )}
+          </span>
+          <span>
+            Last updated: {timeSinceRefresh}s ago
+          </span>
+        </div>
       </CardContent>
     </Card>
   );
