@@ -33,6 +33,7 @@ import { generateSaleOrderData, SaleOrderGeneratedData } from "@/lib/sale-order-
 import { calculateDynamicPrice } from "@/lib/dynamic-pricing";
 import { generateTechnicalSpecifications } from "@/lib/technical-specifications-generator";
 import { JobCardsDisplay } from "@/components/staff/JobCardsDisplay";
+import { EmailDeliveryMonitor } from "@/components/staff/EmailDeliveryMonitor";
 import { generatePremiumSaleOrderHTML, mapSaleOrderData } from "@/lib/sale-order-pdf";
 import { generatePremiumJobCardHTML, mapJobCardData } from "@/lib/job-card-pdf";
 import { downloadPDF, getSaleOrderPDFUrl, generatePDFFilename } from "@/lib/pdf-download";
@@ -865,7 +866,7 @@ const StaffSaleOrderDetail = () => {
           <CardContent className="space-y-4">
             <div className="flex items-center justify-between mb-4 no-print">
               <p className="text-sm text-muted-foreground">
-                This document will be sent to the customer for approval.
+                This document is automatically sent to customers when orders are confirmed.
               </p>
               <div className="flex gap-2">
                 <Button
@@ -899,34 +900,31 @@ const StaffSaleOrderDetail = () => {
               )}
             </div>
 
-            {/* Send to Customer Button */}
-            {!isConfirmed && (
-              <Button
-                size="lg"
-                onClick={() => approveAndSendFinalPDFMutation.mutate()}
-                disabled={approveAndSendFinalPDFMutation.isPending}
-              >
-                {approveAndSendFinalPDFMutation.isPending ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                ) : (
-                  <Mail className="mr-2 h-4 w-4" />
-                )}
-                Send to Customer
-              </Button>
-            )}
-
-            {/* Confirmed Status */}
-            {isConfirmed && (
-              <div className="flex items-center text-green-600 font-medium">
-                <CheckCircle2 className="mr-2 h-5 w-5" />
-                Order Sent to Customer & Job Cards Created
+            {/* Automated Email Notice */}
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+              <div className="flex items-start gap-3">
+                <CheckCircle2 className="h-5 w-5 text-blue-600 mt-0.5" />
+                <div className="flex-1">
+                  <p className="font-semibold text-blue-900">Automated Email System Active</p>
+                  <p className="text-sm text-blue-800 mt-1">
+                    Confirmation emails with PDF attachments are sent automatically when customers place orders.
+                    No manual action required. Monitor email delivery status below.
+                  </p>
+                </div>
               </div>
-            )}
+            </div>
 
           </CardContent>
         </Card>
 
-        {/* SECTION 4: Order Management */}
+        {/* SECTION 4: Email Delivery Monitoring */}
+        <EmailDeliveryMonitor
+          saleOrderId={id!}
+          saleOrderNumber={orderNumber}
+          customerEmail={saleOrder.customer_email || saleOrder.order?.customer_email || ''}
+        />
+
+        {/* SECTION 5: Order Management */}
         <Card>
           <CardHeader>
             <CardTitle>Order Management</CardTitle>
@@ -942,20 +940,6 @@ const StaffSaleOrderDetail = () => {
                   Send to Production
                 </Button>
               )}
-
-              <Button
-                variant="outline"
-                className="w-full"
-                onClick={() => approveAndSendFinalPDFMutation.mutate()}
-                disabled={approveAndSendFinalPDFMutation.isPending}
-              >
-                {approveAndSendFinalPDFMutation.isPending ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                ) : (
-                  <Mail className="mr-2 h-4 w-4" />
-                )}
-                Resend Customer Email (PDF)
-              </Button>
 
               <Separator />
 
