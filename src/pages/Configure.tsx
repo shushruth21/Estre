@@ -104,12 +104,32 @@ const Configure = ({ category: propCategory, productId: propProductId }: Configu
     setIsAddingToCart(true);
 
     try {
+      // Prepare configuration payload
+      // Check if the configuration has helper methods attached (from SofaConfigurator)
+      let configToSave = { ...configuration };
+
+      // Access helpers safely
+      const helpers = (configuration as any).__helpers;
+
+      if (helpers) {
+        // If buildCompleteConfiguration exists, use it to get the structured data
+        if (typeof helpers.buildCompleteConfiguration === 'function') {
+          const completeConfig = helpers.buildCompleteConfiguration();
+          configToSave.completed_configuration = completeConfig;
+
+          // If generateHTMLSummary exists, allow it to generate the summary using the complete config
+          if (typeof helpers.generateHTMLSummary === 'function') {
+            configToSave.html_summary = helpers.generateHTMLSummary(completeConfig);
+          }
+        }
+      }
+
       const { error } = await supabase.from("customer_orders").insert({
         customer_name: user.user_metadata?.full_name || user.email,
         customer_email: user.email,
         product_id: productId,
         product_type: category,
-        configuration,
+        configuration: configToSave,
         calculated_price: pricing?.total || 0,
         status: "draft",
         order_number: `DRAFT-${Date.now()}`,
@@ -203,7 +223,7 @@ const Configure = ({ category: propCategory, productId: propProductId }: Configu
                   <CardTitle className="font-serif text-2xl text-walnut border-b border-gold/20 pb-2">Configuration</CardTitle>
                 </CardHeader>
                 <CardContent className="px-0 space-y-8">
-                  {category === "sofa" && <SofaConfigurator product={product} configuration={configuration} onConfigurationChange={setConfiguration} />}
+                  {category === "sofa" && <SofaConfigurator product={product} configuration={configuration} pricing={pricing} onConfigurationChange={setConfiguration} />}
                   {category === "bed" && <BedConfigurator product={product} configuration={configuration} onConfigurationChange={setConfiguration} />}
                   {category === "recliner" && <ReclinerConfigurator product={product} configuration={configuration} onConfigurationChange={setConfiguration} />}
                   {category === "cinema_chairs" && <CinemaChairConfigurator product={product} configuration={configuration} onConfigurationChange={setConfiguration} />}

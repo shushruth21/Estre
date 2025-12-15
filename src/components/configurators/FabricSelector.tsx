@@ -193,6 +193,7 @@ const FabricSelector = ({
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="Single Colour">Single Colour</SelectItem>
+            <SelectItem value="Dual Colour">Dual Colour</SelectItem>
             <SelectItem value="Multi Colour">Multi Colour</SelectItem>
           </SelectContent>
         </Select>
@@ -200,13 +201,6 @@ const FabricSelector = ({
 
       {/* Fabric Selection */}
       <div className="space-y-4">
-        <FabricPartSelector
-          label="Structure Fabric"
-          selectedCode={configuration.fabric?.structureCode || undefined}
-          selectedFabric={configuration.fabric?.structureCode ? selectedFabrics?.[configuration.fabric.structureCode] : undefined}
-          onOpenLibrary={() => setOpenLibrary("structure")}
-        />
-
         {/* Validation Warnings */}
         {configuration.fabric?.claddingPlan === "Single Colour" && !configuration.fabric?.structureCode && (
           <Alert variant="destructive">
@@ -215,6 +209,17 @@ const FabricSelector = ({
               Please select a Structure fabric for Single Colour plan.
             </AlertDescription>
           </Alert>
+        )}
+
+        {configuration.fabric?.claddingPlan === "Dual Colour" && (
+          (!configuration.fabric?.structureCode || !configuration.fabric?.seatCode) && (
+            <Alert variant="destructive">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>
+                Dual Colour plan requires both Primary (Structure) and Secondary (Cushions) fabrics.
+              </AlertDescription>
+            </Alert>
+          )
         )}
 
         {configuration.fabric?.claddingPlan === "Multi Colour" && (
@@ -242,8 +247,46 @@ const FabricSelector = ({
           </>
         )}
 
+        {/* --- Single Colour Mode --- */}
+        {configuration.fabric?.claddingPlan === "Single Colour" && (
+          <FabricPartSelector
+            label="Structure Fabric"
+            selectedCode={configuration.fabric?.structureCode || undefined}
+            selectedFabric={configuration.fabric?.structureCode ? selectedFabrics?.[configuration.fabric.structureCode] : undefined}
+            onOpenLibrary={() => setOpenLibrary("structure")}
+          />
+        )}
+
+        {/* --- Dual Colour Mode --- */}
+        {configuration.fabric?.claddingPlan === "Dual Colour" && (
+          <>
+            <FabricPartSelector
+              label="Primary Colour (Structure)"
+              selectedCode={configuration.fabric?.structureCode || undefined}
+              selectedFabric={configuration.fabric?.structureCode ? selectedFabrics?.[configuration.fabric.structureCode] : undefined}
+              onOpenLibrary={() => setOpenLibrary("structure")}
+            />
+
+            <FabricPartSelector
+              label="Secondary Colour (Seat, Backrest, Headrest)"
+              selectedCode={configuration.fabric?.seatCode || undefined}
+              selectedFabric={configuration.fabric?.seatCode ? selectedFabrics?.[configuration.fabric.seatCode] : undefined}
+              onOpenLibrary={() => setOpenLibrary("dual_secondary")}
+            />
+          </>
+        )}
+
+        {/* --- Multi Colour Mode --- */}
         {configuration.fabric?.claddingPlan === "Multi Colour" && (
           <>
+            {/* Structure is always first for Multi */}
+            <FabricPartSelector
+              label="Structure Fabric"
+              selectedCode={configuration.fabric?.structureCode || undefined}
+              selectedFabric={configuration.fabric?.structureCode ? selectedFabrics?.[configuration.fabric.structureCode] : undefined}
+              onOpenLibrary={() => setOpenLibrary("structure")}
+            />
+
             {/* Bed category: Only Structure and Headrest */}
             {(effectiveCategory === "bed" || effectiveCategory === "kids_bed") ? (
               <>
@@ -299,6 +342,28 @@ const FabricSelector = ({
         onSelect={(code) => selectFabric(code, "structure")}
         selectedCode={configuration.fabric?.structureCode || undefined}
         title="Select Structure Fabric"
+      />
+      {/* Dual Colour Secondary Selector (Maps to multiple) */}
+      <FabricLibrary
+        open={openLibrary === "dual_secondary"}
+        onOpenChange={(open) => setOpenLibrary(open ? "dual_secondary" : null)}
+        onSelect={(code) => {
+          // Update Seat, Backrest, and Headrest simultaneously
+          onConfigurationChange({
+            ...configuration,
+            fabric: {
+              ...configuration.fabric,
+              seatCode: code,
+              backrestCode: code,
+              headrestCode: code,
+              // Also set headboard for beds if needed
+              headboardCode: (effectiveCategory === "bed" || effectiveCategory === "kids_bed") ? code : undefined
+            }
+          });
+          setOpenLibrary(null);
+        }}
+        selectedCode={configuration.fabric?.seatCode}
+        title="Select Secondary Fabric"
       />
       <FabricLibrary
         open={openLibrary === "backrest"}

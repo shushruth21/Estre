@@ -59,27 +59,35 @@ const PricingSummary = ({
     return true;
   })();
 
-  // Fetch fabric details for display
-  const fabricCode = configuration.fabric?.structureCode;
-  const { data: fabricDetails } = useQuery({
-    queryKey: ["fabric-details", fabricCode],
+  // Fetch fabric details for all selected fabrics
+  const fabricCodes = [
+    configuration.fabric?.structureCode,
+    configuration.fabric?.seatCode,
+    configuration.fabric?.backrestCode,
+    configuration.fabric?.headrestCode,
+    configuration.fabric?.headboardCode,
+    configuration.additionalPillows?.fabricColour,
+    configuration.additionalPillows?.fabricColour1,
+    configuration.additionalPillows?.fabricColour2
+  ].filter(Boolean); // Remove null/undefined/empty strings
+
+  // Deduplicate
+  const uniqueFabricCodes = [...new Set(fabricCodes)];
+
+  const { data: fabricDetailsList } = useQuery({
+    queryKey: ["fabric-details-list", uniqueFabricCodes.join(",")],
     queryFn: async () => {
-      if (!fabricCode) return null;
+      if (uniqueFabricCodes.length === 0) return [];
       const { data, error } = await supabase
         .from("fabric_coding")
         .select("*")
-        .eq("estre_code", fabricCode)
-        .single();
+        .in("estre_code", uniqueFabricCodes);
 
-      if (error) return null;
-      return data;
+      if (error) return [];
+      return data || [];
     },
-    enabled: !!fabricCode,
+    enabled: uniqueFabricCodes.length > 0,
   });
-
-  const fabricImageUrl = fabricDetails
-    ? (getFirstImageUrl(fabricDetails.colour_link) || getFirstImageUrl(fabricDetails.colour))
-    : null;
 
   return (
     <Card className="border border-gold/20 shadow-lg bg-white/80 backdrop-blur-sm">
@@ -192,28 +200,67 @@ const PricingSummary = ({
             </div>
 
             {/* Fabric Preview Section */}
-            {fabricDetails && (
+            {fabricDetailsList && fabricDetailsList.length > 0 && (
               <>
                 <Separator className="bg-gold/20" />
-                <div className="space-y-2">
-                  <p className="text-sm font-medium text-walnut">Selected Fabric</p>
-                  <div className="flex items-center gap-3 p-2 bg-muted/30 rounded-lg border border-gold/10">
-                    <div
-                      className="w-12 h-12 rounded-md border border-gray-200 shadow-sm flex-shrink-0 bg-cover bg-center"
-                      style={{
-                        backgroundColor: fabricDetails.colour_link || `hsl(${(fabricDetails.estre_code.charCodeAt(0) || 0) % 360}, 70%, 75%)`,
-                        backgroundImage: fabricImageUrl ? `url(${fabricImageUrl})` : undefined
-                      }}
-                    />
-                    <div className="flex flex-col">
-                      <span className="text-sm font-semibold text-walnut">
-                        {fabricDetails.description || fabricDetails.colour || "Fabric"}
-                      </span>
-                      <Badge variant="outline" className="w-fit text-[10px] h-5 px-1.5">
-                        {fabricDetails.estre_code}
-                      </Badge>
-                    </div>
-                  </div>
+                <div className="space-y-3">
+                  <p className="text-sm font-medium text-walnut">Selected Fabrics</p>
+                  {fabricDetailsList.map((fabric: any) => {
+                    // unexpected values handling
+                    let finalImage: string | null = null;
+                    let finalColor: string | undefined = undefined;
+
+                    const activeLink = fabric.colour_link || fabric.colour;
+
+                    if (activeLink && (activeLink.startsWith("http") || activeLink.includes("drive.google.com") || activeLink.includes("/storage/"))) {
+                      finalImage = getFirstImageUrl(activeLink);
+                    } else if (activeLink && (activeLink.startsWith("#") || activeLink.startsWith("rgb") || activeLink.startsWith("hsl"))) {
+                      finalColor = activeLink;
+                    }
+
+                    // Fallback color if no specific color is provided
+                    if (!finalColor && !finalImage) {
+                      finalColor = `hsl(${(fabric.estre_code.charCodeAt(0) || 0) % 360}, 70%, 75%)`;
+                    }
+
+                    // Identify roles for this fabric
+                    const roles: string[] = [];
+                    const fConfig = configuration.fabric || {};
+                    const pConfig = configuration.additionalPillows || {};
+
+                    if (fConfig.structureCode === fabric.estre_code) roles.push("Structure");
+                    if (fConfig.seatCode === fabric.estre_code) roles.push("Seat");
+                    if (fConfig.backrestCode === fabric.estre_code) roles.push("Backrest");
+                    if (fConfig.headrestCode === fabric.estre_code) roles.push("Headrest");
+                    if (fConfig.headboardCode === fabric.estre_code) roles.push("Headboard");
+
+                    if (pConfig.fabricColour === fabric.estre_code) roles.push("Pillows");
+                    if (pConfig.fabricColour1 === fabric.estre_code) roles.push("Pillow Colour 1");
+                    if (pConfig.fabricColour2 === fabric.estre_code) roles.push("Pillow Colour 2");
+
+                    return (
+                      <div key={fabric.id} className="flex items-center gap-3 p-2 bg-muted/30 rounded-lg border border-gold/10">
+                        <div
+                          className="w-12 h-12 rounded-md border border-gray-200 shadow-sm flex-shrink-0 bg-cover bg-center"
+                          style={{
+                            backgroundColor: finalColor,
+                            backgroundImage: finalImage ? `url(${finalImage})` : undefined
+                          }}
+                        />
+                        <div className="flex flex-col">
+                          <span className="text-sm font-semibold text-walnut">
+                            {roles.length > 0 ? roles.join(", ") : (fabric.description || "Fabric")}
+                          </span>
+                          <span className="text-xs text-muted-foreground truncate max-w-[150px]">
+                            {fabric.description || fabric.colour}
+                          </span>
+                          <Badge variant="outline" className="w-fit text-[10px] h-5 px-1.5 mt-1">
+                            {fabric.estre_code}
+                          </Badge>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               </>
             )}

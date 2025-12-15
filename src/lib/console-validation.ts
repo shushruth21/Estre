@@ -32,10 +32,10 @@ export const getConsolePositionLabel = (
   };
 
   const sectionLabel = sectionLabels[section] || section;
-  const ordinal = 
+  const ordinal =
     consoleNumber === 1 ? "st" :
-    consoleNumber === 2 ? "nd" :
-    consoleNumber === 3 ? "rd" : "th";
+      consoleNumber === 2 ? "nd" :
+        consoleNumber === 3 ? "rd" : "th";
 
   return `${sectionLabel}: After ${consoleNumber}${ordinal} Seat from Left`;
 };
@@ -99,8 +99,8 @@ export const isConsolePositionAvailable = (
     return false;
   }
 
-  // Extract seat count from seater type (handles "2-Seater", "2-Seater No Mech", etc.)
-  const seatCountMatch = seaterType.match(/(\d+)-Seater/);
+  // Extract seat count from seater type (handles "2-Seater", "3 Seats", "4", etc.)
+  const seatCountMatch = seaterType.toString().match(/(\d+)/);
   if (!seatCountMatch) {
     return false;
   }
@@ -203,8 +203,8 @@ export const generateAllConsolePlacements = (
 ): Array<{ section: string; position: string; label: string; value: string; consoleNumber: number }> => {
   const allPlacements: Array<{ section: string; position: string; label: string; value: string; consoleNumber: number }> = [];
 
-  // Normalize shape
-  const normalizedShape = shape.toUpperCase().replace(/\s+/g, " ");
+  // Normalize shape (handle "L-SHAPE", "L_SHAPE", "L SHAPE", etc.)
+  const normalizedShape = shape.toUpperCase().replace(/[-_]/g, " ").replace(/\s+/g, " ");
 
   // Front section (always available)
   if (sections.front) {
@@ -255,7 +255,8 @@ export const getSeatCountFromSeaterType = (seaterType: string): number => {
   }
 
   // Extract seat count from seater type
-  const match = seaterType.match(/(\d+)-Seater/);
+  // Extract seat count from seater type (handles "2-Seater", "3 Seats", "4", etc.)
+  const match = seaterType.toString().match(/(\d+)/);
   return match ? parseInt(match[1], 10) : 0;
 };
 
