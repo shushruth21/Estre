@@ -40,3 +40,4 @@ COMMENT ON COLUMN sale_orders.order_number IS 'Order number for email subject an
 
 
 
+
