@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -265,7 +265,13 @@ const SofaConfigurator = ({
   // Returns array of placement objects with section, position, and label matching spreadsheet formulas
   const generateAllConsolePlacements = () => {
     const consoleRequired = configuration.console?.required === "Yes" || configuration.console?.required === true;
-    const shape = configuration.shape || "STANDARD";
+    // Convert normalized shape to uppercase format expected by utility
+    const normalizedShape = normalizeShape(configuration.shape || 'standard');
+    const shapeForUtility = normalizedShape === 'standard' ? 'STANDARD' :
+                            normalizedShape === 'l-shape' ? 'L SHAPE' :
+                            normalizedShape === 'u-shape' ? 'U SHAPE' :
+                            normalizedShape === 'combo' ? 'COMBO' : 'STANDARD';
+    
     const sectionSeaterTypes = getSectionSeaterTypes();
 
     // Use the console validation utility to generate placements
@@ -276,7 +282,7 @@ const SofaConfigurator = ({
         left: sectionSeaterTypes.left,
         right: sectionSeaterTypes.right,
       },
-      shape
+      shapeForUtility
     );
 
     return placements;
@@ -323,6 +329,301 @@ const SofaConfigurator = ({
       }
     }
   }, [totalSeats, configuration.console?.required]);
+
+  // Build complete configuration summary matching your example format
+  const buildCompleteConfiguration = useCallback(() => {
+    const shape = normalizeShape(configuration.shape || 'standard');
+    const totalSeats = getTotalSeats();
+    const activeConsoles = (configuration.console?.placements || []).filter(
+      (p: any) => p && p.position && p.position !== "none" && p.section
+    );
+
+    // Build console positioning details
+    const consolePositions: Record<string, string> = {};
+    activeConsoles.forEach((placement: any, index: number) => {
+      const sectionLabel = placement.section === 'front' ? 'Front' :
+                          placement.section === 'left' ? 'Left' :
+                          placement.section === 'right' ? 'Right' : placement.section;
+      const consoleNum = index + 1;
+      consolePositions[`${sectionLabel} Console ${consoleNum}`] = 
+        `After ${placement.afterSeat || 1}${getOrdinalSuffix(placement.afterSeat || 1)} Seat from Left`;
+    });
+
+    // Get accessory details
+    const accessories: string[] = [];
+    activeConsoles.forEach((placement: any) => {
+      if (placement.accessoryId) {
+        const accessory = consoleAccessories?.find((acc: any) => acc.id === placement.accessoryId);
+        if (accessory) {
+          accessories.push(accessory.description);
+        }
+      }
+    });
+
+    // Build fabric details - ensure ALL fields are captured
+    const fabricDetails: any = {};
+    if (configuration.fabric?.claddingPlan) {
+      fabricDetails.plan = configuration.fabric.claddingPlan;
+    }
+    // Capture ALL fabric codes regardless of plan
+    if (configuration.fabric?.structureCode) {
+      fabricDetails.structure = configuration.fabric.structureCode;
+    }
+    if (configuration.fabric?.backrestCode) {
+      fabricDetails.backrest = configuration.fabric.backrestCode;
+    }
+    if (configuration.fabric?.seatCode) {
+      fabricDetails.seat = configuration.fabric.seatCode;
+    }
+    if (configuration.fabric?.headrestCode) {
+      fabricDetails.headrest = configuration.fabric.headrestCode;
+    }
+    // Also capture headboardCode for beds (if exists)
+    if (configuration.fabric?.headboardCode) {
+      fabricDetails.headboard = configuration.fabric.headboardCode;
+    }
+
+    // Build pillow details
+    const pillowDetails: any = {};
+    if (configuration.additionalPillows?.required) {
+      pillowDetails.quantity = configuration.additionalPillows?.quantity || 0;
+      pillowDetails.type = configuration.additionalPillows?.type || "";
+      pillowDetails.size = configuration.additionalPillows?.size || "";
+      pillowDetails.fabricPlan = configuration.additionalPillows?.fabricPlan || "";
+      if (configuration.additionalPillows?.fabricColour1) {
+        pillowDetails.colour1 = configuration.additionalPillows.fabricColour1;
+      }
+      if (configuration.additionalPillows?.fabricColour2) {
+        pillowDetails.colour2 = configuration.additionalPillows.fabricColour2;
+      }
+      if (configuration.additionalPillows?.fabricColour) {
+        pillowDetails.colour = configuration.additionalPillows.fabricColour;
+      }
+    }
+
+    // Build complete configuration object matching your example format
+    const completeConfig = {
+      // Product info
+      productId: configuration.productId || product?.id,
+      productName: product?.name || product?.title || "",
+      modelName: product?.model_name || "",
+      
+      // Shape and seats
+      shape: configuration.shape || "Standard",
+      totalSeats: totalSeats,
+      seats: {
+        front: {
+          count: parseSeatCount(configuration.frontSeatCount || configuration.frontSeats || 2),
+          type: configuration.frontSeatCount || "2-Seater"
+        },
+        ...(shape === 'l-shape' || shape === 'u-shape' || shape === 'combo' ? {
+          left: {
+            l1: configuration.l1Option || configuration.l1 || "Corner",
+            l2: {
+              count: parseSeatCount(configuration.l2SeatCount || configuration.l2 || 0),
+              type: configuration.l2SeatCount || "2-Seater"
+            }
+          }
+        } : {}),
+        ...(shape === 'u-shape' || shape === 'combo' ? {
+          right: {
+            r1: configuration.r1Option || configuration.r1 || "Corner",
+            r2: {
+              count: parseSeatCount(configuration.r2SeatCount || configuration.r2 || 0),
+              type: configuration.r2SeatCount || "2-Seater"
+            }
+          }
+        } : {})
+      },
+
+      // Console details
+      console: {
+        required: configuration.console?.required || false,
+        quantity: activeConsoles.length,
+        size: configuration.console?.size || "",
+        placements: activeConsoles.map((p: any) => ({
+          section: p.section,
+          position: p.position,
+          afterSeat: p.afterSeat,
+          accessoryId: p.accessoryId,
+          accessory: p.accessoryId ? consoleAccessories?.find((acc: any) => acc.id === p.accessoryId)?.description : null
+        })),
+        positions: consolePositions
+      },
+
+      // Lounger details
+      lounger: configuration.lounger?.required ? {
+        required: true,
+        quantity: configuration.lounger?.quantity || 0,
+        size: configuration.lounger?.size || "",
+        placement: configuration.lounger?.placement || "",
+        storage: configuration.lounger?.storage || ""
+      } : { required: false },
+
+      // Pillow details
+      additionalPillows: configuration.additionalPillows?.required ? pillowDetails : { required: false },
+
+      // Fabric details
+      fabric: fabricDetails,
+
+      // Foam details
+      foam: {
+        type: configuration.foam?.type || ""
+      },
+
+      // Dimensions
+      dimensions: {
+        seatDepth: configuration.dimensions?.seatDepth || configuration.seatDepth || 0,
+        seatWidth: configuration.dimensions?.seatWidth || configuration.seatWidth || 0,
+        seatHeight: configuration.dimensions?.seatHeight || configuration.seatHeight || 0
+      },
+
+      // Legs
+      legs: {
+        type: configuration.legs?.type || "",
+        code: configuration.legs?.code || ""
+      },
+
+      // Armrest
+      armrest: {
+        type: configuration.armrest?.type || ""
+      },
+
+      // Wood type
+      woodType: configuration.wood?.type || configuration.woodType || "",
+
+      // Stitch type
+      stitch: {
+        type: configuration.stitch?.type || ""
+      },
+
+      // Headrest
+      headrestRequired: configuration.headrestRequired || "No",
+      modelHasHeadrest: productComesWithHeadrest || "No",
+
+      // Accessories (from console accessories)
+      accessories: accessories,
+
+      // Customer info (if available)
+      customerInfo: configuration.customerInfo || {},
+
+      // Timestamp
+      configuredAt: new Date().toISOString()
+    };
+
+    return completeConfig;
+  }, [configuration, product, consoleAccessories, productComesWithHeadrest, getTotalSeats, normalizeShape, parseSeatCount, getOrdinalSuffix]);
+
+  // Generate HTML summary for order confirmation
+  const generateHTMLSummary = useCallback((config: any) => {
+    return `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Order Summary - ${config.productName || 'Product'}</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; background: #f5f5f5; }
+        .container { max-width: 1200px; margin: 0 auto; background: white; padding: 30px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        h1 { color: #333; border-bottom: 3px solid #d4af37; padding-bottom: 10px; }
+        h2 { color: #555; margin-top: 30px; }
+        table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #ddd; }
+        th { background-color: #f8f8f8; font-weight: bold; color: #333; }
+        .section { margin: 20px 0; padding: 15px; background: #f9f9f9; border-left: 4px solid #d4af37; }
+        .label { font-weight: bold; color: #666; }
+        .value { color: #333; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Order Summary</h1>
+        <div class="section">
+            <h2>Product Information</h2>
+            <p><span class="label">Product:</span> <span class="value">${config.productName || 'N/A'}</span></p>
+            <p><span class="label">Model:</span> <span class="value">${config.modelName || 'N/A'}</span></p>
+            <p><span class="label">Shape:</span> <span class="value">${config.shape || 'Standard'}</span></p>
+            <p><span class="label">Total Seats:</span> <span class="value">${config.totalSeats || 0}</span></p>
+        </div>
+        
+        <div class="section">
+            <h2>Seat Configuration</h2>
+            <p><span class="label">Front:</span> <span class="value">${config.seats?.front?.type || 'N/A'}</span></p>
+            ${config.seats?.left ? `<p><span class="label">Left:</span> <span class="value">${config.seats.left.l1} - ${config.seats.left.l2.type}</span></p>` : ''}
+            ${config.seats?.right ? `<p><span class="label">Right:</span> <span class="value">${config.seats.right.r1} - ${config.seats.right.r2.type}</span></p>` : ''}
+        </div>
+        
+        ${config.console?.required ? `
+        <div class="section">
+            <h2>Console Configuration</h2>
+            <p><span class="label">Console Size:</span> <span class="value">${config.console.size || 'N/A'}</span></p>
+            <p><span class="label">Number of Consoles:</span> <span class="value">${config.console.quantity || 0}</span></p>
+            <h3>Console Positioning</h3>
+            <table>
+                <tr><th>Console</th><th>Position</th></tr>
+                ${Object.entries(config.console.positions || {}).map(([key, value]) => 
+                  `<tr><td>${key}</td><td>${value}</td></tr>`
+                ).join('')}
+            </table>
+        </div>
+        ` : ''}
+        
+        ${config.lounger?.required ? `
+        <div class="section">
+            <h2>Lounger Configuration</h2>
+            <p><span class="label">Quantity:</span> <span class="value">${config.lounger.quantity || 0}</span></p>
+            <p><span class="label">Size:</span> <span class="value">${config.lounger.size || 'N/A'}</span></p>
+            <p><span class="label">Placement:</span> <span class="value">${config.lounger.placement || 'N/A'}</span></p>
+        </div>
+        ` : ''}
+        
+        ${config.additionalPillows?.required ? `
+        <div class="section">
+            <h2>Additional Pillows</h2>
+            <p><span class="label">Quantity:</span> <span class="value">${config.additionalPillows.quantity || 0}</span></p>
+            <p><span class="label">Type:</span> <span class="value">${config.additionalPillows.type || 'N/A'}</span></p>
+            <p><span class="label">Size:</span> <span class="value">${config.additionalPillows.size || 'N/A'}</span></p>
+        </div>
+        ` : ''}
+        
+        <div class="section">
+            <h2>Fabric Details</h2>
+            ${config.fabric?.plan ? `<p><span class="label">Fabric Plan:</span> <span class="value">${config.fabric.plan}</span></p>` : ''}
+            ${config.fabric?.structure ? `<p><span class="label">Structure:</span> <span class="value">${config.fabric.structure}</span></p>` : ''}
+            ${config.fabric?.backrest ? `<p><span class="label">Backrest:</span> <span class="value">${config.fabric.backrest}</span></p>` : ''}
+            ${config.fabric?.seat ? `<p><span class="label">Seat:</span> <span class="value">${config.fabric.seat}</span></p>` : ''}
+            ${config.fabric?.headrest ? `<p><span class="label">Headrest:</span> <span class="value">${config.fabric.headrest}</span></p>` : ''}
+        </div>
+        
+        <div class="section">
+            <h2>Other Specifications</h2>
+            <p><span class="label">Foam Type:</span> <span class="value">${config.foam?.type || 'N/A'}</span></p>
+            <p><span class="label">Legs:</span> <span class="value">${config.legs?.type || 'N/A'}</span></p>
+            <p><span class="label">Armrest:</span> <span class="value">${config.armrest?.type || 'N/A'}</span></p>
+            <p><span class="label">Wood Type:</span> <span class="value">${config.woodType || 'N/A'}</span></p>
+            <p><span class="label">Stitch Type:</span> <span class="value">${config.stitch?.type || 'N/A'}</span></p>
+        </div>
+        
+        <div class="section">
+            <p><span class="label">Configured At:</span> <span class="value">${new Date(config.configuredAt).toLocaleString()}</span></p>
+        </div>
+    </div>
+</body>
+</html>
+  `;
+  }, []);
+
+  // Expose helper functions via configuration object for parent access
+  useEffect(() => {
+    if (onConfigurationChange) {
+      // Attach helper functions to configuration object for parent access
+      (configuration as any).__helpers = {
+        buildCompleteConfiguration,
+        generateHTMLSummary
+      };
+    }
+  }, [configuration, buildCompleteConfiguration, generateHTMLSummary, onConfigurationChange]);
 
   // Initialize configuration
   useEffect(() => {

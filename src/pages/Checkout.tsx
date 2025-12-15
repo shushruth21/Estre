@@ -123,9 +123,30 @@ const Checkout = () => {
         throw new Error("Cart is empty");
       }
 
+      // Generate confirmed order number (will rename DRAFT- to ORD-)
       const orderNumber = `ORD-${Date.now()}`;
 
-      // 1. Create Order
+      // 1. Update draft orders to confirmed status and rename order numbers
+      // Rename all draft orders from DRAFT-xxx to ORD-xxx
+      for (const item of cartItems) {
+        const draftOrderNumber = item.order_number; // Original DRAFT-xxx number
+        const { error: updateError } = await supabase
+          .from("customer_orders")
+          .update({
+            status: "confirmed",
+            order_number: orderNumber, // Rename from DRAFT-xxx to ORD-xxx
+            updated_at: new Date().toISOString()
+          })
+          .eq("id", item.id)
+          .eq("status", "draft");
+
+        if (updateError) {
+          console.error("Error updating draft order:", updateError);
+          // Continue with other items even if one fails
+        }
+      }
+
+      // 2. Create Order in orders table (for order management)
       const orderData: any = {
         order_number: orderNumber,
         customer_id: user.id,
@@ -156,7 +177,7 @@ const Checkout = () => {
 
       if (orderError) throw orderError;
 
-      // 2. Create Order Items
+      // 3. Create Order Items
       const orderItems = cartItems.map((item) => ({
         order_id: order.id,
         product_id: item.product_id,
@@ -175,7 +196,7 @@ const Checkout = () => {
 
       if (itemsError) throw itemsError;
 
-      // 3. Create Sale Order (Auto-generated)
+      // 4. Create Sale Order (Auto-generated)
       const saleOrderData = {
         customer_id: user.id,
         order_id: order.id,
@@ -204,11 +225,20 @@ const Checkout = () => {
         console.error("Error creating sale order:", saleOrderError);
         // Rollback: Delete the created order to prevent inconsistent state
         await supabase.from("orders").delete().eq("id", order.id);
+        // Also revert draft order updates
+        for (const item of cartItems) {
+          await supabase
+            .from("customer_orders")
+            .update({
+              status: "draft",
+              order_number: item.order_number, // Revert to original DRAFT- number
+            })
+            .eq("id", item.id);
+        }
         throw new Error(`Failed to create sale order: ${saleOrderError.message}`);
       }
 
-
-      // 4. Create Job Cards
+      // 5. Create Job Cards
       const jobCardInserts: any[] = [];
       if (insertedItems && insertedItems.length > 0) {
         for (const item of insertedItems) {
@@ -234,27 +264,29 @@ const Checkout = () => {
 
             jobCardInserts.push({
               job_card_number: jobCard.jobCardNumber,
-              so_number: jobCard.soNumber || order.order_number,
+              so_number: jobCard.soNumber,
+              line_item_id: jobCard.lineItemId,
               order_id: order.id,
               order_item_id: item.id,
               sale_order_id: saleOrder?.id || null,
-              order_number: jobCard.soNumber || order.order_number,
-              customer_name: (jobCard.customer?.name || order.customer_name || "").trim() || "Customer",
-              customer_phone: (jobCard.customer?.phone || order.customer_phone || "").trim() || "",
-              customer_email: (jobCard.customer?.email || order.customer_email || "").trim() || "",
-              delivery_address: jobCard.customer?.address || order.delivery_address || {},
-              product_category: jobCard.category || item.product_category,
-              product_title: jobCard.modelName || item.product_title || "Custom Product",
-              configuration: jobCard.configuration || item.configuration || {},
-              technical_specifications: technicalSpecs || {},
-              fabric_codes: jobCard.fabricPlan?.fabricCodes || {},
-              fabric_meters: jobCard.fabricPlan || {},
+              order_number: jobCard.soNumber,
+              customer_name: jobCard.customer.name,
+              customer_phone: jobCard.customer.phone,
+              customer_email: jobCard.customer.email || order.customer_email,
+              delivery_address: jobCard.customer.address,
+              product_category: jobCard.category,
+              product_type: technicalSpecs.sofa_type || technicalSpecs.product_type,
+              product_title: jobCard.modelName,
+              configuration: jobCard.configuration,
+              technical_specifications: technicalSpecs,
+              fabric_codes: jobCard.fabricPlan.fabricCodes,
+              fabric_meters: jobCard.fabricPlan,
               accessories: {
                 console: jobCard.console,
                 dummySeats: jobCard.dummySeats,
                 sections: jobCard.sections,
-              } || {},
-              dimensions: jobCard.dimensions || {},
+              },
+              dimensions: jobCard.dimensions,
               status: "pending",
               priority: "normal",
             });
@@ -263,10 +295,10 @@ const Checkout = () => {
       }
 
       if (jobCardInserts.length > 0) {
-        // Insert without select to avoid 406 error
-        const { error: jobCardError } = await supabase
+        const { data: insertedJobCards, error: jobCardError } = await supabase
           .from("job_cards")
-          .insert(jobCardInserts);
+          .insert(jobCardInserts)
+          .select();
 
         if (jobCardError) {
           console.error("❌ Failed to create job cards:", jobCardError);
@@ -277,74 +309,50 @@ const Checkout = () => {
             variant: "destructive",
           });
         } else {
-          console.log(`✅ Created ${jobCardInserts.length} job cards`);
+          console.log(`✅ Created ${insertedJobCards?.length || 0} job cards`);
         }
       }
 
-      // 5. Trigger PDF Generation & Email (via Edge Function) - Fire-and-forget
-      // Don't await - let it run in background, don't block order creation
-      let pdfGenerated = false;
-      let emailSent = false;
-      let emailError: string | null = null;
-      
+      // 6. Trigger PDF Generation & Email (via Edge Function)
       if (saleOrder) {
-        // Fire-and-forget: Trigger PDF generation without blocking
-        supabase.functions.invoke("generate-sale-order-pdf", {
-          body: {
-            saleOrderId: saleOrder.id,
-            mode: "final",
-            requireOTP: false,
-            skipEmail: false
-          },
-        }).then(({ data: pdfData, error: pdfError }) => {
-          if (pdfError) {
-            console.error("PDF generation error (non-blocking):", pdfError);
-            // Log but don't affect order creation
-          } else if (pdfData) {
-            console.log("✅ PDF generated successfully:", pdfData.pdfUrl);
-            pdfGenerated = pdfData.success === true;
-            emailSent = pdfData.emailSent === true;
-            emailError = pdfData.emailError || null;
-          }
-        }).catch((err: any) => {
-          console.error("PDF generation failed (non-blocking):", err);
-          // Silently fail - order is already created successfully
-        });
+        try {
+          await supabase.functions.invoke("generate-sale-order-pdf", {
+            body: {
+              saleOrderId: saleOrder.id,
+              mode: "final", // Send final PDF immediately
+              requireOTP: false // No OTP needed as they just confirmed
+            },
+          });
+        } catch (err) {
+          console.error("Failed to trigger PDF generation:", err);
+        }
       }
 
-      // 6. Create Timeline & Cleanup
+      // 7. Create Timeline Entry
       await supabase.from("order_timeline").insert({
         order_id: order.id,
         status: "confirmed",
         title: "Order Confirmed",
-        description: "Order placed and confirmed by customer. Advance payment pending/authorized.",
+        description: "Order placed and confirmed by customer. Order number renamed from DRAFT- to ORD-.",
         created_by: user.id,
       });
 
-      const { error: deleteError } = await supabase
-        .from("customer_orders")
-        .delete()
-        .eq("status", "draft")
-        .eq("customer_email", user.email);
-
-      if (deleteError) throw deleteError;
+      // Note: Draft orders are now updated to confirmed status with renamed order numbers
+      // They are NOT deleted - they remain in customer_orders with status "confirmed"
 
       // Update discount usage if applicable
       if (discountCode) {
         await supabase.rpc('increment_discount_usage', { code: discountCode });
       }
 
-      // Return order - PDF generation happens in background (fire-and-forget)
       return { order };
     },
     onSuccess: () => {
       toast({
         title: "Order Confirmed!",
-        description: "Your order has been placed successfully. The invoice PDF will be sent to your email shortly.",
+        description: "Your order has been placed successfully. Check your email for the sale order PDF.",
       });
-      
       queryClient.invalidateQueries({ queryKey: ["cart"] });
-      queryClient.invalidateQueries({ queryKey: ["orders"] });
       navigate("/dashboard");
     },
     onError: (error: any) => {
