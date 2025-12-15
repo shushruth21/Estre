@@ -93,3 +93,7 @@ COMMENT ON COLUMN email_logs.status IS 'Email status: pending, sent, delivered, 
 
 
 
+
+
+
+
