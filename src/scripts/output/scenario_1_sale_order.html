@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Estre – Sale Order SO-2025001</title>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@300;400;600;700&family=Montserrat:wght@300;400;600;700&display=swap" rel="stylesheet">
+
+<style>
+/* --- BRAND COLOURS (From Estre Brand Sheet) --- */
+:root {
+  --estre-white: #F4F5F0;
+  --estre-gold: #D6B485;
+  --estre-brown: #937867;
+  --estre-dark: #664331;
+  --estre-accent1: #B57454;
+  --estre-accent2: #938E6C;
+
+  --font-primary: 'Montserrat', sans-serif;
+  --font-secondary: 'Nunito', sans-serif;
+}
+
+/* GENERAL */
+body {
+  font-family: var(--font-primary);
+  background: white;
+  margin: 0;
+  padding: 40px;
+  color: #222;
+}
+.section-title {
+  font-family: var(--font-primary);
+  font-size: 18px;
+  font-weight: 700;
+  margin-top: 40px;
+  border-bottom: 3px solid var(--estre-gold);
+  padding-bottom: 6px;
+  color: var(--estre-dark);
+}
+
+/* HEADER */
+.header {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 30px;
+}
+.logo img {
+  width: 170px;
+  max-height: 80px;
+  object-fit: contain;
+}
+.company-info {
+  text-align: right;
+  font-size: 13px;
+  line-height: 18px;
+}
+
+/* SALE ORDER TOP */
+.so-box {
+  margin-top: 20px;
+  border: 1px solid #ddd;
+  padding: 20px;
+  border-radius: 6px;
+  background: var(--estre-white);
+}
+.so-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 14px;
+  margin-bottom: 6px;
+}
+
+/* ADDRESS BLOCKS */
+.address-container {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 20px;
+}
+.address-box {
+  width: 48%;
+  background: #fafafa;
+  padding: 15px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+/* PRODUCT TABLE */
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+  margin-top: 20px;
+}
+.table th {
+  background: var(--estre-gold);
+  color: white;
+  padding: 10px;
+  text-align: left;
+}
+.table td {
+  padding: 10px;
+  border-bottom: 1px solid #eee;
+  vertical-align: top;
+}
+
+/* SUB-SECTION TITLES */
+.sub-header {
+  margin-top: 15px;
+  margin-bottom: 5px;
+  font-weight: 700;
+  font-size: 15px;
+  color: var(--estre-brown);
+  border-bottom: 1px dashed #ddd;
+  padding-bottom: 2px;
+  display: inline-block;
+}
+
+/* TOTAL */
+.total-box {
+  margin-top: 30px;
+  padding: 20px;
+  background: var(--estre-accent2);
+  color: white;
+  border-radius: 6px;
+  font-size: 18px;
+  font-weight: 700;
+  text-align: right;
+}
+
+/* PRINT OPTIMIZATION */
+@media print {
+  body {
+    margin: 0;
+    padding: 20px;
+  }
+  .no-print {
+    display: none;
+  }
+  .page-break {
+    page-break-before: always;
+  }
+}
+</style>
+</head>
+
+<body>
+
+<!-- HEADER -->
+<div class="header">
+  <div class="logo">
+    <img src="/brand-logo.png" alt="Estre Logo" />
+  </div>
+  <div class="company-info">
+    <strong>ESTRE GLOBAL PRIVATE LTD</strong><br>
+    Near Dhoni Public School, AECS Layout – A Block<br>
+    Revenue Layout, Singasandra, Bengaluru – 560068<br>
+    Ph: +91 8722200100<br>
+    Email: support@estre.in<br>
+    Website: www.estre.in<br>
+    GST: 29AAMCE9846D1ZU
+  </div>
+</div>
+
+<!-- SALE ORDER TOP -->
+<div class="so-box">
+  <div class="so-row"><strong>SALE ORDER No:</strong> SO-2025001</div>
+  <div class="so-row"><strong>Date:</strong> 15-Dec-2025</div>
+  <div class="so-row"><strong>Mode of Payment:</strong> 
+        1) 50% advance on placing Sale Order<br>
+        2) Balance: upon intimation of product readiness, before dispatch
+    </div>
+  <div class="so-row"><strong>Date of Delivery:</strong> 14-Jan-2026</div>
+  <div class="so-row"><strong>Despatch Through:</strong> Safe Express</div>
+  <div class="so-row"><strong>Buyer GST:</strong> 29ABCDE1234F2Z5</div>
+</div>
+
+<!-- ADDRESS SECTIONS -->
+<div class="address-container">
+  <div class="address-box">
+    <strong>Invoice To:</strong><br>
+    Customer Standard 3-Seater Sofa<br>
+    12 Palm Grove Road<br>Koramangala 4th Block<br>Bengaluru - 560034<br>Karnataka<br>
+    Mobile: +91 98765 43211<br>
+    Email: customer1@example.com
+  </div>
+
+  <div class="address-box">
+    <strong>To be Dispatched To:</strong><br>
+    Customer Standard 3-Seater Sofa<br>
+    12 Palm Grove Road<br>Koramangala 4th Block<br>Near Wipro Park<br>Bengaluru - 560034<br>Karnataka<br>
+    Mobile: +91 98765 43211<br>
+    Email: customer1@example.com
+  </div>
+</div>
+
+<!-- PRODUCT SECTION -->
+<div class="section-title">PRODUCT DETAILS</div>
+
+<table class="table">
+  <tr>
+    <th style="width: 50px;">Sl No.</th>
+    <th>Description of the Product</th>
+    <th style="width: 120px; text-align: right;">Amount (Rs.)</th>
+    <th style="width: 120px; text-align: right;">Total (Rs.)</th>
+  </tr>
+
+  
+      <tr>
+        <td style="text-align: center;">1</td>
+        <td>
+          <strong>SOFA – Cloud 3-Seater</strong><br><br><div class="sub-header">Seating</div>3-Seater<br><br><div class="sub-header">Fabric Selection</div>Velvet - Royal Blue<br><br><div class="sub-header">Seat Dimensions</div>Depth: 36 in<br>Width: 84 in<br>Height: 32 in<br><br><div class="sub-header">Legs</div>Wooden - Oak Finish<br><br>
+        </td>
+        <td style="text-align: right;">₹85,000.00</td>
+        <td style="text-align: right;">₹85,000.00</td>
+      </tr>
+    
+
+  <!-- Summary Rows -->
+  
+  <tr>
+    <td></td>
+    <td style="text-align: right;"><strong>Subtotal</strong></td>
+    <td></td>
+    <td style="text-align: right;">₹85,000.00</td>
+  </tr>
+  <tr>
+    <td></td>
+    <td style="text-align: right; color: #d9534f;"><strong>Discount</strong></td>
+    <td></td>
+    <td style="text-align: right; color: #d9534f;">-₹5,000.00</td>
+  </tr>
+  
+
+</table>
+
+<!-- TOTAL -->
+<div class="total-box">
+  Total Cost: ₹80,000.00
+</div>
+
+</body>
+</html>

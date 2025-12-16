@@ -1,0 +1,117 @@
+{
+  "scenario": "U-Shaped Sectional",
+  "saleOrder": {
+    "id": "so-3",
+    "order_number": "SO-2025003",
+    "created_at": "2025-12-16T00:54:36.928Z",
+    "base_price": 220000,
+    "discount": 0,
+    "final_price": 220000,
+    "status": "confirmed",
+    "order": {
+      "id": "order-3",
+      "order_number": "ORD-2025003",
+      "created_at": "2025-12-16T00:54:36.928Z",
+      "expected_delivery_date": "2026-01-15T00:54:36.928Z",
+      "customer_name": "Customer U-Shaped Sectional",
+      "customer_email": "customer3@example.com",
+      "customer_phone": "+91 98765 43213",
+      "delivery_address": {
+        "street": "36 Palm Grove Road",
+        "line2": "Koramangala 4th Block",
+        "city": "Bengaluru",
+        "pincode": "560034",
+        "state": "Karnataka",
+        "landmark": "Near Wipro Park"
+      },
+      "billing_address": {
+        "street": "36 Palm Grove Road",
+        "line2": "Koramangala 4th Block",
+        "city": "Bengaluru",
+        "pincode": "560034",
+        "state": "Karnataka"
+      },
+      "logistics_partner": "Safe Express",
+      "buyer_gst": "29ABCDE1234F2Z5",
+      "status": "confirmed",
+      "order_items": [
+        {
+          "product_title": "Grand U-Shape",
+          "product_category": "SOFA",
+          "product_name": "Grand U-Shape",
+          "total_price_rs": 220000,
+          "configuration": {
+            "shape": "U-Shape",
+            "seating": "8-Seater",
+            "loungers": [
+              {
+                "size": "Large",
+                "position": "Left"
+              },
+              {
+                "size": "Large",
+                "position": "Right"
+              }
+            ],
+            "fabric": "Suede - Grey",
+            "pillows": [
+              {
+                "quantity": 4,
+                "type": "Square",
+                "size": "20x20 in",
+                "fabric": "Patterned"
+              }
+            ]
+          }
+        }
+      ]
+    }
+  },
+  "jobCard": {
+    "id": "jc-3",
+    "job_card_number": "JC-2025003",
+    "sale_order_id": "so-3",
+    "product_title": "Grand U-Shape",
+    "product_category": "SOFA",
+    "technical_specifications": {
+      "product_type": "Sofa",
+      "sofa_type": "U-Shape",
+      "configuration_summary": "U-Shape with Dual Loungers",
+      "dimensions": {
+        "length": 140,
+        "depth": 70,
+        "height": 34,
+        "seat_height": 17,
+        "seat_depth": 23,
+        "arm_height": 24
+      },
+      "fabric": {
+        "name": "Suede",
+        "color": "Grey",
+        "supplier": "Sarom",
+        "direction": "Standard"
+      },
+      "structure": {
+        "material": "Hardwood"
+      },
+      "legs": {
+        "type": "Block",
+        "finish": "Walnut",
+        "height": 2
+      },
+      "foam": {
+        "seat": "HR 50",
+        "back": "Soft Fill",
+        "firmness": "Medium-Firm"
+      },
+      "accessories": [
+        {
+          "name": "Scatter Pillows",
+          "description": "4 Nos, Patterned Fabric"
+        }
+      ]
+    },
+    "created_at": "2025-12-16T00:54:36.928Z",
+    "status": "pending"
+  }
+}

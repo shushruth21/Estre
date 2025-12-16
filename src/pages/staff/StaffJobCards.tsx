@@ -46,9 +46,11 @@ const JOB_CARD_STATUSES = [
 ];
 
 export default function StaffJobCards() {
-  const { user, isStaff, isAdmin } = useAuth();
+  const { user, profile, isStaff, isAdmin } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+
+  const isFactoryStaff = profile?.role === 'factory_staff';
 
   // Fetch all job cards (staff can see all job cards)
   const { data: jobCards, isLoading } = useQuery({
@@ -326,9 +328,11 @@ export default function StaffJobCards() {
                     <p className="text-xs text-muted-foreground">
                       Status: {jobCard.order.status?.replace(/_/g, " ") || "PENDING"}
                     </p>
-                    <p className="text-xs text-muted-foreground">
-                      Total: ₹{Math.round(jobCard.order.net_total_rs || 0).toLocaleString()}
-                    </p>
+                    {!isFactoryStaff && (
+                      <p className="text-xs text-muted-foreground">
+                        Total: ₹{Math.round(jobCard.order.net_total_rs || 0).toLocaleString()}
+                      </p>
+                    )}
                   </div>
                 )}
               </div>

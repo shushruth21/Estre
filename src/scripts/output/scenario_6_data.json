@@ -1,0 +1,95 @@
+{
+  "scenario": "Dining Chairs",
+  "saleOrder": {
+    "id": "so-6",
+    "order_number": "SO-2025006",
+    "created_at": "2025-12-16T00:54:36.930Z",
+    "base_price": 72000,
+    "discount": 2000,
+    "final_price": 70000,
+    "status": "confirmed",
+    "order": {
+      "id": "order-6",
+      "order_number": "ORD-2025006",
+      "created_at": "2025-12-16T00:54:36.930Z",
+      "expected_delivery_date": "2026-01-15T00:54:36.930Z",
+      "customer_name": "Customer Dining Chairs",
+      "customer_email": "customer6@example.com",
+      "customer_phone": "+91 98765 43216",
+      "delivery_address": {
+        "street": "72 Palm Grove Road",
+        "line2": "Koramangala 4th Block",
+        "city": "Bengaluru",
+        "pincode": "560034",
+        "state": "Karnataka",
+        "landmark": "Near Wipro Park"
+      },
+      "billing_address": {
+        "street": "72 Palm Grove Road",
+        "line2": "Koramangala 4th Block",
+        "city": "Bengaluru",
+        "pincode": "560034",
+        "state": "Karnataka"
+      },
+      "logistics_partner": "Safe Express",
+      "buyer_gst": "29ABCDE1234F2Z5",
+      "status": "confirmed",
+      "order_items": [
+        {
+          "product_title": "Elegance Dining Chair",
+          "product_category": "DINING_CHAIR",
+          "product_name": "Elegance Dining Chair",
+          "total_price_rs": 72000,
+          "quantity": 6,
+          "configuration": {
+            "wood": "Teak",
+            "fabric": "Jacquard - Cream",
+            "style": "High Back"
+          }
+        }
+      ]
+    }
+  },
+  "jobCard": {
+    "id": "jc-6",
+    "job_card_number": "JC-2025006",
+    "sale_order_id": "so-6",
+    "product_title": "Elegance Dining Chair",
+    "product_category": "DINING_CHAIR",
+    "technical_specifications": {
+      "product_type": "Dining Chair",
+      "sofa_type": "-",
+      "configuration_summary": "Set of 6, High Back",
+      "dimensions": {
+        "length": 20,
+        "depth": 22,
+        "height": 42,
+        "seat_height": 19,
+        "seat_depth": 18,
+        "arm_height": 0
+      },
+      "fabric": {
+        "name": "Jacquard",
+        "color": "Cream",
+        "supplier": "D'Decor",
+        "direction": "Standard"
+      },
+      "structure": {
+        "material": "Solid Teak Wood"
+      },
+      "legs": {
+        "type": "Integrated",
+        "finish": "Natural Teak",
+        "height": 16
+      },
+      "foam": {
+        "seat": "Firm",
+        "back": "Medium",
+        "firmness": "Firm"
+      },
+      "wood": "Teak Wood"
+    },
+    "created_at": "2025-12-16T00:54:36.930Z",
+    "status": "pending"
+  }
+}

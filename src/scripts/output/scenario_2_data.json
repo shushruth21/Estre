@@ -1,0 +1,101 @@
+{
+  "scenario": "L-Shaped Sectional",
+  "saleOrder": {
+    "id": "so-2",
+    "order_number": "SO-2025002",
+    "created_at": "2025-12-16T00:54:36.928Z",
+    "base_price": 145000,
+    "discount": 10000,
+    "final_price": 135000,
+    "status": "confirmed",
+    "order": {
+      "id": "order-2",
+      "order_number": "ORD-2025002",
+      "created_at": "2025-12-16T00:54:36.928Z",
+      "expected_delivery_date": "2026-01-15T00:54:36.928Z",
+      "customer_name": "Customer L-Shaped Sectional",
+      "customer_email": "customer2@example.com",
+      "customer_phone": "+91 98765 43212",
+      "delivery_address": {
+        "street": "24 Palm Grove Road",
+        "line2": "Koramangala 4th Block",
+        "city": "Bengaluru",
+        "pincode": "560034",
+        "state": "Karnataka",
+        "landmark": "Near Wipro Park"
+      },
+      "billing_address": {
+        "street": "24 Palm Grove Road",
+        "line2": "Koramangala 4th Block",
+        "city": "Bengaluru",
+        "pincode": "560034",
+        "state": "Karnataka"
+      },
+      "logistics_partner": "Safe Express",
+      "buyer_gst": "29ABCDE1234F2Z5",
+      "status": "confirmed",
+      "order_items": [
+        {
+          "product_title": "Haven Sectional",
+          "product_category": "SOFA",
+          "product_name": "Haven Sectional",
+          "total_price_rs": 145000,
+          "configuration": {
+            "shape": "L-Shape (Left Aligned)",
+            "seating": {
+              "Left": "3-Seater",
+              "Right": "Chaise"
+            },
+            "fabric": {
+              "structure": "Linen - Beige",
+              "seat": "Linen - Beige",
+              "backrest": "Chenille - Terracotta"
+            },
+            "legs": "Metal - Matte Black"
+          }
+        }
+      ]
+    }
+  },
+  "jobCard": {
+    "id": "jc-2",
+    "job_card_number": "JC-2025002",
+    "sale_order_id": "so-2",
+    "product_title": "Haven Sectional",
+    "product_category": "SOFA",
+    "technical_specifications": {
+      "product_type": "Sofa",
+      "sofa_type": "L-Shape",
+      "configuration_summary": "3-Seater Left + Chaise Right",
+      "dimensions": {
+        "length": 110,
+        "depth": 65,
+        "height": 34,
+        "seat_height": 18,
+        "seat_depth": 24,
+        "arm_height": 25
+      },
+      "fabric": {
+        "name": "Linen/Chenille Combo",
+        "color": "Beige/Terracotta",
+        "supplier": "Pure",
+        "direction": "Railroaded"
+      },
+      "structure": {
+        "material": "Plywood + Pine"
+      },
+      "legs": {
+        "type": "Metal Pin",
+        "finish": "Matte Black",
+        "height": 5
+      },
+      "foam": {
+        "seat": "Feather Blend",
+        "back": "Microfiber",
+        "firmness": "Soft"
+      }
+    },
+    "created_at": "2025-12-16T00:54:36.928Z",
+    "status": "pending"
+  }
+}

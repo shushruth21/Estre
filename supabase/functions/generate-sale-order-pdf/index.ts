@@ -244,9 +244,10 @@ serve(async (req) => {
     const finalPdfBytes: Uint8Array = pdfBytes;
 
     // Upload to Supabase Storage - different paths for draft vs final
+    // Using 'confirmed_orders' for final PDFs to match new structure
     const fileName = mode === "draft"
       ? `sale-orders/draft/${saleOrderId}.pdf`
-      : `sale-orders/final/${saleOrderId}.pdf`;
+      : `sale-orders/confirmed_orders/${templateData.so_number}.pdf`;
 
     const { data: uploadData, error: uploadError } = await supabase.storage
       .from("documents")
@@ -356,11 +357,11 @@ serve(async (req) => {
     let emailSent = false;
     let emailError: string | null = null;
     const resendApiKey = Deno.env.get("RESEND_API_KEY");
-    
+
     if (!resendApiKey && !skipEmail) {
       emailError = "RESEND_API_KEY not configured. Please configure Resend API key in Supabase secrets.";
       console.warn("⚠️ Email not sent:", emailError);
-      
+
       // Log missing configuration
       await logEmail(supabase, {
         recipientEmail: templateData.customer_email,
@@ -406,9 +407,9 @@ serve(async (req) => {
         if (!emailResponse.ok) {
           const errorText = await emailResponse.text();
           console.error("Email failed:", errorText);
-          
+
           emailError = errorText;
-          
+
           // Log failed email
           await logEmail(supabase, {
             recipientEmail: templateData.customer_email,
@@ -420,12 +421,12 @@ serve(async (req) => {
             status: 'failed',
             errorMessage: errorText,
           });
-          
+
           // Don't throw - PDF generation succeeded, email can be retried
         } else {
           console.log("Email sent successfully to", templateData.customer_email);
           emailSent = true;
-          
+
           // Log successful email send
           const emailResult = await emailResponse.json();
           await logEmail(supabase, {
@@ -443,9 +444,9 @@ serve(async (req) => {
         }
       } catch (emailError) {
         console.error("Email error:", emailError);
-        
+
         emailError = emailError instanceof Error ? emailError.message : String(emailError);
-        
+
         // Log email error
         await logEmail(supabase, {
           recipientEmail: templateData.customer_email,
@@ -457,7 +458,7 @@ serve(async (req) => {
           status: 'failed',
           errorMessage: emailError,
         });
-        
+
         // Don't throw - PDF generation succeeded, email can be retried
       }
     }
@@ -465,8 +466,8 @@ serve(async (req) => {
     return new Response(
       JSON.stringify({
         success: true,
-        message: mode === "draft" 
-          ? "Draft PDF generated successfully" 
+        message: mode === "draft"
+          ? "Draft PDF generated successfully"
           : "Final PDF generated" + (emailSent ? " and email sent" : (emailError ? " but email failed" : "")),
         saleOrderId,
         pdfUrl: urlData.publicUrl,

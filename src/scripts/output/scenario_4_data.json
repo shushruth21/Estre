@@ -1,0 +1,113 @@
+{
+  "scenario": "Recliner Sofa",
+  "saleOrder": {
+    "id": "so-4",
+    "order_number": "SO-2025004",
+    "created_at": "2025-12-16T00:54:36.929Z",
+    "base_price": 180000,
+    "discount": 5000,
+    "final_price": 175000,
+    "status": "confirmed",
+    "order": {
+      "id": "order-4",
+      "order_number": "ORD-2025004",
+      "created_at": "2025-12-16T00:54:36.929Z",
+      "expected_delivery_date": "2026-01-15T00:54:36.929Z",
+      "customer_name": "Customer Recliner Sofa",
+      "customer_email": "customer4@example.com",
+      "customer_phone": "+91 98765 43214",
+      "delivery_address": {
+        "street": "48 Palm Grove Road",
+        "line2": "Koramangala 4th Block",
+        "city": "Bengaluru",
+        "pincode": "560034",
+        "state": "Karnataka",
+        "landmark": "Near Wipro Park"
+      },
+      "billing_address": {
+        "street": "48 Palm Grove Road",
+        "line2": "Koramangala 4th Block",
+        "city": "Bengaluru",
+        "pincode": "560034",
+        "state": "Karnataka"
+      },
+      "logistics_partner": "Safe Express",
+      "buyer_gst": "29ABCDE1234F2Z5",
+      "status": "confirmed",
+      "order_items": [
+        {
+          "product_title": "Cinema Comfort Recliner",
+          "product_category": "RECLINER",
+          "product_name": "Cinema Comfort Recliner",
+          "total_price_rs": 180000,
+          "configuration": {
+            "seating": "3-Seater",
+            "features": [
+              "Electric Recline",
+              "Cup Holders",
+              "USB Charging"
+            ],
+            "fabric": "Leatherette - Black",
+            "consoles": [
+              {
+                "size": "Standard",
+                "position": "Between Seats"
+              }
+            ]
+          }
+        }
+      ]
+    }
+  },
+  "jobCard": {
+    "id": "jc-4",
+    "job_card_number": "JC-2025004",
+    "sale_order_id": "so-4",
+    "product_title": "Cinema Comfort Recliner",
+    "product_category": "RECLINER",
+    "technical_specifications": {
+      "product_type": "Recliner",
+      "sofa_type": "Linear",
+      "configuration_summary": "3-Seater (Electric) + 2 Consoles",
+      "dimensions": {
+        "length": 115,
+        "depth": 38,
+        "height": 40,
+        "seat_height": 19,
+        "seat_depth": 21,
+        "arm_height": 26
+      },
+      "fabric": {
+        "name": "Premium Leatherette",
+        "color": "Jet Black",
+        "supplier": "Stanley",
+        "direction": "Standard"
+      },
+      "structure": {
+        "material": "Metal Mechanism + Wood"
+      },
+      "legs": {
+        "type": "Hidden",
+        "finish": "-",
+        "height": 1
+      },
+      "foam": {
+        "seat": "Recliner Foam",
+        "back": "Polyfill",
+        "firmness": "Plush"
+      },
+      "accessories": [
+        {
+          "name": "Motor",
+          "description": "Okin Motor"
+        },
+        {
+          "name": "Console",
+          "description": "With Cup Holders"
+        }
+      ]
+    },
+    "created_at": "2025-12-16T00:54:36.929Z",
+    "status": "pending"
+  }
+}

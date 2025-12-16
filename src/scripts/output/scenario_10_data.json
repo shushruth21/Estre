@@ -1,0 +1,107 @@
+{
+  "scenario": "Cinema Chairs",
+  "saleOrder": {
+    "id": "so-10",
+    "order_number": "SO-2025010",
+    "created_at": "2025-12-16T00:54:36.933Z",
+    "base_price": 300000,
+    "discount": 15000,
+    "final_price": 285000,
+    "status": "confirmed",
+    "order": {
+      "id": "order-10",
+      "order_number": "ORD-2025010",
+      "created_at": "2025-12-16T00:54:36.933Z",
+      "expected_delivery_date": "2026-01-15T00:54:36.933Z",
+      "customer_name": "Customer Cinema Chairs",
+      "customer_email": "customer10@example.com",
+      "customer_phone": "+91 98765 432110",
+      "delivery_address": {
+        "street": "120 Palm Grove Road",
+        "line2": "Koramangala 4th Block",
+        "city": "Bengaluru",
+        "pincode": "560034",
+        "state": "Karnataka",
+        "landmark": "Near Wipro Park"
+      },
+      "billing_address": {
+        "street": "120 Palm Grove Road",
+        "line2": "Koramangala 4th Block",
+        "city": "Bengaluru",
+        "pincode": "560034",
+        "state": "Karnataka"
+      },
+      "logistics_partner": "Safe Express",
+      "buyer_gst": "29ABCDE1234F2Z5",
+      "status": "confirmed",
+      "order_items": [
+        {
+          "product_title": "VIP Cinema Row",
+          "product_category": "CINEMA_CHAIRS",
+          "product_name": "VIP Cinema Row",
+          "total_price_rs": 300000,
+          "configuration": {
+            "layout": "Row of 4",
+            "mechanism": "Motorized Recline",
+            "extras": [
+              "Tray Tables",
+              "Led Lighting"
+            ],
+            "fabric": "Composite Leather - Red"
+          }
+        }
+      ]
+    }
+  },
+  "jobCard": {
+    "id": "jc-10",
+    "job_card_number": "JC-2025010",
+    "sale_order_id": "so-10",
+    "product_title": "VIP Cinema Row",
+    "product_category": "CINEMA_CHAIRS",
+    "technical_specifications": {
+      "product_type": "Cinema Chair",
+      "sofa_type": "Row Seating",
+      "configuration_summary": "Row of 4 (Curved)",
+      "dimensions": {
+        "length": 140,
+        "depth": 40,
+        "height": 42,
+        "seat_height": 18,
+        "seat_depth": 22,
+        "arm_height": 26
+      },
+      "fabric": {
+        "name": "Composite Leather",
+        "color": "Red",
+        "supplier": "Imported",
+        "direction": "Standard"
+      },
+      "structure": {
+        "material": "Steel + Wood"
+      },
+      "legs": {
+        "type": "Base Plate",
+        "finish": "Black",
+        "height": 0
+      },
+      "foam": {
+        "seat": "Cinema Grade",
+        "back": "Contoured",
+        "firmness": "Firm"
+      },
+      "accessories": [
+        {
+          "name": "Tray Table",
+          "description": "Swivel"
+        },
+        {
+          "name": "LED",
+          "description": "Blue Underlighting"
+        }
+      ]
+    },
+    "created_at": "2025-12-16T00:54:36.933Z",
+    "status": "pending"
+  }
+}

@@ -1,0 +1,98 @@
+{
+  "scenario": "Standard 3-Seater Sofa",
+  "saleOrder": {
+    "id": "so-1",
+    "order_number": "SO-2025001",
+    "created_at": "2025-12-16T00:54:36.889Z",
+    "base_price": 85000,
+    "discount": 5000,
+    "final_price": 80000,
+    "status": "confirmed",
+    "order": {
+      "id": "order-1",
+      "order_number": "ORD-2025001",
+      "created_at": "2025-12-16T00:54:36.888Z",
+      "expected_delivery_date": "2026-01-15T00:54:36.889Z",
+      "customer_name": "Customer Standard 3-Seater Sofa",
+      "customer_email": "customer1@example.com",
+      "customer_phone": "+91 98765 43211",
+      "delivery_address": {
+        "street": "12 Palm Grove Road",
+        "line2": "Koramangala 4th Block",
+        "city": "Bengaluru",
+        "pincode": "560034",
+        "state": "Karnataka",
+        "landmark": "Near Wipro Park"
+      },
+      "billing_address": {
+        "street": "12 Palm Grove Road",
+        "line2": "Koramangala 4th Block",
+        "city": "Bengaluru",
+        "pincode": "560034",
+        "state": "Karnataka"
+      },
+      "logistics_partner": "Safe Express",
+      "buyer_gst": "29ABCDE1234F2Z5",
+      "status": "confirmed",
+      "order_items": [
+        {
+          "product_title": "Cloud 3-Seater",
+          "product_category": "SOFA",
+          "product_name": "Cloud 3-Seater",
+          "total_price_rs": 85000,
+          "configuration": {
+            "seating": "3-Seater",
+            "fabric": "Velvet - Royal Blue",
+            "legs": "Wooden - Oak Finish",
+            "dimensions": {
+              "width": 84,
+              "depth": 36,
+              "height": 32
+            }
+          }
+        }
+      ]
+    }
+  },
+  "jobCard": {
+    "id": "jc-1",
+    "job_card_number": "JC-2025001",
+    "sale_order_id": "so-1",
+    "product_title": "Cloud 3-Seater",
+    "product_category": "SOFA",
+    "technical_specifications": {
+      "product_type": "Sofa",
+      "sofa_type": "Standard",
+      "configuration_summary": "3-Seater",
+      "dimensions": {
+        "length": 84,
+        "depth": 36,
+        "height": 32,
+        "seat_height": 18,
+        "seat_depth": 22,
+        "arm_height": 24
+      },
+      "fabric": {
+        "name": "Velvet",
+        "color": "Royal Blue",
+        "supplier": "D'Decor",
+        "direction": "Standard"
+      },
+      "structure": {
+        "material": "Solid Wood"
+      },
+      "legs": {
+        "type": "Tapered",
+        "finish": "Oak",
+        "height": 6
+      },
+      "foam": {
+        "seat": "HD 40",
+        "back": "Soft PU",
+        "firmness": "Medium"
+      }
+    },
+    "created_at": "2025-12-16T00:54:36.889Z",
+    "status": "pending"
+  }
+}

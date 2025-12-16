@@ -1,0 +1,94 @@
+{
+  "scenario": "Sofa Bed",
+  "saleOrder": {
+    "id": "so-5",
+    "order_number": "SO-2025005",
+    "created_at": "2025-12-16T00:54:36.930Z",
+    "base_price": 65000,
+    "discount": 0,
+    "final_price": 65000,
+    "status": "confirmed",
+    "order": {
+      "id": "order-5",
+      "order_number": "ORD-2025005",
+      "created_at": "2025-12-16T00:54:36.930Z",
+      "expected_delivery_date": "2026-01-15T00:54:36.930Z",
+      "customer_name": "Customer Sofa Bed",
+      "customer_email": "customer5@example.com",
+      "customer_phone": "+91 98765 43215",
+      "delivery_address": {
+        "street": "60 Palm Grove Road",
+        "line2": "Koramangala 4th Block",
+        "city": "Bengaluru",
+        "pincode": "560034",
+        "state": "Karnataka",
+        "landmark": "Near Wipro Park"
+      },
+      "billing_address": {
+        "street": "60 Palm Grove Road",
+        "line2": "Koramangala 4th Block",
+        "city": "Bengaluru",
+        "pincode": "560034",
+        "state": "Karnataka"
+      },
+      "logistics_partner": "Safe Express",
+      "buyer_gst": "29ABCDE1234F2Z5",
+      "status": "confirmed",
+      "order_items": [
+        {
+          "product_title": "Snooze Sofa Bed",
+          "product_category": "SOFABED",
+          "product_name": "Snooze Sofa Bed",
+          "total_price_rs": 65000,
+          "configuration": {
+            "size": "Queen",
+            "mechanism": "Pull-out",
+            "fabric": "Woven - Teal",
+            "mattress": "Memory Foam"
+          }
+        }
+      ]
+    }
+  },
+  "jobCard": {
+    "id": "jc-5",
+    "job_card_number": "JC-2025005",
+    "sale_order_id": "so-5",
+    "product_title": "Snooze Sofa Bed",
+    "product_category": "SOFABED",
+    "technical_specifications": {
+      "product_type": "Sofa Bed",
+      "sofa_type": "Pull-out",
+      "configuration_summary": "3-Seater converts to Queen Bed",
+      "dimensions": {
+        "length": 72,
+        "depth": 36,
+        "height": 34,
+        "seat_height": 18,
+        "seat_depth": 22,
+        "arm_height": 24
+      },
+      "fabric": {
+        "name": "Woven Texture",
+        "color": "Teal",
+        "supplier": "Atmosphere",
+        "direction": "Standard"
+      },
+      "structure": {
+        "material": "Metal Frame"
+      },
+      "legs": {
+        "type": "Casters/Feet",
+        "finish": "Chrome",
+        "height": 3
+      },
+      "foam": {
+        "seat": "Memory Foam Mattress",
+        "back": "Soft Foam",
+        "firmness": "Medium"
+      }
+    },
+    "created_at": "2025-12-16T00:54:36.930Z",
+    "status": "pending"
+  }
+}

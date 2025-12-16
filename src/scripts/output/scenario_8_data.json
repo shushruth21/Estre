@@ -1,0 +1,93 @@
+{
+  "scenario": "Pouffe",
+  "saleOrder": {
+    "id": "so-8",
+    "order_number": "SO-2025008",
+    "created_at": "2025-12-16T00:54:36.931Z",
+    "base_price": 12000,
+    "discount": 0,
+    "final_price": 12000,
+    "status": "confirmed",
+    "order": {
+      "id": "order-8",
+      "order_number": "ORD-2025008",
+      "created_at": "2025-12-16T00:54:36.931Z",
+      "expected_delivery_date": "2026-01-15T00:54:36.931Z",
+      "customer_name": "Customer Pouffe",
+      "customer_email": "customer8@example.com",
+      "customer_phone": "+91 98765 43218",
+      "delivery_address": {
+        "street": "96 Palm Grove Road",
+        "line2": "Koramangala 4th Block",
+        "city": "Bengaluru",
+        "pincode": "560034",
+        "state": "Karnataka",
+        "landmark": "Near Wipro Park"
+      },
+      "billing_address": {
+        "street": "96 Palm Grove Road",
+        "line2": "Koramangala 4th Block",
+        "city": "Bengaluru",
+        "pincode": "560034",
+        "state": "Karnataka"
+      },
+      "logistics_partner": "Safe Express",
+      "buyer_gst": "29ABCDE1234F2Z5",
+      "status": "confirmed",
+      "order_items": [
+        {
+          "product_title": "Round Tufted Pouffe",
+          "product_category": "POUFFE",
+          "product_name": "Round Tufted Pouffe",
+          "total_price_rs": 12000,
+          "configuration": {
+            "shape": "Round",
+            "size": "24 inch dia",
+            "fabric": "Velvet - Mustard"
+          }
+        }
+      ]
+    }
+  },
+  "jobCard": {
+    "id": "jc-8",
+    "job_card_number": "JC-2025008",
+    "sale_order_id": "so-8",
+    "product_title": "Round Tufted Pouffe",
+    "product_category": "POUFFE",
+    "technical_specifications": {
+      "product_type": "Pouffe",
+      "sofa_type": "Ottoman",
+      "configuration_summary": "Round, Button Tufted",
+      "dimensions": {
+        "length": 24,
+        "depth": 24,
+        "height": 16,
+        "seat_height": 16,
+        "seat_depth": 0,
+        "arm_height": 0
+      },
+      "fabric": {
+        "name": "Velvet",
+        "color": "Mustard Yellow",
+        "supplier": "D'Decor",
+        "direction": "Standard"
+      },
+      "structure": {
+        "material": "Plywood"
+      },
+      "legs": {
+        "type": "Glides",
+        "finish": "-",
+        "height": 0.5
+      },
+      "foam": {
+        "seat": "Block Foam",
+        "back": "-",
+        "firmness": "Firm"
+      }
+    },
+    "created_at": "2025-12-16T00:54:36.931Z",
+    "status": "pending"
+  }
+}

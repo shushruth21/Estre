@@ -34,7 +34,8 @@ import { JobCardDocument } from "@/components/orders/JobCardDocument";
 export default function StaffJobCardDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, profile } = useAuth(); // Added profile
+  const isFactoryStaff = profile?.role === 'factory_staff';
   const { toast } = useToast();
   const [jobCard, setJobCard] = useState<any>(null);
   const [order, setOrder] = useState<any>(null);
@@ -65,13 +66,13 @@ export default function StaffJobCardDetail() {
 
     // For factory_staff, add assigned_to filter (RLS also checks this)
     // For staff/admin, RLS allows all, so no filter needed
-    const { data: profile } = await supabase
+    const { data: localProfile } = await supabase
       .from("profiles")
       .select("role")
       .eq("user_id", user.id)
       .single();
 
-    if (profile?.role === 'factory_staff') {
+    if (localProfile?.role === 'factory_staff') {
       query = query.eq("assigned_to", user.id);
     }
     // Staff/admin can see all (RLS handles this)
@@ -511,46 +512,48 @@ export default function StaffJobCardDetail() {
               </CardContent>
             </Card>
 
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <ClipboardList className="h-5 w-5" />
-                  Sale Order Snapshot
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3 text-sm">
-                {order ? (
-                  <>
-                    <div className="flex items-center justify-between">
-                      <span className="text-muted-foreground">Net Total</span>
-                      <span>
-                        ₹{Math.round(order.net_total_rs || 0).toLocaleString()}
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-muted-foreground">Advance Paid</span>
-                      <span>
-                        ₹{Math.round(order.advance_amount_rs || 0).toLocaleString()}
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-muted-foreground">Balance</span>
-                      <span>
-                        ₹{Math.round(order.balance_amount_rs || 0).toLocaleString()}
-                      </span>
-                    </div>
-                    {order.expected_delivery_date && (
-                      <p className="text-muted-foreground">
-                        Expected Delivery:{" "}
-                        {new Date(order.expected_delivery_date).toLocaleDateString()}
-                      </p>
-                    )}
-                  </>
-                ) : (
-                  <p className="text-muted-foreground">Order summary not available.</p>
-                )}
-              </CardContent>
-            </Card>
+            {!isFactoryStaff && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <ClipboardList className="h-5 w-5" />
+                    Sale Order Snapshot
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3 text-sm">
+                  {order ? (
+                    <>
+                      <div className="flex items-center justify-between">
+                        <span className="text-muted-foreground">Net Total</span>
+                        <span>
+                          ₹{Math.round(order.net_total_rs || 0).toLocaleString()}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-muted-foreground">Advance Paid</span>
+                        <span>
+                          ₹{Math.round(order.advance_amount_rs || 0).toLocaleString()}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-muted-foreground">Balance</span>
+                        <span>
+                          ₹{Math.round(order.balance_amount_rs || 0).toLocaleString()}
+                        </span>
+                      </div>
+                      {order.expected_delivery_date && (
+                        <p className="text-muted-foreground">
+                          Expected Delivery:{" "}
+                          {new Date(order.expected_delivery_date).toLocaleDateString()}
+                        </p>
+                      )}
+                    </>
+                  ) : (
+                    <p className="text-muted-foreground">Order summary not available.</p>
+                  )}
+                </CardContent>
+              </Card>
+            )}
 
             <Card>
               <CardHeader>

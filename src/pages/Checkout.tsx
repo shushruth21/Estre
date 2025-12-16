@@ -313,7 +313,39 @@ const Checkout = () => {
         }
       }
 
-      // 6. Trigger PDF Generation & Email (via Edge Function)
+      // 6. Upload Order JSON to Storage (Reliable Backup)
+      const orderJsonData = {
+        order: order,
+        sale_order: saleOrder,
+        order_items: insertedItems,
+        customer: {
+          id: user.id,
+          email: user.email,
+          metadata: user.user_metadata
+        },
+        job_cards: jobCardInserts,
+        created_at: new Date().toISOString()
+      };
+
+      const jsonFileName = `sale-orders/confirmed_orders/${orderNumber}.json`;
+      const jsonBlob = new Blob([JSON.stringify(orderJsonData, null, 2)], { type: 'application/json' });
+
+      const { error: jsonUploadError } = await supabase.storage
+        .from("documents")
+        .upload(jsonFileName, jsonBlob, {
+          contentType: 'application/json',
+          upsert: true
+        });
+
+      if (jsonUploadError) {
+        console.error("❌ Failed to upload order JSON:", jsonUploadError);
+        // We ensure we don't block the flow, but we log it. 
+        // In a strict environment we might want to alert the user or retry.
+      } else {
+        console.log("✅ Order JSON uploaded successfully to", jsonFileName);
+      }
+
+      // 7. Trigger PDF Generation & Email (via Edge Function)
       if (saleOrder) {
         try {
           await supabase.functions.invoke("generate-sale-order-pdf", {

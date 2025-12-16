@@ -1,0 +1,95 @@
+{
+  "scenario": "Kids Bed",
+  "saleOrder": {
+    "id": "so-9",
+    "order_number": "SO-2025009",
+    "created_at": "2025-12-16T00:54:36.932Z",
+    "base_price": 45000,
+    "discount": 5000,
+    "final_price": 40000,
+    "status": "confirmed",
+    "order": {
+      "id": "order-9",
+      "order_number": "ORD-2025009",
+      "created_at": "2025-12-16T00:54:36.932Z",
+      "expected_delivery_date": "2026-01-15T00:54:36.932Z",
+      "customer_name": "Customer Kids Bed",
+      "customer_email": "customer9@example.com",
+      "customer_phone": "+91 98765 43219",
+      "delivery_address": {
+        "street": "108 Palm Grove Road",
+        "line2": "Koramangala 4th Block",
+        "city": "Bengaluru",
+        "pincode": "560034",
+        "state": "Karnataka",
+        "landmark": "Near Wipro Park"
+      },
+      "billing_address": {
+        "street": "108 Palm Grove Road",
+        "line2": "Koramangala 4th Block",
+        "city": "Bengaluru",
+        "pincode": "560034",
+        "state": "Karnataka"
+      },
+      "logistics_partner": "Safe Express",
+      "buyer_gst": "29ABCDE1234F2Z5",
+      "status": "confirmed",
+      "order_items": [
+        {
+          "product_title": "Dreamer Kids Bed",
+          "product_category": "KIDS_BED",
+          "product_name": "Dreamer Kids Bed",
+          "total_price_rs": 45000,
+          "configuration": {
+            "size": "Single",
+            "storage": "Hydraulic",
+            "headboard": "Upholstered - Car Shape",
+            "fabric": "Canvas - Blue"
+          }
+        }
+      ]
+    }
+  },
+  "jobCard": {
+    "id": "jc-9",
+    "job_card_number": "JC-2025009",
+    "sale_order_id": "so-9",
+    "product_title": "Dreamer Kids Bed",
+    "product_category": "KIDS_BED",
+    "technical_specifications": {
+      "product_type": "Bed",
+      "sofa_type": "-",
+      "configuration_summary": "Single Bed with Storage",
+      "dimensions": {
+        "length": 78,
+        "depth": 36,
+        "height": 40,
+        "seat_height": 12,
+        "seat_depth": 0,
+        "arm_height": 0
+      },
+      "fabric": {
+        "name": "Canvas",
+        "color": "Blue",
+        "supplier": "Local",
+        "direction": "Standard"
+      },
+      "structure": {
+        "material": "Plywood + Laminate"
+      },
+      "legs": {
+        "type": "-",
+        "finish": "-",
+        "height": 0
+      },
+      "foam": {
+        "seat": "-",
+        "back": "Soft Padding",
+        "firmness": "-"
+      },
+      "notes": "Car shaped headboard cutout"
+    },
+    "created_at": "2025-12-16T00:54:36.932Z",
+    "status": "pending"
+  }
+}
