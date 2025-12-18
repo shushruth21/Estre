@@ -1,8 +1,14 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
+import { SchemaGuard } from "./components/SchemaGuard";
+import ErrorBoundary from "./components/ErrorBoundary";
 import App from "./App.tsx";
 import "./index.css";
 import "./styles/print.css";
+import { validateEnv } from "./lib/env-check";
+
+// Validate environment before doing anything else
+validateEnv();
 
 // Check if root element exists
 const rootElement = document.getElementById("root");
@@ -16,7 +22,11 @@ const root = createRoot(rootElement);
 
 root.render(
   <StrictMode>
-    <App />
+    <SchemaGuard>
+      <ErrorBoundary>
+        <App />
+      </ErrorBoundary>
+    </SchemaGuard>
   </StrictMode>
 );
 

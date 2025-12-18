@@ -5,54 +5,44 @@
  */
 
 import { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { CanonicalEmailLog } from "./email.types.ts";
+import { logError } from "./logger.ts";
 
-export interface EmailLogParams {
-  recipientEmail: string;
-  recipientName?: string;
-  subject: string;
-  emailType: 'otp' | 'sale_order' | 'job_card' | 'custom';
-  orderId?: string;
-  saleOrderId?: string;
-  jobCardId?: string;
-  status: 'pending' | 'sent' | 'delivered' | 'failed' | 'bounced';
-  errorMessage?: string;
-  providerMessageId?: string;
-  providerResponse?: any;
-  metadata?: Record<string, any>;
-}
 
 export async function logEmail(
   supabase: SupabaseClient,
-  params: EmailLogParams
+  params: CanonicalEmailLog
 ): Promise<void> {
   try {
-    const logData: any = {
-      recipient_email: params.recipientEmail,
-      recipient_name: params.recipientName || null,
+    const logData: CanonicalEmailLog = {
+      recipient_email: params.recipient_email,
+      recipient_name: params.recipient_name || undefined,
       subject: params.subject,
-      email_type: params.emailType,
-      order_id: params.orderId || null,
-      sale_order_id: params.saleOrderId || null,
-      job_card_id: params.jobCardId || null,
+      email_type: params.email_type,
+      order_id: params.order_id || undefined,
+      sale_order_id: params.sale_order_id || undefined,
+      job_card_id: params.job_card_id || undefined,
       status: params.status,
-      error_message: params.errorMessage || null,
-      provider_message_id: params.providerMessageId || null,
-      provider_response: params.providerResponse || null,
+      error_message: params.error_message || undefined,
+      provider_message_id: params.provider_message_id || undefined,
+      provider_response: params.provider_response || undefined,
       metadata: params.metadata || {},
-      sent_at: params.status === 'sent' || params.status === 'delivered' ? new Date().toISOString() : null,
-      failed_at: params.status === 'failed' || params.status === 'bounced' ? new Date().toISOString() : null,
+      sent_at: params.status === 'sent' && !params.sent_at ? new Date().toISOString() : params.sent_at,
+      failed_at: (params.status === 'failed' || params.status === 'bounced') && !params.failed_at ? new Date().toISOString() : params.failed_at,
     };
 
+    // We can't type check the database insert perfectly without generated types, 
+    // but we can ensure our object is clean.
     const { error } = await supabase
       .from('email_logs')
       .insert(logData);
 
     if (error) {
-      console.error('Failed to log email:', error);
+      logError('Failed to log email', error, { logData });
       // Don't throw - email logging failure shouldn't break email sending
     }
   } catch (error) {
-    console.error('Error in email logger:', error);
+    logError('Error in email logger', error);
     // Silently fail - logging is non-critical
   }
 }
@@ -64,11 +54,11 @@ export async function updateEmailLogStatus(
   errorMessage?: string
 ): Promise<void> {
   try {
-    const updateData: any = {
+    const updateData: Partial<CanonicalEmailLog> = {
       status,
-      delivered_at: status === 'delivered' ? new Date().toISOString() : null,
-      failed_at: status === 'failed' || status === 'bounced' ? new Date().toISOString() : null,
-      error_message: errorMessage || null,
+      delivered_at: status === 'delivered' ? new Date().toISOString() : undefined,
+      failed_at: status === 'failed' || status === 'bounced' ? new Date().toISOString() : undefined,
+      error_message: errorMessage,
     };
 
     const { error } = await supabase
@@ -77,9 +67,9 @@ export async function updateEmailLogStatus(
       .eq('provider_message_id', providerMessageId);
 
     if (error) {
-      console.error('Failed to update email log:', error);
+      logError('Failed to update email log', error, { providerMessageId, status });
     }
   } catch (error) {
-    console.error('Error updating email log:', error);
+    logError('Error updating email log', error, { providerMessageId });
   }
 }

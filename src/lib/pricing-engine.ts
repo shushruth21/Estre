@@ -78,6 +78,21 @@ export interface SofaConfiguration {
 export async function calculateSofaPrice(
   configuration: SofaConfiguration
 ): Promise<{ breakdown: PricingBreakdown; total: number }> {
+  // Validate configuration
+  // Note: We use a partial schema check or full check depending on what is available. 
+  // Since `SofaConfiguration` interface closely matches `ConfigurationSchema`, we can attempt parsing.
+  // However, `SofaConfiguration` is slightly different structure than the storage `Configuration` schema.
+  // Let's at least validate critical pricing components if possible, or basic structure.
+  // For now, we will trust TypeScript interface but add runtime checks for numeric values where critical.
+
+  if (!configuration.productId) throw new Error("Product ID is required");
+  if (!configuration.fabric) throw new Error("Fabric configuration is required");
+
+  // Basic numeric guards
+  if (configuration.dimensions.seatDepth < 0 || configuration.dimensions.seatWidth < 0) {
+    throw new Error("Invalid dimensions detected");
+  }
+
   // Fetch pricing formulas from database
   const { data: formulas, error: formulasError } = await supabase
     .from("pricing_formulas")

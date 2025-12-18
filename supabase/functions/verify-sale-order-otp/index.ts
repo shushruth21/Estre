@@ -15,6 +15,8 @@ import { mapJobCardData } from "../_shared/mapJobCardData.ts";
 import { mapJobCardToQIR } from "../_shared/mapQIRData.ts";
 import { generateQIRHTML } from "../_shared/premiumQIRTemplate.ts";
 
+import { logError, logInfo } from "../_shared/logger.ts";
+
 serve(async (req) => {
     // Handle CORS
     if (req.method === "OPTIONS") {
@@ -29,7 +31,11 @@ serve(async (req) => {
     }
 
     try {
-        const { saleOrderId, otpCode } = await req.json();
+        const requestId = crypto.randomUUID();
+        const body = await req.json();
+        const { saleOrderId, otpCode } = body;
+
+        logInfo("START_OTP_VERIFICATION", { requestId, saleOrderId });
 
         if (!saleOrderId || !otpCode) {
             return new Response(
@@ -54,6 +60,20 @@ serve(async (req) => {
         }
 
         // 2. Verify OTP
+
+        // Idempotency: If already confirmed, return success immediately
+        if (saleOrder.status === 'confirmed_by_customer') {
+            console.log("Idempotency: Order already confirmed. Returning success.");
+            return new Response(
+                JSON.stringify({
+                    success: true,
+                    message: "Order already confirmed (idempotent)",
+                    alreadyConfirmed: true
+                }),
+                { status: 200, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } }
+            );
+        }
+
         if (saleOrder.otp_code !== otpCode) {
             return new Response(
                 JSON.stringify({ error: "Invalid OTP code" }),
@@ -82,7 +102,27 @@ serve(async (req) => {
 
         if (updateError) throw updateError;
 
+        if (updateError) throw updateError;
+
         // 4. Create Job Cards
+        // Idempotency: Check if job cards already exist
+        const { count: existingJobCardsCount } = await supabase
+            .from("job_cards")
+            .select("*", { count: 'exact', head: true })
+            .eq("sale_order_id", saleOrder.id);
+
+        if (existingJobCardsCount && existingJobCardsCount > 0) {
+            console.log("Idempotency: Job cards already exist. Skipping creation.");
+            // Return success as the goal (job cards exist) is met
+            return new Response(
+                JSON.stringify({
+                    success: true,
+                    message: "Order confirmed. Job Cards already existed (idempotent skip).",
+                }),
+                { status: 200, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } }
+            );
+        }
+
         const orderItems = saleOrder.order?.order_items || [];
         const jobCardsToCreate = [];
 
@@ -94,7 +134,7 @@ serve(async (req) => {
                     ? JSON.parse(item.configuration)
                     : item.configuration || {};
             } catch (e) {
-                console.error("Error parsing configuration", e);
+                logError("CONFIG_PARSE_ERROR", e, { requestId, saleOrderId, itemId: item.id });
             }
 
             // Generate technical specs
@@ -123,7 +163,7 @@ serve(async (req) => {
                 const templateData = mapJobCardData(jobCardData, saleOrder);
                 finalHtml = generatePremiumJobCardHTML(templateData);
             } catch (e) {
-                console.error("Error generating Job Card HTML", e);
+                logError("JOB_CARD_HTML_GEN_ERROR", e, { requestId, saleOrderId, itemId: item.id });
             }
 
             // Add HTML to record
@@ -141,11 +181,11 @@ serve(async (req) => {
                 .select();
 
             if (jobCardError) {
-                console.error("Error creating job cards:", jobCardError);
+                logError("JOB_CARD_CREATION_FAILED", jobCardError, { requestId, saleOrderId });
                 // We don't throw here because the order is already confirmed, 
                 // but we should log it. Staff can manually create job cards if needed.
             } else {
-                console.log(`Created ${jobCardsToCreate.length} job cards`);
+                logInfo("JOB_CARDS_CREATED", { requestId, saleOrderId, count: jobCardsToCreate.length });
 
                 // 6. Create Quality Inspection Reports for each job card
                 if (createdJobCards && createdJobCards.length > 0) {
@@ -174,7 +214,7 @@ serve(async (req) => {
                                 qc_notes: null
                             });
                         } catch (qirError) {
-                            console.error(`Error preparing QIR for job card ${jobCard.id}:`, qirError);
+                            logError("QIR_PREPARATION_FAILED", qirError, { requestId, saleOrderId, jobCardId: jobCard.id });
                         }
                     }
 
@@ -184,9 +224,9 @@ serve(async (req) => {
                             .insert(qirsToCreate);
 
                         if (qirError) {
-                            console.error("Error creating QIRs:", qirError);
+                            logError("QIR_CREATION_FAILED", qirError, { requestId, saleOrderId });
                         } else {
-                            console.log(`Created ${qirsToCreate.length} Quality Inspection Reports`);
+                            logInfo("QIRS_CREATED", { requestId, saleOrderId, count: qirsToCreate.length });
                         }
                     }
                 }
@@ -208,7 +248,10 @@ serve(async (req) => {
         );
 
     } catch (error: any) {
-        console.error("Error:", error);
+        // requestId might be undefined if error happened before generation, but unlikely in this structure
+        // We can't easily access requestId here due to scope, so we leave it out or we could hoist it.
+        // For simplicity, we just log the error.
+        logError("FATAL_ERROR", error);
         return new Response(
             JSON.stringify({
                 error: error.message || "Internal Server Error",

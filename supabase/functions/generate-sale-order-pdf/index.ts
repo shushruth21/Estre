@@ -20,7 +20,9 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { logEmail } from "../_shared/emailLogger.ts";
 
-// Import HTML template generator
+// Import shared schemas
+import { ConfigurationSchema, PricingBreakdownSchema } from "../_shared/schemas.ts";
+
 import { generateSaleOrderHTML } from "../_shared/htmlTemplates.ts";
 
 // Import premium templates
@@ -91,6 +93,39 @@ serve(async (req) => {
       throw new Error(`Sale order not found: ${saleOrderError?.message}`);
     }
 
+    // ==========================================
+    // RUNTIME DATA VALIDATION (Zod)
+    // ==========================================
+    try {
+      // Validate Pricing Breakdown
+      if (saleOrder.pricing_breakdown) {
+        PricingBreakdownSchema.parse(saleOrder.pricing_breakdown);
+      }
+
+      // Validate Configuration from Order Items (if applicable)
+      if (saleOrder.order?.order_items && saleOrder.order.order_items.length > 0) {
+        saleOrder.order.order_items.forEach((item: any) => {
+          if (item.configuration) {
+            // It might be a string or JSON object depending on how Supabase returns it
+            const jsonConfig = typeof item.configuration === 'string'
+              ? JSON.parse(item.configuration)
+              : item.configuration;
+
+            ConfigurationSchema.parse(jsonConfig);
+          }
+        });
+      }
+    } catch (schemaError: any) {
+      console.error("❌ Schema Validation Failed:", schemaError);
+      return new Response(
+        JSON.stringify({
+          error: "Critical Schema Validation Failed",
+          details: schemaError.issues || schemaError.message
+        }),
+        { status: 422, headers: { "Content-Type": "application/json" } }
+      );
+    }
+
     // Get pricing breakdown from sale order or generate from order items
     let pricingBreakdown = saleOrder.pricing_breakdown;
     if (!pricingBreakdown && saleOrder.order?.order_items) {
@@ -102,6 +137,54 @@ serve(async (req) => {
         total: saleOrder.final_price,
       };
     }
+
+    // ==========================================
+    // IDEMPOTENCY CHECK
+    // ==========================================
+    // If in final mode, check if we've already done this recently
+    if (mode === "final") {
+      const alreadyHasPdf = !!saleOrder.final_pdf_url;
+
+      // Check if email was sent recently (within last 5 mins) to prevent duplicate blasting
+      // We check email_logs table
+      let emailRecentlySent = false;
+
+      if (!skipEmail) {
+        const fiveMinsAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+        const { data: recentLogs } = await supabase
+          .from("email_logs")
+          .select("id")
+          .eq("sale_order_id", saleOrderId)
+          .eq("email_type", "sale_order")
+          .eq("status", "sent")
+          .gt("sent_at", fiveMinsAgo)
+          .limit(1);
+
+        if (recentLogs && recentLogs.length > 0) {
+          emailRecentlySent = true;
+        }
+      }
+
+      // If we have PDF and (email logic is satisfied: either skipped, recently sent, or not required), return early
+      if (alreadyHasPdf && (skipEmail || emailRecentlySent)) {
+        console.log("Idempotency: PDF already generated and email processed. Returning existing data.");
+        return new Response(
+          JSON.stringify({
+            success: true,
+            message: "PDF already generated" + (emailRecentlySent ? " and email recently sent (idempotent)" : ""),
+            saleOrderId,
+            pdfUrl: saleOrder.final_pdf_url,
+            // We don't have the base64 handy but for idempotent retries usually URL is enough. 
+            // If client strictly needs base64 we'd need to download it, but usually URL suffices for display.
+            mode: "final",
+            requireOTP: saleOrder.require_otp,
+            idempotent: true
+          }),
+          { status: 200, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } }
+        );
+      }
+    }
+    // ==========================================
 
     // Prepare template data
     const order = saleOrder.order || {};
@@ -364,14 +447,14 @@ serve(async (req) => {
 
       // Log missing configuration
       await logEmail(supabase, {
-        recipientEmail: templateData.customer_email,
-        recipientName: templateData.customer_name,
+        recipient_email: templateData.customer_email,
+        recipient_name: templateData.customer_name,
         subject: "Your Estre Sale Order is Ready",
-        emailType: 'sale_order',
-        saleOrderId: saleOrderId,
-        orderId: saleOrder.order_id || order.id || null,
+        email_type: 'sale_order',
+        sale_order_id: saleOrderId,
+        order_id: saleOrder.order_id || order.id || undefined,
         status: 'failed',
-        errorMessage: emailError,
+        error_message: emailError,
       });
     } else if (resendApiKey && !skipEmail) {
       try {
@@ -412,14 +495,14 @@ serve(async (req) => {
 
           // Log failed email
           await logEmail(supabase, {
-            recipientEmail: templateData.customer_email,
-            recipientName: templateData.customer_name,
+            recipient_email: templateData.customer_email,
+            recipient_name: templateData.customer_name,
             subject: "Your Estre Sale Order is Ready",
-            emailType: 'sale_order',
-            saleOrderId: saleOrderId,
-            orderId: saleOrder.order_id || order.id || null,
+            email_type: 'sale_order',
+            sale_order_id: saleOrderId,
+            order_id: saleOrder.order_id || order.id || undefined,
             status: 'failed',
-            errorMessage: errorText,
+            error_message: errorText,
           });
 
           // Don't throw - PDF generation succeeded, email can be retried
@@ -430,33 +513,33 @@ serve(async (req) => {
           // Log successful email send
           const emailResult = await emailResponse.json();
           await logEmail(supabase, {
-            recipientEmail: templateData.customer_email,
-            recipientName: templateData.customer_name,
+            recipient_email: templateData.customer_email,
+            recipient_name: templateData.customer_name,
             subject: "Your Estre Sale Order is Ready",
-            emailType: 'sale_order',
-            saleOrderId: saleOrderId,
-            orderId: saleOrder.order_id || order.id || null,
+            email_type: 'sale_order',
+            sale_order_id: saleOrderId,
+            order_id: saleOrder.order_id || order.id || undefined,
             status: 'sent',
-            providerMessageId: emailResult?.id || null,
-            providerResponse: emailResult,
+            provider_message_id: emailResult?.id || undefined,
+            provider_response: emailResult,
             metadata: { otp_sent: !!otp, mode: 'final' },
           });
         }
-      } catch (emailError) {
-        console.error("Email error:", emailError);
+      } catch (err) {
+        console.error("Email error:", err);
 
-        emailError = emailError instanceof Error ? emailError.message : String(emailError);
+        emailError = err instanceof Error ? err.message : String(err);
 
         // Log email error
         await logEmail(supabase, {
-          recipientEmail: templateData.customer_email,
-          recipientName: templateData.customer_name,
+          recipient_email: templateData.customer_email,
+          recipient_name: templateData.customer_name,
           subject: "Your Estre Sale Order is Ready",
-          emailType: 'sale_order',
-          saleOrderId: saleOrderId,
-          orderId: saleOrder.order_id || order.id || null,
+          email_type: 'sale_order',
+          sale_order_id: saleOrderId,
+          order_id: saleOrder.order_id || order.id || undefined,
           status: 'failed',
-          errorMessage: emailError,
+          error_message: emailError,
         });
 
         // Don't throw - PDF generation succeeded, email can be retried

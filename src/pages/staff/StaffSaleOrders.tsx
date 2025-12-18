@@ -105,10 +105,6 @@ export default function StaffSaleOrders() {
         throw new Error(`RLS Policy Error: ${testQuery.error.message}. Please ensure RLS policies are configured correctly.`);
       }
 
-      // Add timeout to prevent hanging
-      // Note: buyer_gst and dispatch_method are optional columns added by migration
-      // If migration not run, they won't exist - so we don't select them explicitly
-      // They'll be available via * if they exist, or undefined if they don't
       const queryPromise = supabase
         .from("sale_orders")
         .select(`

@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { logger } from "@/lib/logger";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -1063,7 +1064,7 @@ const SofaConfigurator = ({
         label: `${shapeLabel} • ${totalSeats}-Seater`,
       };
     } catch (error) {
-      console.error('Error calculating dimensions:', error);
+      logger.error(error, { action: "calculateDimensions", shape: configuration.shape }, "DIMENSION_CALCULATION_ERROR");
       return {
         width: 96,
         depth: 95,

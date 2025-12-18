@@ -4,6 +4,7 @@
  */
 
 import { SaleOrderTemplateData } from "./premiumSaleOrderTemplate.ts";
+import { logError } from "./logger.ts";
 // Import date-fns from esm.sh for Deno
 import { format } from "https://esm.sh/date-fns@2.30.0";
 
@@ -91,7 +92,7 @@ function generateProductsTable(orderItems: any[]): string {
         ? JSON.parse(item.configuration)
         : item.configuration || {};
     } catch (e) {
-      console.error("Error parsing configuration", e);
+      logError("Error parsing configuration", e);
     }
 
     const descriptionHTML = generateDetailedDescription(productTitle, category, config);

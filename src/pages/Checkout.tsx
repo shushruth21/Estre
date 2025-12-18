@@ -11,6 +11,8 @@ import { ReviewStep } from "@/components/checkout/ReviewStep";
 import { calculateDynamicPrice } from "@/lib/dynamic-pricing";
 import { generateSaleOrderData } from "@/lib/sale-order-generator";
 import { generateTechnicalSpecifications } from "@/lib/technical-specifications-generator";
+import { logger } from "@/lib/logger";
+import { Configuration } from "@/lib/schemas/configuration";
 
 const STEPS = [
   { id: 1, name: "Delivery", description: "Shipping details" },
@@ -78,25 +80,29 @@ const Checkout = () => {
         .eq("is_active", true)
         .single();
 
-      if (error || !data) {
+
+
+      const discount = data as unknown as any;
+
+      if (error || !discount) {
         throw new Error("Invalid or expired discount code");
       }
 
       // Check expiry
-      if (data.expires_at && new Date(data.expires_at) < new Date()) {
+      if (discount.expires_at && new Date(discount.expires_at) < new Date()) {
         throw new Error("Discount code has expired");
       }
 
       // Check usage limits
-      if (data.max_usage && data.usage_count >= data.max_usage) {
+      if (discount.max_usage && discount.usage_count >= discount.max_usage) {
         throw new Error("Discount code usage limit reached");
       }
 
       let calculatedDiscount = 0;
-      if (data.type === "percent") {
-        calculatedDiscount = (subtotal * (data.percent || 0)) / 100;
+      if (discount.type === "percent") {
+        calculatedDiscount = (subtotal * (discount.percent || 0)) / 100;
       } else {
-        calculatedDiscount = data.value || 0;
+        calculatedDiscount = discount.value || 0;
       }
 
       setDiscountCode(code);
@@ -107,6 +113,7 @@ const Checkout = () => {
         description: `Saved ₹${Math.round(calculatedDiscount).toLocaleString()}`,
       });
     } catch (error: any) {
+      logger.error(error, { code, action: "applyDiscount" }, "DISCOUNT_ERROR");
       setDiscountCode("");
       setDiscountAmount(0);
       toast({
@@ -141,7 +148,7 @@ const Checkout = () => {
           .eq("status", "draft");
 
         if (updateError) {
-          console.error("Error updating draft order:", updateError);
+          logger.error(updateError, { draftOrderNumber }, "DRAFT_ORDER_UPDATE_FAILED");
           // Continue with other items even if one fails
         }
       }
@@ -167,6 +174,8 @@ const Checkout = () => {
         advance_amount_rs: advanceAmount,
         terms_accepted: termsAccepted,
         terms_accepted_at: new Date().toISOString(),
+        buyer_gst: buyerGst,
+        dispatch_method: dispatchMethod,
       };
 
       const { data: order, error: orderError } = await supabase
@@ -222,7 +231,7 @@ const Checkout = () => {
         .single();
 
       if (saleOrderError) {
-        console.error("Error creating sale order:", saleOrderError);
+        logger.error(saleOrderError, { orderId: order.id }, "SALE_ORDER_CREATION_FAILED");
         // Rollback: Delete the created order to prevent inconsistent state
         await supabase.from("orders").delete().eq("id", order.id);
         // Also revert draft order updates
@@ -242,16 +251,17 @@ const Checkout = () => {
       const jobCardInserts: any[] = [];
       if (insertedItems && insertedItems.length > 0) {
         for (const item of insertedItems) {
+          const configuration = item.configuration as unknown as Configuration;
           const pricing = await calculateDynamicPrice(
             item.product_category,
             item.product_id,
-            item.configuration
+            configuration
           );
 
           const saleData = await generateSaleOrderData(
             order,
             item,
-            item.configuration,
+            configuration,
             pricing.breakdown
           );
 
@@ -277,7 +287,7 @@ const Checkout = () => {
               product_category: jobCard.category,
               product_type: technicalSpecs.sofa_type || technicalSpecs.product_type,
               product_title: jobCard.modelName,
-              configuration: jobCard.configuration,
+              configuration: jobCard.configuration as any,
               technical_specifications: technicalSpecs,
               fabric_codes: jobCard.fabricPlan.fabricCodes,
               fabric_meters: jobCard.fabricPlan,
@@ -301,7 +311,7 @@ const Checkout = () => {
           .select();
 
         if (jobCardError) {
-          console.error("❌ Failed to create job cards:", jobCardError);
+          logger.error(jobCardError, { orderId: order.id }, "JOB_CARD_CREATION_FAILED");
           // Don't throw - order is created, job cards can be created manually
           toast({
             title: "Warning",
@@ -309,7 +319,7 @@ const Checkout = () => {
             variant: "destructive",
           });
         } else {
-          console.log(`✅ Created ${insertedJobCards?.length || 0} job cards`);
+          logger.info(`Created ${insertedJobCards?.length || 0} job cards`, { orderId: order.id, count: insertedJobCards?.length });
         }
       }
 
@@ -338,11 +348,11 @@ const Checkout = () => {
         });
 
       if (jsonUploadError) {
-        console.error("❌ Failed to upload order JSON:", jsonUploadError);
+        logger.error(jsonUploadError, { orderNumber }, "ORDER_JSON_BACKUP_FAILED");
         // We ensure we don't block the flow, but we log it. 
         // In a strict environment we might want to alert the user or retry.
       } else {
-        console.log("✅ Order JSON uploaded successfully to", jsonFileName);
+        logger.info("Order JSON uploaded successfully", { orderNumber, jsonFileName });
       }
 
       // 7. Trigger PDF Generation & Email (via Edge Function)
@@ -356,7 +366,7 @@ const Checkout = () => {
             },
           });
         } catch (err) {
-          console.error("Failed to trigger PDF generation:", err);
+          logger.error(err, { saleOrderId: saleOrder.id }, "PDF_GENERATION_TRIGGER_FAILED");
         }
       }
 
@@ -388,7 +398,7 @@ const Checkout = () => {
       navigate("/dashboard");
     },
     onError: (error: any) => {
-      console.error("Order creation error:", error);
+      logger.error(error, { action: "placeOrder" }, "ORDER_PLACEMENT_FAILED");
       toast({
         title: "Order Failed",
         description: error.message || "An unexpected error occurred",

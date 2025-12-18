@@ -44,6 +44,10 @@ interface EmailRequest {
   pdfFileName?: string;
   otp?: string;
   orderNumber?: string;
+  // Added IDs to request interface
+  orderId?: string;
+  saleOrderId?: string;
+  jobCardId?: string;
   htmlContent?: string;
   metadata?: Record<string, any>;
 }
@@ -405,14 +409,19 @@ Deno.serve(async (req: Request) => {
       console.error("Resend API error:", errorText);
 
       await logEmail(supabaseClient, {
-        emailType: requestData.type,
-        recipientEmail: requestData.to,
-        recipientName: requestData.customerName,
+        email_type: requestData.type,
+        recipient_email: requestData.to,
+        recipient_name: requestData.customerName,
         subject: subject,
         status: 'failed',
-        orderNumber: requestData.orderNumber,
-        metadata: requestData.metadata,
-        errorMessage: `Resend API error: ${emailResponse.status} ${errorText}`,
+        order_id: requestData.orderId,
+        sale_order_id: requestData.saleOrderId,
+        job_card_id: requestData.jobCardId,
+        metadata: {
+          ...requestData.metadata,
+          orderNumber: requestData.orderNumber
+        },
+        error_message: `Resend API error: ${emailResponse.status} ${errorText}`,
       });
 
       throw new Error(`Resend API error: ${emailResponse.status} ${errorText}`);
@@ -421,18 +430,21 @@ Deno.serve(async (req: Request) => {
     const emailResult = await emailResponse.json();
 
     await logEmail(supabaseClient, {
-      emailType: requestData.type,
-      recipientEmail: requestData.to,
-      recipientName: requestData.customerName,
+      email_type: requestData.type,
+      recipient_email: requestData.to,
+      recipient_name: requestData.customerName,
       subject: subject,
-      resendEmailId: emailResult.id,
+      provider_message_id: emailResult.id,
       status: 'sent',
-      orderNumber: requestData.orderNumber,
+      order_id: requestData.orderId,
+      sale_order_id: requestData.saleOrderId,
+      job_card_id: requestData.jobCardId,
       metadata: {
         ...requestData.metadata,
         otp: requestData.otp,
         pdfUrl: requestData.pdfUrl,
         hasAttachment: attachments.length > 0,
+        orderNumber: requestData.orderNumber
       },
     });
 

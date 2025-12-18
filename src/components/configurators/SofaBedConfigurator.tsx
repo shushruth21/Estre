@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
+import { logger } from "@/lib/logger";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -484,7 +485,7 @@ const SofaBedConfigurator = ({
   const legTypesResult = useDropdownOptions("sofa", "leg_type");
   const woodTypesResult = useDropdownOptions("sofa", "wood_type");
   const stitchTypesResult = useDropdownOptions("sofa", "stitch_type");
-  
+
   // Safely extract data
   const shapes = Array.isArray(shapesResult.data) ? shapesResult.data : [];
   const seatTypes = Array.isArray(seatTypesResult.data) ? seatTypesResult.data : [];
@@ -750,21 +751,21 @@ const SofaBedConfigurator = ({
 
     const base2Seater = Number(
       product?.net_price_rs ??
-        product?.net_price ??
-        product?.strike_price_rs ??
-        product?.strike_price ??
-        0
+      product?.net_price ??
+      product?.strike_price_rs ??
+      product?.strike_price ??
+      0
     );
 
     const baseFabricMeters = Number(
       product?.fabric_lounger_6ft_mtrs ??
-        product?.fabric_lounger_mtrs ??
-        0
+      product?.fabric_lounger_mtrs ??
+      0
     );
     const additionalFabricMeters = Number(
       product?.fabric_lounger_additional_6_mtrs ??
-        product?.fabric_lounger_additional ??
-        0
+      product?.fabric_lounger_additional ??
+      0
     );
     const storagePrice = Number(product?.lounger_storage_price ?? 0);
 
@@ -934,10 +935,10 @@ const SofaBedConfigurator = ({
   const seatWidthValue = parseSeatWidthValue(configuration.dimensions?.seatWidth ?? 24);
   const base2SeaterPrice = Number(
     product?.net_price_rs ??
-      product?.net_price ??
-      product?.strike_price_rs ??
-      product?.strike_price ??
-      0
+    product?.net_price ??
+    product?.strike_price_rs ??
+    product?.strike_price ??
+    0
   );
 
   const sectionSummaries = useMemo(
@@ -983,14 +984,14 @@ const SofaBedConfigurator = ({
       const totalWidth = totalSeats * baseWidth;
       const depth = 95;
       const shapeLabel = normalizedShape.replace(' ', '-');
-      
+
       return {
         width: totalWidth,
         depth: depth,
         label: `${shapeLabel} • ${totalSeats}-Seater`,
       };
     } catch (error) {
-      console.error('Error calculating dimensions:', error);
+      logger.error(error, { action: "calculateDimensions" }, "DIMENSION_CALCULATION_ERROR");
       return {
         width: 96,
         depth: 95,
@@ -1208,14 +1209,14 @@ const SofaBedConfigurator = ({
   const fabricBreakdown = useMemo(() => {
     const base2SeaterFabric = Number(
       product?.fabric_first_seat_mtrs ??
-        product?.fabric_2_seater_mtrs ??
-        product?.fabric_base_seat_mtrs ??
-        0
+      product?.fabric_2_seater_mtrs ??
+      product?.fabric_base_seat_mtrs ??
+      0
     );
     const additionalSeatFabric = Number(
       product?.fabric_additional_seat_mtrs ??
-        product?.fabric_additional_mtrs ??
-        0
+      product?.fabric_additional_mtrs ??
+      0
     );
     const cornerFabricPerUnit = Number(
       product?.fabric_corner_seat_mtrs ?? product?.fabric_corner_mtrs ?? 0
@@ -1261,9 +1262,9 @@ const SofaBedConfigurator = ({
     const reclinerFabric =
       reclinerFabricPerUnit > 0
         ? reclinerSummaries.reduce(
-            (sum, summary) => sum + summary.quantity * reclinerFabricPerUnit,
-            0
-          )
+          (sum, summary) => sum + summary.quantity * reclinerFabricPerUnit,
+          0
+        )
         : 0;
 
     const consoleSize = configuration.console?.size?.toLowerCase() || "";
@@ -1343,11 +1344,11 @@ const SofaBedConfigurator = ({
     const subtotal =
       pricing?.breakdown?.subtotal ||
       basePriceValue +
-        mechanismPrice +
-        consolePrice +
-        armrestAccessories +
-        fabricUpgrade +
-        loungerPrice;
+      mechanismPrice +
+      consolePrice +
+      armrestAccessories +
+      fabricUpgrade +
+      loungerPrice;
 
     const total = pricing?.total || subtotal;
 
@@ -1438,14 +1439,14 @@ const SofaBedConfigurator = ({
                     const normalizedShapeValue = normalizeShapeValue(shapeValue);
                     const currentNormalizedShape = normalizeShapeValue(configuration.baseShape || '');
                     const isSelected = currentNormalizedShape === normalizedShapeValue;
-                    
+
                     const getShapeIcon = () => {
                       const shapeLower = shapeValue.toLowerCase();
                       if (shapeLower.includes("l-shape") || shapeLower.includes("l shape")) {
                         return (
-                          <img 
-                            src="/shape-icons/l-sectionals.svg" 
-                            alt="L-Sectionals" 
+                          <img
+                            src="/shape-icons/l-sectionals.svg"
+                            alt="L-Sectionals"
                             className="w-16 h-16 object-contain"
                             onError={(e) => {
                               e.currentTarget.style.display = 'none';
@@ -1454,9 +1455,9 @@ const SofaBedConfigurator = ({
                         );
                       } else if (shapeLower.includes("u-shape") || shapeLower.includes("u shape")) {
                         return (
-                          <img 
-                            src="/shape-icons/u-sectionals.svg" 
-                            alt="U-Sectionals" 
+                          <img
+                            src="/shape-icons/u-sectionals.svg"
+                            alt="U-Sectionals"
                             className="w-16 h-16 object-contain"
                             onError={(e) => {
                               e.currentTarget.style.display = 'none';
@@ -1465,9 +1466,9 @@ const SofaBedConfigurator = ({
                         );
                       } else if (shapeLower.includes("combo")) {
                         return (
-                          <img 
-                            src="/shape-icons/u-sectionals.svg" 
-                            alt="Combo Modules" 
+                          <img
+                            src="/shape-icons/u-sectionals.svg"
+                            alt="Combo Modules"
                             className="w-16 h-16 object-contain"
                             onError={(e) => {
                               e.currentTarget.style.display = 'none';
@@ -1478,7 +1479,7 @@ const SofaBedConfigurator = ({
                         return <Square className="w-12 h-12" />;
                       }
                     };
-                    
+
                     return (
                       <SelectionCard
                         key={shape.id}
@@ -1508,7 +1509,7 @@ const SofaBedConfigurator = ({
             <>
               <div className="space-y-4">
                 <Label className="text-lg font-semibold">Section Configuration</Label>
-                
+
                 {/* F Section */}
                 <Card>
                   <CardContent className="p-4 space-y-3">
@@ -1809,7 +1810,7 @@ const SofaBedConfigurator = ({
                 <Card className="bg-muted">
                   <CardContent className="p-4">
                     <p className="text-sm font-medium">Total Seats</p>
-                  <p className="text-2xl font-bold">{totalSeatCount}</p>
+                    <p className="text-2xl font-bold">{totalSeatCount}</p>
                   </CardContent>
                 </Card>
               </div>
@@ -1885,26 +1886,26 @@ const SofaBedConfigurator = ({
                   const isRequired = value === "Yes";
                   const maxConsolesForShape = getMaxConsoles(sections);
                   const autoQuantity = isRequired ? maxConsolesForShape : 0;
-                  
+
                   // Initialize placements array - always maintain maxConsoles slots
                   // Use "none" placeholder to maintain slot positions
-                  const placements = isRequired 
+                  const placements = isRequired
                     ? Array(autoQuantity).fill(null).map((_, i) => {
-                        const existing = configuration.console?.placements?.[i];
-                        // If existing placement is valid, keep it; otherwise set to "none"
-                        if (existing && existing.position && existing.position !== "none" && existing.section) {
-                          return existing;
-                        }
-                        // Return "none" placeholder to maintain slot position
-                        return {
-                          section: null,
-                          position: "none",
-                          afterSeat: null,
-                          accessoryId: null
-                        };
-                      })
+                      const existing = configuration.console?.placements?.[i];
+                      // If existing placement is valid, keep it; otherwise set to "none"
+                      if (existing && existing.position && existing.position !== "none" && existing.section) {
+                        return existing;
+                      }
+                      // Return "none" placeholder to maintain slot position
+                      return {
+                        section: null,
+                        position: "none",
+                        afterSeat: null,
+                        accessoryId: null
+                      };
+                    })
                     : [];
-                  
+
                   updateConfiguration({
                     console: {
                       ...configuration.console,
@@ -1960,14 +1961,14 @@ const SofaBedConfigurator = ({
                     </SelectContent>
                   </Select>
                 </div>
-                
+
                 <div className="space-y-2">
                   <Label>Number of Consoles</Label>
                   <div className="p-3 bg-muted/50 rounded-lg">
                     <p className="text-sm font-medium">
-                      {configuration.console?.quantity || 0} Console{configuration.console?.quantity !== 1 ? 's' : ''} 
+                      {configuration.console?.quantity || 0} Console{configuration.console?.quantity !== 1 ? 's' : ''}
                       <span className="text-muted-foreground ml-2">
-                    (Auto-calculated: Total Seats - 1 = {totalSeatCount} - 1 = {maxConsoles})
+                        (Auto-calculated: Total Seats - 1 = {totalSeatCount} - 1 = {maxConsoles})
                       </span>
                     </p>
                     <p className="text-xs text-muted-foreground mt-1">
@@ -1983,7 +1984,7 @@ const SofaBedConfigurator = ({
                   // Always maintain maxConsoles slots in the array
                   // This ensures slots maintain their positions even when set to "none"
                   let currentPlacements = configuration.console?.placements || [];
-                  
+
                   // Ensure we have exactly maxConsoles slots
                   if (currentPlacements.length < maxConsoles) {
                     currentPlacements = [...currentPlacements];
@@ -2000,7 +2001,7 @@ const SofaBedConfigurator = ({
                     // Trim excess slots
                     currentPlacements = currentPlacements.slice(0, maxConsoles);
                   }
-                  
+
                   // Display all slots (including "none" ones) to maintain correct slot numbers
                   return Array(maxConsoles).fill(null).map((_, index: number) => {
                     const currentPlacement = currentPlacements[index] || {
@@ -2009,17 +2010,17 @@ const SofaBedConfigurator = ({
                       afterSeat: null,
                       accessoryId: null
                     };
-                    
+
                     // Check if this slot is active (not "none")
-                    const isActive = currentPlacement.position && 
-                                     currentPlacement.position !== "none" && 
-                                     currentPlacement.section;
-                    
+                    const isActive = currentPlacement.position &&
+                      currentPlacement.position !== "none" &&
+                      currentPlacement.section;
+
                     // Get current placement value for the select dropdown
                     const currentPlacementValue = isActive
                       ? `${currentPlacement.section}_${currentPlacement.afterSeat || 1}`
                       : "none";
-                    
+
                     // Filter out placements that are already selected by OTHER console slots
                     // Only consider ACTIVE slots (not "none") when filtering
                     const otherActivePlacements = currentPlacements
@@ -2031,17 +2032,17 @@ const SofaBedConfigurator = ({
                         return null;
                       })
                       .filter(Boolean);
-                    
+
                     // Get available placement options - exclude already selected ones (except current)
-                    const availablePlacements = allPlacements.length > 0 
+                    const availablePlacements = allPlacements.length > 0
                       ? allPlacements.filter((placement) => {
-                          // Always include the current placement (so user can see what's selected)
-                          if (placement.value === currentPlacementValue) return true;
-                          // Exclude placements already selected by other ACTIVE console slots
-                          return !otherActivePlacements.includes(placement.value);
-                        })
+                        // Always include the current placement (so user can see what's selected)
+                        if (placement.value === currentPlacementValue) return true;
+                        // Exclude placements already selected by other ACTIVE console slots
+                        return !otherActivePlacements.includes(placement.value);
+                      })
                       : [{ section: "front", position: "after_1", label: "After 1st Seat from Left (Front)", value: "front_1" }];
-                    
+
                     return (
                       <div key={`console-slot-${index}`} className="space-y-3 p-4 bg-muted/30 rounded-lg border">
                         <div className="flex items-center justify-between">
@@ -2060,7 +2061,7 @@ const SofaBedConfigurator = ({
                             onValueChange={(value) => {
                               // Get fresh placements from configuration to ensure we have the latest state
                               const freshPlacements = [...(configuration.console?.placements || [])];
-                              
+
                               // Ensure we have exactly maxConsoles slots
                               while (freshPlacements.length < maxConsoles) {
                                 freshPlacements.push({
@@ -2070,7 +2071,7 @@ const SofaBedConfigurator = ({
                                   accessoryId: null
                                 });
                               }
-                              
+
                               if (value === "none") {
                                 // Set to "none" but keep in array
                                 freshPlacements[index] = {
@@ -2092,10 +2093,10 @@ const SofaBedConfigurator = ({
                                   };
                                 }
                               }
-                              
+
                               updateConfiguration({
-                                console: { 
-                                  ...configuration.console, 
+                                console: {
+                                  ...configuration.console,
                                   placements: freshPlacements,
                                   quantity: maxConsoles // Keep quantity at maxConsoles
                                 },
@@ -2150,7 +2151,7 @@ const SofaBedConfigurator = ({
                                   <SelectItem value="loading" disabled>Loading...</SelectItem>
                                 ) : consoleAccessories && consoleAccessories.length > 0 ? (
                                   consoleAccessories
-                                    .filter((acc: any, idx: number, self: any[]) => 
+                                    .filter((acc: any, idx: number, self: any[]) =>
                                       idx === self.findIndex((a: any) => a.id === acc.id && a.description === acc.description)
                                     )
                                     .map((acc: any) => (
@@ -2402,9 +2403,9 @@ const SofaBedConfigurator = ({
                     value={(configuration.additionalPillows?.quantity || 1).toString()}
                     onValueChange={(value) =>
                       updateConfiguration({
-                        additionalPillows: { 
-                          ...configuration.additionalPillows, 
-                          quantity: parseInt(value, 10) 
+                        additionalPillows: {
+                          ...configuration.additionalPillows,
+                          quantity: parseInt(value, 10)
                         },
                       })
                     }
@@ -2497,8 +2498,8 @@ const SofaBedConfigurator = ({
                     value={configuration.additionalPillows?.fabricPlan || "Single Colour"}
                     onValueChange={(value) =>
                       updateConfiguration({
-                        additionalPillows: { 
-                          ...configuration.additionalPillows, 
+                        additionalPillows: {
+                          ...configuration.additionalPillows,
                           fabricPlan: value,
                           fabricColour: value === "Single Colour" ? (configuration.additionalPillows?.fabricColour || undefined) : undefined,
                           fabricColour1: value === "Dual Colour" ? (configuration.additionalPillows?.fabricColour1 || undefined) : undefined,
@@ -2546,7 +2547,7 @@ const SofaBedConfigurator = ({
                             <div
                               className="w-8 h-8 rounded-full border-2 border-gray-200 flex-shrink-0"
                               style={{
-                                backgroundColor: selectedPillowFabrics[configuration.additionalPillows.fabricColour].colour_link || 
+                                backgroundColor: selectedPillowFabrics[configuration.additionalPillows.fabricColour].colour_link ||
                                   `hsl(${(selectedPillowFabrics[configuration.additionalPillows.fabricColour].estre_code.charCodeAt(0) || 0) % 360}, 70%, 75%)`,
                               }}
                             />
@@ -2554,13 +2555,13 @@ const SofaBedConfigurator = ({
                               {selectedPillowFabrics[configuration.additionalPillows.fabricColour].estre_code}
                             </Badge>
                             <span className="flex-1 truncate">
-                              {selectedPillowFabrics[configuration.additionalPillows.fabricColour].description || 
-                               selectedPillowFabrics[configuration.additionalPillows.fabricColour].colour || 
-                               selectedPillowFabrics[configuration.additionalPillows.fabricColour].estre_code}
+                              {selectedPillowFabrics[configuration.additionalPillows.fabricColour].description ||
+                                selectedPillowFabrics[configuration.additionalPillows.fabricColour].colour ||
+                                selectedPillowFabrics[configuration.additionalPillows.fabricColour].estre_code}
                             </span>
                             <span className="ml-auto text-primary font-semibold">
-                              ₹{selectedPillowFabrics[configuration.additionalPillows.fabricColour].bom_price?.toLocaleString() || 
-                                 selectedPillowFabrics[configuration.additionalPillows.fabricColour].price?.toLocaleString() || 0}
+                              ₹{selectedPillowFabrics[configuration.additionalPillows.fabricColour].bom_price?.toLocaleString() ||
+                                selectedPillowFabrics[configuration.additionalPillows.fabricColour].price?.toLocaleString() || 0}
                             </span>
                           </div>
                         ) : (
@@ -2586,7 +2587,7 @@ const SofaBedConfigurator = ({
                             <div
                               className="w-8 h-8 rounded-full border-2 border-gray-200 flex-shrink-0"
                               style={{
-                                backgroundColor: selectedPillowFabrics[configuration.additionalPillows.fabricColour1].colour_link || 
+                                backgroundColor: selectedPillowFabrics[configuration.additionalPillows.fabricColour1].colour_link ||
                                   `hsl(${(selectedPillowFabrics[configuration.additionalPillows.fabricColour1].estre_code.charCodeAt(0) || 0) % 360}, 70%, 75%)`,
                               }}
                             />
@@ -2594,13 +2595,13 @@ const SofaBedConfigurator = ({
                               {selectedPillowFabrics[configuration.additionalPillows.fabricColour1].estre_code}
                             </Badge>
                             <span className="flex-1 truncate">
-                              {selectedPillowFabrics[configuration.additionalPillows.fabricColour1].description || 
-                               selectedPillowFabrics[configuration.additionalPillows.fabricColour1].colour || 
-                               selectedPillowFabrics[configuration.additionalPillows.fabricColour1].estre_code}
+                              {selectedPillowFabrics[configuration.additionalPillows.fabricColour1].description ||
+                                selectedPillowFabrics[configuration.additionalPillows.fabricColour1].colour ||
+                                selectedPillowFabrics[configuration.additionalPillows.fabricColour1].estre_code}
                             </span>
                             <span className="ml-auto text-primary font-semibold">
-                              ₹{selectedPillowFabrics[configuration.additionalPillows.fabricColour1].bom_price?.toLocaleString() || 
-                                 selectedPillowFabrics[configuration.additionalPillows.fabricColour1].price?.toLocaleString() || 0}
+                              ₹{selectedPillowFabrics[configuration.additionalPillows.fabricColour1].bom_price?.toLocaleString() ||
+                                selectedPillowFabrics[configuration.additionalPillows.fabricColour1].price?.toLocaleString() || 0}
                             </span>
                           </div>
                         ) : (
@@ -2620,7 +2621,7 @@ const SofaBedConfigurator = ({
                             <div
                               className="w-8 h-8 rounded-full border-2 border-gray-200 flex-shrink-0"
                               style={{
-                                backgroundColor: selectedPillowFabrics[configuration.additionalPillows.fabricColour2].colour_link || 
+                                backgroundColor: selectedPillowFabrics[configuration.additionalPillows.fabricColour2].colour_link ||
                                   `hsl(${(selectedPillowFabrics[configuration.additionalPillows.fabricColour2].estre_code.charCodeAt(0) || 0) % 360}, 70%, 75%)`,
                               }}
                             />
@@ -2628,13 +2629,13 @@ const SofaBedConfigurator = ({
                               {selectedPillowFabrics[configuration.additionalPillows.fabricColour2].estre_code}
                             </Badge>
                             <span className="flex-1 truncate">
-                              {selectedPillowFabrics[configuration.additionalPillows.fabricColour2].description || 
-                               selectedPillowFabrics[configuration.additionalPillows.fabricColour2].colour || 
-                               selectedPillowFabrics[configuration.additionalPillows.fabricColour2].estre_code}
+                              {selectedPillowFabrics[configuration.additionalPillows.fabricColour2].description ||
+                                selectedPillowFabrics[configuration.additionalPillows.fabricColour2].colour ||
+                                selectedPillowFabrics[configuration.additionalPillows.fabricColour2].estre_code}
                             </span>
                             <span className="ml-auto text-primary font-semibold">
-                              ₹{selectedPillowFabrics[configuration.additionalPillows.fabricColour2].bom_price?.toLocaleString() || 
-                                 selectedPillowFabrics[configuration.additionalPillows.fabricColour2].price?.toLocaleString() || 0}
+                              ₹{selectedPillowFabrics[configuration.additionalPillows.fabricColour2].bom_price?.toLocaleString() ||
+                                selectedPillowFabrics[configuration.additionalPillows.fabricColour2].price?.toLocaleString() || 0}
                             </span>
                           </div>
                         ) : (
@@ -3013,7 +3014,7 @@ const SofaBedConfigurator = ({
                       </Label>
                     </div>
                   </RadioGroup>
-                  
+
                   {reclinerData.required === "Yes" && (
                     <div className="space-y-3">
                       <div className="space-y-2">

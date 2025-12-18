@@ -1,7 +1,9 @@
 import { supabase } from "@/integrations/supabase/client";
 import { getConsolePositionLabel } from "@/lib/console-validation";
 import { generateJobCardData, JobCardGeneratedData } from "@/lib/job-card-generator";
-import { PricingBreakdown } from "@/lib/dynamic-pricing";
+import { PricingBreakdown, PricingBreakdownSchema } from "@/lib/schemas/pricing";
+import { Configuration, ConfigurationSchema } from "@/lib/schemas/configuration";
+
 
 type SaleOrderStatus =
   | "DRAFT"
@@ -119,13 +121,13 @@ export interface SaleOrderLineItem {
   line_item_id: string;
   so_number: string;
   category:
-    | "SOFA"
-    | "SOFABED"
-    | "RECLINER"
-    | "DINING_CHAIR"
-    | "ARM_CHAIR"
-    | "KIDS_BED"
-    | "POUFFE";
+  | "SOFA"
+  | "SOFABED"
+  | "RECLINER"
+  | "DINING_CHAIR"
+  | "ARM_CHAIR"
+  | "KIDS_BED"
+  | "POUFFE";
   model_name: string;
   shape: string;
   sections: SaleOrderSection[];
@@ -291,7 +293,7 @@ const deriveSeatCountFromSeater = (seater?: string) => {
   return match ? parseInt(match[1], 10) : 0;
 };
 
-const calculateOverallWidth = (configuration: any): number => {
+const calculateOverallWidth = (configuration: Configuration): number => {
   const seatWidth = coerceNumber(configuration.dimensions?.seatWidth, 22);
   const sections = configuration.sections || {};
   let width = 0;
@@ -306,7 +308,7 @@ const calculateOverallWidth = (configuration: any): number => {
   return width || seatWidth * 2;
 };
 
-const deriveLineItemSections = (configuration: any, basePrice: number): SaleOrderSection[] => {
+const deriveLineItemSections = (configuration: Configuration, basePrice: number): SaleOrderSection[] => {
   const sectionsConfig = configuration.sections || {};
   const activeKeys = Object.keys(sectionsConfig).filter(
     (key) => sectionsConfig[key] && sectionsConfig[key].seater && sectionsConfig[key].seater !== "none"
@@ -338,7 +340,7 @@ const deriveLineItemSections = (configuration: any, basePrice: number): SaleOrde
   });
 };
 
-const deriveConsoleData = (configuration: any, breakdown: any): SaleOrderConsole | undefined => {
+const deriveConsoleData = (configuration: Configuration, breakdown: any): SaleOrderConsole | undefined => {
   if (!configuration.console?.required) return undefined;
 
   const positions = deriveConsolePositions(configuration.console.placements);
@@ -352,7 +354,7 @@ const deriveConsoleData = (configuration: any, breakdown: any): SaleOrderConsole
   };
 };
 
-const deriveLoungerData = (configuration: any, breakdown: any): SaleOrderLounger | undefined => {
+const deriveLoungerData = (configuration: Configuration, breakdown: any): SaleOrderLounger | undefined => {
   if (!normaliseBooleanString(configuration.lounger?.required)) return undefined;
 
   const loungerConfig = configuration.lounger || {};
@@ -371,7 +373,7 @@ const deriveLoungerData = (configuration: any, breakdown: any): SaleOrderLounger
   };
 };
 
-const derivePillowData = (configuration: any, breakdown: any): SaleOrderPillow | undefined => {
+const derivePillowData = (configuration: Configuration, breakdown: any): SaleOrderPillow | undefined => {
   const pillows = configuration.additionalPillows || {};
   if (!normaliseBooleanString(pillows.required)) return undefined;
 
@@ -390,7 +392,7 @@ const derivePillowData = (configuration: any, breakdown: any): SaleOrderPillow |
   };
 };
 
-const deriveFabricData = async (configuration: any, breakdown: any): Promise<SaleOrderFabric> => {
+const deriveFabricData = async (configuration: Configuration, breakdown: any): Promise<SaleOrderFabric> => {
   const plan = (configuration.fabric?.claddingPlan || "Single Colour") as SaleOrderFabric["plan"];
   const fabric: SaleOrderFabric = {
     plan,
@@ -414,9 +416,9 @@ const deriveFabricData = async (configuration: any, breakdown: any): Promise<Sal
     fabric.multi_colour = {
       structure: structure
         ? {
-            code: structure.estre_code,
-            name: structure.description || structure.colour || structure.estre_code,
-          }
+          code: structure.estre_code,
+          name: structure.description || structure.colour || structure.estre_code,
+        }
         : undefined,
       backrest: backrest
         ? { code: backrest.estre_code, name: backrest.description || backrest.colour || backrest.estre_code }
@@ -431,7 +433,7 @@ const deriveFabricData = async (configuration: any, breakdown: any): Promise<Sal
   return fabric;
 };
 
-const deriveAccessories = async (configuration: any): Promise<SaleOrderAccessory[]> => {
+const deriveAccessories = async (configuration: Configuration): Promise<SaleOrderAccessory[]> => {
   const accessories: SaleOrderAccessory[] = [];
   const placements = configuration.console?.placements || [];
 
@@ -467,7 +469,7 @@ const deriveAccessories = async (configuration: any): Promise<SaleOrderAccessory
   return accessories;
 };
 
-const deriveSeatDimensions = (configuration: any, breakdown: any) => {
+const deriveSeatDimensions = (configuration: Configuration, breakdown: any) => {
   const depth = coerceNumber(configuration.dimensions?.seatDepth, 22);
   const width = coerceNumber(configuration.dimensions?.seatWidth, 22);
   const height = coerceNumber(configuration.dimensions?.seatHeight, 18);
@@ -486,7 +488,7 @@ const deriveSeatDimensions = (configuration: any, breakdown: any) => {
 const deriveLineItem = async (
   soNumber: string,
   orderItem: any,
-  configuration: any,
+  configuration: Configuration,
   breakdown: PricingBreakdown
 ): Promise<SaleOrderLineItem> => {
   const category = (orderItem.product_category || "sofa").toUpperCase() as SaleOrderLineItem["category"];
@@ -646,9 +648,18 @@ const generateSaleOrderNumber = (order: any) => {
 export async function generateSaleOrderData(
   order: any,
   orderItem: any,
-  configuration: any,
+  configuration: Configuration,
   pricingBreakdown: PricingBreakdown
 ): Promise<SaleOrderGeneratedData> {
+  // Validate payloads before processing
+  try {
+    ConfigurationSchema.parse(configuration);
+    PricingBreakdownSchema.parse(pricingBreakdown);
+  } catch (error) {
+    console.error("Sale Order Generation Validation Error:", error);
+    throw new Error("Invalid configuration or pricing data provided to sale order generator.");
+  }
+
   const soNumber = generateSaleOrderNumber(order);
   const deliveryDate = new Date();
   deliveryDate.setDate(deliveryDate.getDate() + DEFAULT_DELIVERY_DAYS);

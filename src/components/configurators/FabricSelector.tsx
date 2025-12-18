@@ -1,4 +1,5 @@
 import { useState, useMemo, useCallback } from "react";
+import { logger } from "@/lib/logger";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Label } from "@/components/ui/label";
@@ -122,15 +123,13 @@ const FabricSelector = ({
       });
       setOpenLibrary(null);
     } catch (error) {
-      console.error("Error selecting fabric:", error);
-      if (import.meta.env.DEV) {
-        console.error("Fabric selection error details:", {
-          part,
-          fabricCode,
-          configuration: configuration.fabric,
-          effectiveCategory,
-        });
-      }
+      logger.error(error, {
+        part,
+        fabricCode,
+        configuration: configuration.fabric,
+        effectiveCategory,
+        action: "selectFabric"
+      }, "FABRIC_SELECTION_ERROR");
     }
   }, [configuration, effectiveCategory, onConfigurationChange]);
 
@@ -169,14 +168,12 @@ const FabricSelector = ({
         fabric: updatedFabric
       });
     } catch (error) {
-      console.error("Error changing cladding plan:", error);
-      if (import.meta.env.DEV) {
-        console.error("Cladding plan change error details:", {
-          value,
-          configuration: configuration.fabric,
-          effectiveCategory,
-        });
-      }
+      logger.error(error, {
+        value,
+        configuration: configuration.fabric,
+        effectiveCategory,
+        action: "handleCladdingPlanChange"
+      }, "CLADDING_PLAN_CHANGE_ERROR");
     }
   }, [configuration, effectiveCategory, onConfigurationChange]);
 

@@ -15,6 +15,7 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { logError, logInfo } from "../_shared/logger.ts";
 
 // Tables and their image columns to migrate
 const IMAGE_TABLES = [
@@ -29,25 +30,25 @@ const IMAGE_TABLES = [
 // Check if URL is external (not Supabase Storage)
 function isExternalUrl(url: string | null | undefined): boolean {
   if (!url || typeof url !== "string") return false;
-  
+
   // Already in Supabase Storage (public URLs - don't migrate)
   if (url.includes("supabase.co/storage") && url.includes("/storage/v1/object/public/")) {
     return false;
   }
-  
+
   // Signed URLs should be converted to public, but we'll handle that separately
   // For now, treat signed URLs as external so they get converted
-  
+
   // Relative paths (already local)
   if (url.startsWith("/")) {
     return false;
   }
-  
+
   // Data URIs (already embedded)
   if (url.startsWith("data:")) {
     return false;
   }
-  
+
   // External URLs (http/https)
   return url.match(/^https?:\/\//i) !== null;
 }
@@ -80,16 +81,16 @@ async function downloadImage(url: string): Promise<Uint8Array | null> {
         "User-Agent": "Mozilla/5.0 (compatible; EstreImageMigrator/1.0)",
       },
     });
-    
+
     if (!response.ok) {
-      console.error(`❌ Failed to download ${url}: ${response.status} ${response.statusText}`);
+      logError(`Failed to download ${url}`, null, { status: response.status, statusText: response.statusText });
       return null;
     }
-    
+
     const arrayBuffer = await response.arrayBuffer();
     return new Uint8Array(arrayBuffer);
   } catch (error) {
-    console.error(`❌ Error downloading ${url}:`, error);
+    logError(`Error downloading ${url}`, error);
     return null;
   }
 }
@@ -109,20 +110,20 @@ async function uploadToStorage(
         contentType,
         upsert: true,
       });
-    
+
     if (error) {
-      console.error(`❌ Upload error:`, error);
+      logError("Upload error", error);
       return null;
     }
-    
+
     // Get public URL
     const { data: urlData } = supabase.storage
       .from(bucket)
       .getPublicUrl(path);
-    
+
     return urlData.publicUrl;
   } catch (error) {
-    console.error(`❌ Upload exception:`, error);
+    logError("Upload exception", error);
     return null;
   }
 }
@@ -138,30 +139,30 @@ async function migrateRecordImages(
 ): Promise<{ migrated: number; failed: number; skipped: number }> {
   const stats = { migrated: 0, failed: 0, skipped: 0 };
   const recordId = record.id;
-  
+
   if (type === "array") {
     const images = record[column] || [];
     if (!Array.isArray(images) || images.length === 0) {
       return stats;
     }
-    
+
     const newImages: string[] = [];
     let needsUpdate = false;
-    
+
     for (const imageUrl of images) {
       if (!isExternalUrl(imageUrl)) {
         newImages.push(imageUrl);
         stats.skipped++;
         continue;
       }
-      
+
       if (dryRun) {
         console.log(`  [DRY RUN] Would migrate: ${imageUrl}`);
         newImages.push(imageUrl); // Keep original in dry run
         stats.migrated++;
         continue;
       }
-      
+
       // Download image
       const imageBytes = await downloadImage(imageUrl);
       if (!imageBytes) {
@@ -169,15 +170,15 @@ async function migrateRecordImages(
         stats.failed++;
         continue;
       }
-      
+
       // Determine content type
       const contentType = imageUrl.match(/\.(jpg|jpeg)$/i) ? "image/jpeg" :
-                         imageUrl.match(/\.png$/i) ? "image/png" :
-                         imageUrl.match(/\.gif$/i) ? "image/gif" :
-                         imageUrl.match(/\.webp$/i) ? "image/webp" :
-                         imageUrl.match(/\.svg$/i) ? "image/svg+xml" :
-                         "image/jpeg";
-      
+        imageUrl.match(/\.png$/i) ? "image/png" :
+          imageUrl.match(/\.gif$/i) ? "image/gif" :
+            imageUrl.match(/\.webp$/i) ? "image/webp" :
+              imageUrl.match(/\.svg$/i) ? "image/svg+xml" :
+                "image/jpeg";
+
       // Upload to storage
       // For fabric_coding, preserve collection/brand structure if available
       let storagePath: string;
@@ -192,7 +193,7 @@ async function migrateRecordImages(
         storagePath = `images/${table}/${fileName}`;
       }
       const newUrl = await uploadToStorage(supabase, "public", storagePath, imageBytes, contentType);
-      
+
       if (newUrl) {
         newImages.push(newUrl);
         needsUpdate = true;
@@ -203,16 +204,16 @@ async function migrateRecordImages(
         stats.failed++;
       }
     }
-    
+
     // Update record if any images were migrated
     if (needsUpdate && !dryRun) {
       const { error } = await supabase
         .from(table)
         .update({ [column]: newImages })
         .eq("id", recordId);
-      
+
       if (error) {
-        console.error(`  ❌ Failed to update ${table} record ${recordId}:`, error);
+        logError(`Failed to update ${table} record ${recordId}`, error);
       } else {
         console.log(`  ✅ Updated ${table} record ${recordId}`);
       }
@@ -223,28 +224,28 @@ async function migrateRecordImages(
     if (!imageUrl || !isExternalUrl(imageUrl)) {
       return stats;
     }
-    
+
     if (dryRun) {
       console.log(`  [DRY RUN] Would migrate: ${imageUrl}`);
       stats.migrated++;
       return stats;
     }
-    
+
     // Download image
     const imageBytes = await downloadImage(imageUrl);
     if (!imageBytes) {
       stats.failed++;
       return stats;
     }
-    
+
     // Determine content type
     const contentType = imageUrl.match(/\.(jpg|jpeg)$/i) ? "image/jpeg" :
-                       imageUrl.match(/\.png$/i) ? "image/png" :
-                       imageUrl.match(/\.gif$/i) ? "image/gif" :
-                       imageUrl.match(/\.webp$/i) ? "image/webp" :
-                       imageUrl.match(/\.svg$/i) ? "image/svg+xml" :
-                       "image/jpeg";
-    
+      imageUrl.match(/\.png$/i) ? "image/png" :
+        imageUrl.match(/\.gif$/i) ? "image/gif" :
+          imageUrl.match(/\.webp$/i) ? "image/webp" :
+            imageUrl.match(/\.svg$/i) ? "image/svg+xml" :
+              "image/jpeg";
+
     // Upload to storage
     // For fabric_coding, preserve collection/brand structure if available
     let storagePath: string;
@@ -259,16 +260,16 @@ async function migrateRecordImages(
       storagePath = `images/${table}/${fileName}`;
     }
     const newUrl = await uploadToStorage(supabase, "public", storagePath, imageBytes, contentType);
-    
+
     if (newUrl) {
       // Update record
       const { error } = await supabase
         .from(table)
         .update({ [column]: newUrl })
         .eq("id", recordId);
-      
+
       if (error) {
-        console.error(`  ❌ Failed to update ${table} record ${recordId}:`, error);
+        logError(`Failed to update ${table} record ${recordId}`, error);
         stats.failed++;
       } else {
         console.log(`  ✅ Migrated and updated: ${imageUrl} → ${newUrl}`);
@@ -278,7 +279,7 @@ async function migrateRecordImages(
       stats.failed++;
     }
   }
-  
+
   return stats;
 }
 
@@ -306,7 +307,7 @@ serve(async (req) => {
     // Check if public bucket exists
     const { data: buckets } = await supabase.storage.listBuckets();
     const publicBucket = buckets?.find((b) => b.name === "public");
-    
+
     if (!publicBucket) {
       return new Response(
         JSON.stringify({
@@ -323,7 +324,7 @@ serve(async (req) => {
       );
     }
 
-    const tablesToProcess = table 
+    const tablesToProcess = table
       ? IMAGE_TABLES.filter((t) => t.table === table)
       : IMAGE_TABLES;
 
@@ -336,10 +337,10 @@ serve(async (req) => {
 
     for (const { table: tableName, column, type } of tablesToProcess) {
       console.log(`\n📊 Processing table: ${tableName}.${column}`);
-      
+
       // Build query - special handling for fabric_coding (filter is_active and get extra fields)
       let query = supabase.from(tableName);
-      
+
       // For fabric_coding, get collection and brand for folder structure
       if (tableName === "fabric_coding") {
         query = query
@@ -348,26 +349,26 @@ serve(async (req) => {
       } else {
         query = query.select(`id, ${column}`);
       }
-      
+
       // Filter out null, empty strings, and error values
       query = query
         .not(column, "is", null)
         .neq(column, "")
         .neq(column, "NULL")
         .neq(column, "#VALUE!");
-      
+
       const { data: records, error } = await query;
-      
+
       if (error) {
-        console.error(`❌ Error fetching ${tableName}:`, error);
+        logError(`Error fetching ${tableName}`, error);
         continue;
       }
-      
+
       if (!records || records.length === 0) {
         console.log(`  ℹ️  No records found in ${tableName}`);
         continue;
       }
-      
+
       // Filter records to only process those with external URLs (Google Drive, etc.)
       const recordsToProcess = records.filter((record: any) => {
         const url = record[column];
@@ -377,19 +378,19 @@ serve(async (req) => {
         // Process Google Drive and other external URLs
         return isExternalUrl(url);
       });
-      
+
       console.log(`  Found ${records.length} total records, ${recordsToProcess.length} with external URLs to migrate`);
-      
+
       if (recordsToProcess.length === 0) {
         console.log(`  ✅ All images already migrated or no external URLs found`);
         continue;
       }
-      
+
       // Process in batches
       for (let i = 0; i < recordsToProcess.length; i += batchSize) {
         const batch = recordsToProcess.slice(i, i + batchSize);
         console.log(`  Processing batch ${Math.floor(i / batchSize) + 1}/${Math.ceil(records.length / batchSize)}`);
-        
+
         for (const record of batch) {
           const stats = await migrateRecordImages(
             supabase,
@@ -399,13 +400,13 @@ serve(async (req) => {
             record,
             dryRun
           );
-          
+
           totalStats.migrated += stats.migrated;
           totalStats.failed += stats.failed;
           totalStats.skipped += stats.skipped;
           totalStats.processed++;
         }
-        
+
         // Small delay between batches to avoid rate limiting
         if (i + batchSize < recordsToProcess.length) {
           await new Promise((resolve) => setTimeout(resolve, 1000));
@@ -429,7 +430,7 @@ serve(async (req) => {
       }
     );
   } catch (error: any) {
-    console.error("Error:", error);
+    logError("Migration Error", error);
     return new Response(
       JSON.stringify({
         error: error.message || "Failed to migrate images",

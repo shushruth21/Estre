@@ -9,6 +9,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { saleOrderConfirmedEmailHTML } from "../_shared/emailTemplates.ts";
 import { logEmail } from "../_shared/emailLogger.ts";
+import { logError } from "../_shared/logger.ts";
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -23,7 +24,7 @@ serve(async (req) => {
   }
 
   let saleOrderId: string | null = null;
-  
+
   try {
     const requestBody = await req.json();
     saleOrderId = requestBody.saleOrderId;
@@ -66,6 +67,37 @@ serve(async (req) => {
       throw new Error(`Sale order not found: ${saleOrderError?.message}`);
     }
 
+    // ==========================================
+    // IDEMPOTENCY CHECK
+    // ==========================================
+    // Check if we already sent this recently
+    const { data: recentLogs } = await supabase
+      .from("email_logs")
+      .select("id, sent_at")
+      .eq("sale_order_id", saleOrderId)
+      .eq("email_type", "sale_order")
+      .eq("status", "sent")
+      .order("sent_at", { ascending: false })
+      .limit(1);
+
+    // Also check metadata flag
+    const lastSentAt = saleOrder.metadata?.pdf_sent_to_customer_at;
+    const isRecentlySentInLog = recentLogs && recentLogs.length > 0 &&
+      (new Date().getTime() - new Date(recentLogs[0].sent_at).getTime() < 5 * 60 * 1000);
+
+    // If sent within last 5 minutes, skip
+    if (isRecentlySentInLog) {
+      console.log("Idempotency: Email already sent recently. Skipping.");
+      return new Response(
+        JSON.stringify({
+          success: true,
+          message: "Email already sent recently (idempotent)",
+          emailSent: true,
+        }),
+        { status: 200, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } }
+      );
+    }
+
     // Check if PDF exists
     const pdfUrl = saleOrder.final_pdf_url || saleOrder.pdf_url;
     if (!pdfUrl) {
@@ -96,7 +128,7 @@ serve(async (req) => {
         }
       }
     } catch (e) {
-      console.error("Error parsing PDF URL:", e);
+      logError("Error parsing PDF URL", e, { pdfUrl });
       // Fallback to simple string splitting
       if (pdfUrl.includes('/storage/v1/object/public/')) {
         storagePath = pdfUrl.split('/storage/v1/object/public/')[1];
@@ -104,7 +136,7 @@ serve(async (req) => {
     }
 
     if (!storagePath) {
-      console.error("Could not extract storage path from URL:", pdfUrl);
+      logError("Could not extract storage path from URL", null, { pdfUrl });
       throw new Error("Invalid PDF URL format");
     }
 
@@ -162,34 +194,34 @@ serve(async (req) => {
 
     if (!emailResponse.ok) {
       const errorText = await emailResponse.text();
-      
+
       // Log failed email
       await logEmail(supabase, {
-        recipientEmail: customerEmail,
-        recipientName: customerName,
+        recipient_email: customerEmail,
+        recipient_name: customerName,
         subject: `Your Confirmed Sale Order - ${orderNumber}`,
-        emailType: 'sale_order',
-        saleOrderId: saleOrderId,
-        orderId: saleOrder.order?.id || null,
+        email_type: 'sale_order',
+        sale_order_id: saleOrderId,
+        order_id: saleOrder.order?.id || undefined,
         status: 'failed',
-        errorMessage: errorText,
+        error_message: errorText,
       });
-      
+
       throw new Error(`Email failed: ${errorText}`);
     }
 
     // Log successful email send
     const emailResult = await emailResponse.json();
     await logEmail(supabase, {
-      recipientEmail: customerEmail,
-      recipientName: customerName,
+      recipient_email: customerEmail,
+      recipient_name: customerName,
       subject: `Your Confirmed Sale Order - ${orderNumber}`,
-      emailType: 'sale_order',
-      saleOrderId: saleOrderId,
-      orderId: saleOrder.order?.id || null,
+      email_type: 'sale_order',
+      sale_order_id: saleOrderId,
+      order_id: saleOrder.order?.id || undefined,
       status: 'sent',
-      providerMessageId: emailResult?.id || null,
-      providerResponse: emailResult,
+      provider_message_id: emailResult?.id || undefined,
+      provider_response: emailResult,
     });
 
     // Update sale order to mark PDF as sent
@@ -219,29 +251,29 @@ serve(async (req) => {
       }
     );
   } catch (error: any) {
-    console.error("Error:", error);
-    
+    logError("FATAL_ERROR", error, { saleOrderId });
+
     // Log failed email if we have the saleOrderId
     if (saleOrderId) {
       try {
         const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
         const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
         const supabase = createClient(supabaseUrl, supabaseServiceKey);
-        
+
         await logEmail(supabase, {
-          recipientEmail: 'unknown',
+          recipient_email: 'unknown',
           subject: `Sale Order PDF - ${saleOrderId}`,
-          emailType: 'sale_order',
-          saleOrderId: saleOrderId,
+          email_type: 'sale_order',
+          sale_order_id: saleOrderId,
           status: 'failed',
-          errorMessage: error.message || error.toString(),
+          error_message: error.message || error.toString(),
         });
-      } catch (logError) {
+      } catch (logErr) {
         // Ignore logging errors - don't fail the main error response
-        console.error("Failed to log email error:", logError);
+        console.error("Failed to log email error:", logErr);
       }
     }
-    
+
     return new Response(
       JSON.stringify({
         error: error.message || "Failed to send PDF email",
